@@ -1,0 +1,24 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Build artifacts
+app/build/
+app/android/.gradle_home/
+app/android/build/
+app/android/.android_home/
+app/android/app/build/
+app/app/
+*.apk
+*.aab
+
+# Runtime / generated
+server/pb_data/
+server/pb.zip
+server/pocketbase.exe
+downloads/
+
+# OS
+Thumbs.db
+.DS_Store

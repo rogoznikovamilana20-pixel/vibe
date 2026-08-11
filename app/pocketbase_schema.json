@@ -1,0 +1,42 @@
+[
+  {
+    "name": "profiles",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "username", "type": "text", "required": true, "unique": true },
+      { "name": "displayName", "type": "text", "required": false },
+      { "name": "phone", "type": "text", "required": false, "unique": true },
+      { "name": "fcmToken", "type": "text", "required": false },
+      { "name": "uid", "type": "number", "required": false },
+      { "name": "emoji", "type": "text", "required": false },
+      { "name": "avatar", "type": "file", "required": false, "options": { "maxSelect": 1, "maxSize": 5242880, "mimeTypes": ["image/png", "image/jpeg", "image/jpg"] } },
+      { "name": "online", "type": "bool", "required": false }
+    ],
+    "listRule": "", "viewRule": "", "createRule": "", "updateRule": "id = @request.auth.id", "deleteRule": "id = @request.auth.id"
+  },
+  {
+    "name": "chats",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "title", "type": "text", "required": false },
+      { "name": "kind", "type": "text", "required": true },
+      { "name": "members", "type": "relation", "required": true, "options": { "collectionId": "profiles", "cascadeDelete": false, "minSelect": null, "maxSelect": null, "displayFields": null } }
+    ],
+    "listRule": "members ~ @request.auth.id", "viewRule": "members ~ @request.auth.id", "createRule": "@request.auth.id != ''", "updateRule": "members ~ @request.auth.id", "deleteRule": "members ~ @request.auth.id"
+  },
+  {
+    "name": "messages",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "chat", "type": "relation", "required": true, "options": { "collectionId": "chats", "cascadeDelete": true, "minSelect": 1, "maxSelect": 1, "displayFields": null } },
+      { "name": "sender", "type": "relation", "required": true, "options": { "collectionId": "profiles", "cascadeDelete": false, "minSelect": 1, "maxSelect": 1, "displayFields": null } },
+      { "name": "text", "type": "text", "required": false },
+      { "name": "voice", "type": "file", "required": false, "options": { "maxSelect": 1, "maxSize": 10485760, "mimeTypes": ["audio/mpeg", "audio/ogg", "audio/wav", "audio/aac", "audio/m4a"] } },
+      { "name": "photo", "type": "file", "required": false, "options": { "maxSelect": 1, "maxSize": 10485760, "mimeTypes": ["image/png", "image/jpeg", "image/jpg"] } }
+    ],
+    "listRule": "chat.members ~ @request.auth.id", "viewRule": "chat.members ~ @request.auth.id", "createRule": "@request.auth.id != ''", "updateRule": "sender = @request.auth.id", "deleteRule": "sender = @request.auth.id"
+  }
+]
