@@ -36,7 +36,7 @@ class _VibeIconPainter extends CustomPainter {
       }
 
       final bg = Paint()
-        ..shader = ui.Gradient.linear(
+        ..        shader = ui.Gradient.linear(
           Offset(w * 0.15, 0),
           Offset(w * 0.85, h),
           const [
@@ -44,6 +44,7 @@ class _VibeIconPainter extends CustomPainter {
             Color(0xFF8B5CF6),
             Color(0xFF5B21B6),
           ],
+          const [0.0, 0.5, 1.0],
         );
       canvas.drawRect(rect, bg);
 
@@ -110,6 +111,7 @@ Future<void> _render(
   required String path,
 }) async {
   final key = GlobalKey();
+  await tester.binding.setSurfaceSize(Size.square(size));
   await tester.pumpWidget(
     RepaintBoundary(
       key: key,
@@ -122,20 +124,27 @@ Future<void> _render(
   await tester.pump();
   final boundary =
       key.currentContext!.findRenderObject() as RenderRepaintBoundary;
-  final image = await boundary.toImage(pixelRatio: 1);
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 1));
+  final data = await tester.runAsync(
+    () => image!.toByteData(format: ui.ImageByteFormat.png),
+  );
   File(path).writeAsBytesSync(data!.buffer.asUint8List(), flush: true);
-  await _assertPixels(image, size, background: background);
+  await _assertPixels(image!, size,
+      tester: tester, background: background, round: round);
+  await tester.binding.setSurfaceSize(null);
 }
 
 Future<void> _assertPixels(
-    ui.Image image,
-    double size, {
-    required bool background,
-  }) async {
-    final data =
-        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    final bytes = data!.buffer.asUint8List();
+  ui.Image image,
+  double size, {
+  required WidgetTester tester,
+  required bool background,
+  required bool round,
+}) async {
+  final data = await tester.runAsync(
+    () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+  );
+  final bytes = data!.buffer.asUint8List();
 
   int px(double fx, double fy) {
     final x = (size * fx).round();
@@ -152,8 +161,11 @@ Future<void> _assertPixels(
       reason: 'центр V должен быть белым');
 
   if (background) {
-    final r = (px(0.08, 0.08) >> 24) & 0xFF;
-    final b = (px(0.08, 0.08) >> 8) & 0xFF;
+    // Для круглой иконки угол (0.08, 0.08) вне овала-клипа — сэмплим
+    // верх-центр, который гарантированно внутри фигуры.
+    final fx = round ? 0.5 : 0.08;
+    final r = (px(fx, 0.08) >> 24) & 0xFF;
+    final b = (px(fx, 0.08) >> 8) & 0xFF;
     expect(b > r && px(0.50, 0.08) != 0, isTrue,
         reason: 'фон должен быть фиолетовым');
   } else {

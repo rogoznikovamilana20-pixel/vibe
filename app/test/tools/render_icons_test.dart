@@ -49,7 +49,7 @@ Future<void> render(
 void main() {
   testWidgets('Render Vibe app icons', (tester) async {
     final base = Directory.current.path;
-    final res = '$base/app/src/main/res';
+    final res = '$base/android/app/src/main/res';
     const legacySizes = {
       'mipmap-mdpi': 48,
       'mipmap-hdpi': 72,
