@@ -191,4 +191,112 @@ void main() {
       reason: 'текст подставляется в композер для правки',
     );
   });
+
+  testWidgets('удаление по меню: «Удалить для всех» → deleteMessage',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'удалить меня', incoming: false),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.longPress(find.text('удалить меня'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Удалить'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Удалить для всех'));
+    await tester.pumpAndSettle();
+
+    expect(fake.deleteCalls, ['m1']);
+    expect(find.text('удалить меня'), findsNothing);
+  });
+
+  testWidgets('удаление по меню: «Удалить для меня» — только локально',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'удалить локально', incoming: false),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.longPress(find.text('удалить локально'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Удалить'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Удалить для меня'));
+    await tester.pumpAndSettle();
+
+    expect(fake.deleteCalls, isEmpty);
+    expect(find.text('удалить локально'), findsNothing);
+  });
+
+  testWidgets('закрепление по меню: плашка «Закреплённое», открепление',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'закрепи меня', incoming: false),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.longPress(find.text('закрепи меня'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Закрепить'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Закрепить'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('закрепи меня'),
+      findsNWidgets(2),
+      reason: 'текст в пузыре + плашка закреплённого под шапкой',
+    );
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('закрепи меня'), findsOneWidget);
+  });
+
+  testWidgets('пересылка: меню → выбор чата → forwardMessage в цель',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'перешли меня', incoming: false),
+    ];
+    fake.chatList = [
+      VibeChat(
+        id: 'c2',
+        title: 'Мария',
+        kind: 'pm',
+        lastMessage: '',
+        lastTime: '',
+        unread: 0,
+        peerName: 'Мария',
+        peerAvatar: null,
+      ),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.longPress(find.text('перешли меня'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Переслать'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Переслать'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Выберите чаты'), findsOneWidget);
+
+    await tester.tap(find.text('Мария'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Отправить'));
+    await tester.pumpAndSettle();
+
+    expect(fake.forwardCalls, [(chatId: 'c2', text: 'перешли меня')]);
+  });
 }

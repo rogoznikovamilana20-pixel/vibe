@@ -86,6 +86,14 @@ abstract class VibeBackendApi {
   Future<void> setChatArchived(String chatId, {required bool archived});
   Future<void> setChatMuted(String chatId, {required bool muted});
 
+  // ─── Прочее (экраны: пересылка, «Сохранить в Избранное») ───
+  String? get myProfileId;
+  Future<String> ensureSavedChat();
+  Future<VibeMessage?> forwardMessage(
+    String targetChatId,
+    VibeMessage original,
+  );
+
   /// Форматирование времени (в `VibeBackend` — статика, здесь — метод).
   String formatTime(dynamic raw);
 }
@@ -227,6 +235,19 @@ class LiveVibeBackend implements VibeBackendApi {
   @override
   Future<void> setChatMuted(String chatId, {required bool muted}) =>
       _b.setChatMuted(chatId, muted: muted);
+
+  @override
+  String? get myProfileId => _b.myProfileId;
+
+  @override
+  Future<String> ensureSavedChat() => _b.ensureSavedChat();
+
+  @override
+  Future<VibeMessage?> forwardMessage(
+    String targetChatId,
+    VibeMessage original,
+  ) =>
+      _b.forwardMessage(targetChatId, original);
 
   @override
   String formatTime(dynamic raw) => VibeBackend.formatTime(raw);

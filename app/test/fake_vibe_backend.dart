@@ -232,6 +232,32 @@ class FakeVibeBackend implements VibeBackendApi {
     return true;
   }
 
+  // ─── Прочее (экраны: пересылка, «Сохранить в Избранное») ───
+  @override
+  String? get myProfileId => 'me';
+
+  @override
+  Future<String> ensureSavedChat() async {
+    calls.add('ensureSavedChat');
+    return 'saved';
+  }
+
+  final List<({String chatId, String text})> forwardCalls = [];
+
+  @override
+  Future<VibeMessage?> forwardMessage(
+    String targetChatId,
+    VibeMessage original,
+  ) async {
+    calls.add('forwardMessage($targetChatId)');
+    forwardCalls.add((chatId: targetChatId, text: original.text ?? ''));
+    return _sent(
+      targetChatId,
+      text: original.text,
+      forwardedFrom: original.senderName,
+    );
+  }
+
   // ─── Действия ───
   @override
   Future<void> setReaction(
@@ -295,6 +321,7 @@ class FakeVibeBackend implements VibeBackendApi {
     MsgStatus status = MsgStatus.sent,
     DateTime? created,
     bool incoming = false,
+    String? forwardedFrom,
   }) {
     return VibeMessage(
       id: id ?? 'sent-${calls.length}-${DateTime.now().microsecondsSinceEpoch}',
@@ -311,6 +338,7 @@ class FakeVibeBackend implements VibeBackendApi {
       status: status,
       localId: localId,
       stickerEmoji: stickerEmoji,
+      forwardedFrom: forwardedFrom,
     );
   }
 

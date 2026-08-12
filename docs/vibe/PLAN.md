@@ -258,6 +258,18 @@
 ### Проверка
 - `flutter analyze` — 0 issues; `flutter test` — 89/89 (+13: 8 chat_screen + 5 chat_list)
 
+## Phase 3 — Фаза C (порция 7): насыщение тест-покрытия чата (9.3) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 93/93)
+- `chat_screen_test.dart` +4 (12 всего): «Удалить для всех» → deleteMessage + исчезание из ленты; «Удалить для меня» — только локально; «Закрепить» → плашка закреплённого под шапкой + открепление крестиком; «Переслать» → ForwardPickerScreen → выбор чата → forwardMessage в цель
+- DI доведён до конца: `_saveToSaved`/`_openForward` используют `_backend` (widget.backend ?? LiveVibeBackend()) вместо `VibeBackend.instance`; `VibeBackendApi` += `myProfileId`, `ensureSavedChat`, `forwardMessage`; `FakeVibeBackend` реализует (журнал forwardCalls)
+
+### Проверка
+- `flutter analyze` — 0 issues; `flutter test` — 93/93 (+4)
+
+### Следующее
+- Фаза 9.4: короткая ссылка — редактирование (UI + бэкенд); Aurion: после Фаз A/B/C (D7)
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list

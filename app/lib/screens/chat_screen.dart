@@ -740,7 +740,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _saveToSaved(ChatMsg msg) async {
-    final backend = VibeBackend.instance;
+    final backend = _backend;
     try {
       final savedId = await backend.ensureSavedChat();
       if (savedId.isEmpty) {
@@ -757,7 +757,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openForward(ChatMsg msg) async {
-    final backend = VibeBackend.instance;
+    final backend = _backend;
     final me = backend.myProfileId;
     if (me == null) return;
     List<VibeChat> chats;
