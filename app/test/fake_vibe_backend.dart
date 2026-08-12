@@ -1,0 +1,345 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
+import 'package:vibe_app/data/backend.dart';
+import 'package:vibe_app/data/backend_api.dart';
+
+/// In-memory фейк `VibeBackendApi` для unit-тестов контроллеров:
+/// хранит чаты/сообщения в памяти и позволяет эмитить realtime-события
+/// вручную (как это делает живой websocket).
+class FakeVibeBackend implements VibeBackendApi {
+  final streamCtrl = StreamController<VibeMessage>.broadcast();
+  final msgEventsCtrl = StreamController<VibeMsgEvent>.broadcast();
+  final typingCtrl = StreamController<String>.broadcast();
+  final chatEventsCtrl = StreamController<void>.broadcast();
+
+  final presenceNotifier = ValueNotifier<int>(0);
+  @override
+  final ValueNotifier<Set<String>> archivedNotifier = ValueNotifier({});
+  @override
+  final ValueNotifier<Set<String>> mutedNotifier = ValueNotifier({});
+
+  @override
+  final ValueNotifier<int> connectivityVersion = ValueNotifier<int>(0);
+
+  @override
+  bool get isOffline => false;
+
+  /// Заготовка для ленты сториз (экран списка читает для кружков).
+  List<VibeStory> stories = [];
+
+  @override
+  Future<List<VibeStory>> listStories() async {
+    calls.add('listStories');
+    return List.of(stories);
+  }
+
+  /// Лента сообщений чата (newest-first), как возвращает бэкенд.
+  final Map<String, List<VibeMessage>> messagesByChat = {};
+
+  /// Живая лента чатов (`listChats`) и офлайн-кэш.
+  List<VibeChat> chatList = [];
+  List<VibeChat> offlineCache = [];
+
+  // ─── Журнал вызовов ───
+  final List<String> calls = [];
+  String? lastTextSent;
+  String? lastReplyText;
+  String? lastReplyAuthor;
+  String? lastStickerSent;
+  int markReadCalls = 0;
+  int refreshReactionsCalls = 0;
+  int sendTypingCalls = 0;
+  final List<({String id, bool archived})> setArchivedCalls = [];
+  final List<({String id, bool muted})> setMutedCalls = [];
+  final List<String> deleteCalls = [];
+  final List<({String chatId, String messageId, String emoji})> reactions =
+      [];
+  String? lastUpdatedMessageId;
+  String? lastUpdatedText;
+
+  /// Если true — `sendText` бросает исключение (эмуляция сетевой ошибки).
+  bool throwOnSendText = false;
+
+  /// Если true — `sendText` эмитит подтверждённое сообщение в `stream`
+  /// (как живой бэкенд). Выключите, чтобы проверить оптимистичный статус.
+  bool emitOnSend = true;
+
+  @override
+  Stream<VibeMessage> get stream => streamCtrl.stream;
+
+  @override
+  Stream<VibeMsgEvent> get msgEvents => msgEventsCtrl.stream;
+
+  @override
+  Stream<String> get typingEvents => typingCtrl.stream;
+
+  @override
+  Stream<void> get chatEvents => chatEventsCtrl.stream;
+
+  @override
+  ValueListenable<int> get presenceVersion => presenceNotifier;
+
+  // ─── Чаты ───
+  @override
+  Future<List<VibeChat>> listChats() async {
+    calls.add('listChats');
+    return List.of(chatList);
+  }
+
+  @override
+  Future<List<VibeChat>> getOfflineChats() async {
+    calls.add('getOfflineChats');
+    return List.of(offlineCache);
+  }
+
+  // ─── Сообщения ───
+  @override
+  Future<List<VibeMessage>> listMessages(
+    String chatId, {
+    int? limit,
+    DateTime? before,
+  }) async {
+    calls.add('listMessages($chatId)');
+    var list = messagesByChat[chatId] ?? const <VibeMessage>[];
+    if (before != null) {
+      list = list.where((m) => m.created.isBefore(before)).toList();
+    }
+    if (limit != null && list.length > limit) {
+      list = list.sublist(0, limit);
+    }
+    return List.of(list);
+  }
+
+  @override
+  Future<VibeMessage> sendText(
+    String chatId,
+    String text, {
+    String? localId,
+    String? replyText,
+    String? replyAuthor,
+  }) async {
+    if (throwOnSendText) {
+      throw Exception('network');
+    }
+    calls.add('sendText($chatId)');
+    lastTextSent = text;
+    lastReplyText = replyText;
+    lastReplyAuthor = replyAuthor;
+    final sent = _sent(
+      chatId,
+      text: text,
+      localId: localId,
+      status: MsgStatus.sent,
+    );
+    if (emitOnSend) streamCtrl.add(sent);
+    return sent;
+  }
+
+  @override
+  Future<VibeMessage> sendSticker(
+    String chatId,
+    String emoji, {
+    String? localId,
+  }) async {
+    calls.add('sendSticker($chatId)');
+    lastStickerSent = emoji;
+    final sent = _sent(
+      chatId,
+      stickerEmoji: emoji,
+      localId: localId,
+      status: MsgStatus.sent,
+    );
+    streamCtrl.add(sent);
+    return sent;
+  }
+
+  @override
+  Future<VibeMessage> sendPhoto(
+    String chatId,
+    Uint8List bytes, {
+    String? localId,
+    String? localPath,
+  }) async {
+    calls.add('sendPhoto($chatId)');
+    final sent = _sent(
+      chatId,
+      photoPath: 'media/$chatId/photo.jpg',
+      localId: localId,
+      status: MsgStatus.sent,
+      created: DateTime.now(),
+    );
+    streamCtrl.add(sent);
+    return sent;
+  }
+
+  @override
+  Future<VibeMessage> sendVoice(
+    String chatId,
+    File voiceFile, {
+    String? localId,
+    String? localPath,
+    int? voiceSeconds,
+  }) async {
+    calls.add('sendVoice($chatId)');
+    final sent = _sent(
+      chatId,
+      voicePath: localPath ?? voiceFile.path,
+      localId: localId,
+      status: MsgStatus.sent,
+    );
+    streamCtrl.add(sent);
+    return sent;
+  }
+
+  @override
+  Future<VibeMessage> sendVideo(
+    String chatId,
+    File videoFile, {
+    String? localId,
+    String? localPath,
+  }) async {
+    calls.add('sendVideo($chatId)');
+    final sent = _sent(
+      chatId,
+      videoPath: localPath ?? videoFile.path,
+      localId: localId,
+      status: MsgStatus.sent,
+    );
+    streamCtrl.add(sent);
+    return sent;
+  }
+
+  @override
+  Future<VibeMessage?> updateMessage(String messageId, String newText) async {
+    calls.add('updateMessage($messageId)');
+    lastUpdatedMessageId = messageId;
+    lastUpdatedText = newText;
+    return _sent(
+      'x',
+      text: newText,
+      id: messageId,
+      status: MsgStatus.sent,
+    );
+  }
+
+  @override
+  Future<bool> deleteMessage(String messageId) async {
+    calls.add('deleteMessage($messageId)');
+    deleteCalls.add(messageId);
+    return true;
+  }
+
+  // ─── Действия ───
+  @override
+  Future<void> setReaction(
+    String chatId,
+    String messageId,
+    String emoji,
+  ) async {
+    reactions.add((chatId: chatId, messageId: messageId, emoji: emoji));
+  }
+
+  @override
+  Future<void> refreshChatReactions(String chatId) async {
+    refreshReactionsCalls++;
+  }
+
+  @override
+  Future<void> sendTyping(String chatId) async {
+    sendTypingCalls++;
+  }
+
+  @override
+  Future<void> markChatRead(String chatId) async {
+    markReadCalls++;
+  }
+
+  @override
+  Future<void> setChatArchived(String chatId, {required bool archived}) async {
+    setArchivedCalls.add((id: chatId, archived: archived));
+    if (archived) {
+      archivedNotifier.value = {...archivedNotifier.value, chatId};
+    } else {
+      archivedNotifier.value = {
+        ...archivedNotifier.value,
+      }..remove(chatId);
+    }
+  }
+
+  @override
+  Future<void> setChatMuted(String chatId, {required bool muted}) async {
+    setMutedCalls.add((id: chatId, muted: muted));
+    if (muted) {
+      mutedNotifier.value = {...mutedNotifier.value, chatId};
+    } else {
+      mutedNotifier.value = {...mutedNotifier.value}..remove(chatId);
+    }
+  }
+
+  @override
+  String formatTime(dynamic raw) => VibeBackend.formatTime(raw);
+
+  // ─── Помощники ───
+  VibeMessage _sent(
+    String chatId, {
+    String? text,
+    String? stickerEmoji,
+    String? photoPath,
+    String? voicePath,
+    String? videoPath,
+    String? localId,
+    String? id,
+    MsgStatus status = MsgStatus.sent,
+    DateTime? created,
+    bool incoming = false,
+  }) {
+    return VibeMessage(
+      id: id ?? 'sent-${calls.length}-${DateTime.now().microsecondsSinceEpoch}',
+      chatId: chatId,
+      senderId: 'me',
+      senderName: 'Я',
+      senderAvatar: null,
+      text: text,
+      voicePath: voicePath,
+      photoPath: photoPath,
+      videoPath: videoPath,
+      created: created ?? DateTime.now(),
+      incoming: incoming,
+      status: status,
+      localId: localId,
+      stickerEmoji: stickerEmoji,
+    );
+  }
+
+  /// Стандартное входящее сообщение для ручной эмуляции realtime.
+  VibeMessage incomingMessage({
+    String chatId = 'c1',
+    String text = 'hi',
+    String? id,
+  }) {
+    return VibeMessage(
+      id: id ?? 'in-${DateTime.now().microsecondsSinceEpoch}',
+      chatId: chatId,
+      senderId: 'peer',
+      senderName: 'Пир',
+      senderAvatar: null,
+      text: text,
+      voicePath: null,
+      photoPath: null,
+      videoPath: null,
+      created: DateTime.now(),
+      incoming: true,
+      status: MsgStatus.sent,
+    );
+  }
+
+  void close() {
+    streamCtrl.close();
+    msgEventsCtrl.close();
+    typingCtrl.close();
+    chatEventsCtrl.close();
+  }
+}

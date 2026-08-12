@@ -31,8 +31,18 @@ class NotificationService {
   NotificationService._();
   static final instance = NotificationService._();
 
-  final _fcm = FirebaseMessaging.instance;
   final _local = FlutterLocalNotificationsPlugin();
+
+  /// FCM-часть доступна только когда Firebase инициализирован (в widget-тестах
+  /// его нет — лениво возвращаем null, и всё FCM-ветки тихо отключаются).
+  FirebaseMessaging? _fcm;
+  FirebaseMessaging? get _messaging {
+    try {
+      return _fcm ??= FirebaseMessaging.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// События для in-app баннеров (приходят, когда приложение на экране).
   final _events = StreamController<VibePushEvent>.broadcast();
@@ -74,7 +84,9 @@ class NotificationService {
   }
 
   Future<void> _initFcm() async {
-    final settings = await _fcm.requestPermission(
+    final messaging = _messaging;
+    if (messaging == null) return; // нет Firebase (widget-тесты)
+    final settings = await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -82,7 +94,7 @@ class NotificationService {
     debugPrint('FCM permission: ${settings.authorizationStatus}');
     await _syncToken();
 
-    _fcm.onTokenRefresh.listen((_) => _syncToken());
+    messaging.onTokenRefresh.listen((_) => _syncToken());
 
     // Приложение открыто, получено сообщение в foreground -> баннер.
     FirebaseMessaging.onMessage.listen((msg) {
@@ -105,7 +117,7 @@ class NotificationService {
     });
 
     // Приложение запущено из трея (tap по уведомлению в завёрнутом виде).
-    final initial = await _fcm.getInitialMessage();
+    final initial = await _messaging?.getInitialMessage();
     if (initial != null) {
       final chatId = initial.data['chatId'];
       if (chatId != null && chatId.isNotEmpty) {
@@ -253,7 +265,7 @@ class NotificationService {
 
   Future<void> _syncToken() async {
     try {
-      final token = await _fcm.getToken();
+      final token = await _messaging?.getToken();
       if (token == null) return;
       debugPrint('FCM token synced');
       if (VibeBackend.instance.myProfileId != null) {

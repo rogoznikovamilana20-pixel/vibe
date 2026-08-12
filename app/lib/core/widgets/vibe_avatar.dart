@@ -18,6 +18,11 @@ class VibeNetImage extends StatefulWidget {
     this.errorBuilder,
   });
 
+  /// Резолвер пути в подписанный URL (по умолчанию — живой бэкенд;
+  /// в unit-тестах подменяется фейком).
+  static Future<String?> Function(String? source) resolveUrl =
+      (s) => VibeBackend.instance.mediaUrl(s);
+
   /// Путь в бакете, старый публичный URL или локальный путь.
   final String? source;
   final BoxFit fit;
@@ -37,7 +42,7 @@ class _VibeNetImageState extends State<VibeNetImage> {
   Future<String?> _urlFor(String? source) {
     if (source != _lastSource || _future == null) {
       _lastSource = source;
-      _future = VibeBackend.instance.mediaUrl(source);
+      _future = VibeNetImage.resolveUrl(source);
     }
     return _future!;
   }

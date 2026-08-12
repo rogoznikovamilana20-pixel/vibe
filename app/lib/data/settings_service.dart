@@ -257,4 +257,18 @@ class SettingsService {
   Future<void> setStoriesHintShown() async {
     await _prefs.setBool(_keyStoriesHint, true);
   }
+
+  // Черновики сообщений: chatId → текст (как в ТГ — «Черновик: …» в списке)
+  static const _keyDrafts = 'vibe_drafts';
+
+  String? draftFor(String chatId) => _prefs.getString('$_keyDrafts:$chatId');
+
+  /// Сохранить черновик; `null`/пустой — удалить.
+  Future<void> setDraft(String chatId, String? text) async {
+    if (text == null || text.trim().isEmpty) {
+      await _prefs.remove('$_keyDrafts:$chatId');
+    } else {
+      await _prefs.setString('$_keyDrafts:$chatId', text);
+    }
+  }
 }
