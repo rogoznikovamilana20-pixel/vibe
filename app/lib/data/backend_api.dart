@@ -94,6 +94,15 @@ abstract class VibeBackendApi {
     VibeMessage original,
   );
 
+  // ─── Профиль ───
+  Future<bool> isUsernameAvailable(String username);
+  Future<void> updateProfile({
+    required String username,
+    required String displayName,
+    String? emoji,
+    String? bio,
+  });
+
   /// Форматирование времени (в `VibeBackend` — статика, здесь — метод).
   String formatTime(dynamic raw);
 }
@@ -248,6 +257,24 @@ class LiveVibeBackend implements VibeBackendApi {
     VibeMessage original,
   ) =>
       _b.forwardMessage(targetChatId, original);
+
+  @override
+  Future<bool> isUsernameAvailable(String username) =>
+      _b.isUsernameAvailable(username);
+
+  @override
+  Future<void> updateProfile({
+    required String username,
+    required String displayName,
+    String? emoji,
+    String? bio,
+  }) =>
+      _b.updateProfile(
+        username: username,
+        displayName: displayName,
+        emoji: emoji,
+        bio: bio,
+      );
 
   @override
   String formatTime(dynamic raw) => VibeBackend.formatTime(raw);

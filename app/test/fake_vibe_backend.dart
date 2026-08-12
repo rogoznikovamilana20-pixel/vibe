@@ -258,6 +258,29 @@ class FakeVibeBackend implements VibeBackendApi {
     );
   }
 
+  // ─── Профиль ───
+  final Set<String> takenUsernames = {};
+  int updateProfileCalls = 0;
+  String? lastUsernameUpdated;
+
+  @override
+  Future<bool> isUsernameAvailable(String username) async {
+    calls.add('isUsernameAvailable($username)');
+    return !takenUsernames.contains(username.trim().toLowerCase());
+  }
+
+  @override
+  Future<void> updateProfile({
+    required String username,
+    required String displayName,
+    String? emoji,
+    String? bio,
+  }) async {
+    calls.add('updateProfile($username)');
+    updateProfileCalls++;
+    lastUsernameUpdated = username;
+  }
+
   // ─── Действия ───
   @override
   Future<void> setReaction(

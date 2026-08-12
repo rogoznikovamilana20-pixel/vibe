@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_spacing.dart';
@@ -7,12 +9,16 @@ import '../core/widgets/vibe_input.dart';
 import '../core/widgets/settings_widgets.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
+import '../data/backend_api.dart';
 import 'aurion_screen.dart';
 
 /// Редактирование данных аккаунта — аналог экрана
 /// «Изменить данные» в профиле Telegram.
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+  const EditProfileScreen({super.key, this.backend});
+
+  /// Инжектируемый бэкенд (widget-тесты); null — живой `VibeBackend`.
+  final VibeBackendApi? backend;
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -22,7 +28,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _name;
   late final TextEditingController _username;
   late final TextEditingController _bio;
+  late final VibeBackendApi _backend = widget.backend ?? LiveVibeBackend();
   bool _saving = false;
+  bool _usernameTaken = false;
+  Timer? _checkTimer;
 
   @override
   void initState() {
@@ -35,10 +44,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    _checkTimer?.cancel();
     _name.dispose();
     _username.dispose();
     _bio.dispose();
     super.dispose();
+  }
+
+  /// Живая проверка ника на занятость (с дебаунсом, как в Telegram).
+  Future<void> _checkUsername(String val) async {
+    _checkTimer?.cancel();
+    final clean = val.trim();
+    final mine = VibeBackend.myProfileNotifier.value?.username ?? '';
+    if (clean.isEmpty || clean.toLowerCase() == mine.toLowerCase()) {
+      setState(() => _usernameTaken = false);
+      return;
+    }
+    _checkTimer = Timer(const Duration(milliseconds: 300), () async {
+      final available = await _backend.isUsernameAvailable(clean);
+      if (!mounted) return;
+      setState(() => _usernameTaken = !available);
+    });
   }
 
   Future<void> _save() async {
@@ -47,9 +73,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _snack('Введите имя');
       return;
     }
+    if (_usernameTaken) {
+      _snack('Этот никнейм уже занят');
+      return;
+    }
     setState(() => _saving = true);
     try {
-      await VibeBackend.instance.updateProfile(
+      await _backend.updateProfile(
         username: _username.text.trim().isEmpty
             ? (VibeBackend.myProfileNotifier.value?.username ?? 'user')
             : _username.text.trim(),
@@ -105,6 +135,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   VibeInput(
                     controller: _username,
                     hint: 'Имя пользователя (@ник)',
+                    errorText: _usernameTaken ? 'Этот никнейм уже занят' : null,
+                    onChanged: _checkUsername,
                     onSubmitted: (_) => _save(),
                   ),
                   const SizedBox(height: VibeSpacing.md),

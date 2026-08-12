@@ -791,6 +791,7 @@ class VibeBackend {
         .from('profiles')
         .select('id')
         .eq('username', clean)
+        .neq('id', myProfileId ?? '')
         .maybeSingle();
     return res == null;
   }
