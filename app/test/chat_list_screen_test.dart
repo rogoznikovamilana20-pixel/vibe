@@ -132,4 +132,27 @@ void main() {
 
     expect(find.byIcon(Icons.clear_rounded), findsNothing);
   });
+
+  testWidgets('навигация: тап по чату → ChatScreen с тем же backend → назад',
+      (tester) async {
+    fake.chatList = [chatX(id: 'c1', title: 'Иван', lastMessage: 'Привет!')];
+    fake.messagesByChat['c1'] = [
+      fake.incomingMessage(chatId: 'c1', text: 'сообщение из чата', id: 'm1'),
+    ];
+
+    await pumpList(tester);
+
+    await tester.tap(find.text('Иван'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('сообщение из чата'), findsOneWidget,
+        reason: 'ChatScreen должен получить от чат-листа тот же backend');
+    expect(find.byType(TextField), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Иван'), findsOneWidget);
+    expect(find.text('Привет!'), findsOneWidget);
+  });
 }

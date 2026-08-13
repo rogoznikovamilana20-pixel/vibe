@@ -99,6 +99,17 @@ void main() {
     expect(find.textContaining('На что я отвечаю'), findsOneWidget);
   });
 
+  testWidgets('MessageBubble: длинный ответ (>50 симв.) не ломает верстку',
+      (tester) async {
+    final long = List.filled(12, 'очень длинный ответ-цитата').join(' ');
+    expect(long.length, greaterThan(50));
+
+    await tester.pumpWidget(wrap(textMsg(replyText: long)));
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('очень длинный ответ-цитата'), findsOneWidget);
+  });
+
   testWidgets('MessageBubble: метка «изменено»', (tester) async {
     await tester.pumpWidget(wrap(textMsg(edited: true)));
 

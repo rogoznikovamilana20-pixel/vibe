@@ -1310,7 +1310,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         } else {
           await Navigator.of(context).push(
             PageRouteBuilder(
-              pageBuilder: (_, _, _) => ChatScreen(chat: chat),
+              pageBuilder: (_, _, _) =>
+                  ChatScreen(chat: chat, backend: _backend),
               transitionsBuilder: (_, animation, _, child) {
                 return FadeTransition(
                   opacity: animation,
