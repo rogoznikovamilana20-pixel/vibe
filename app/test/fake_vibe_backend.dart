@@ -248,6 +248,14 @@ class FakeVibeBackend implements VibeBackendApi {
     hiddenMessageIds.add(messageId);
   }
 
+  final List<String> clearHistoryCalls = [];
+
+  @override
+  Future<void> clearHistory(String chatId) async {
+    calls.add('clearHistory($chatId)');
+    clearHistoryCalls.add(chatId);
+  }
+
   // ─── Прочее (экраны: пересылка, «Сохранить в Избранное») ───
   @override
   String? get myProfileId => 'me';

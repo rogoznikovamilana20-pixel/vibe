@@ -451,8 +451,34 @@ class _ChatScreenState extends State<ChatScreen> {
           Navigator.of(sheetCtx).pop();
           _openMedia();
         },
+        onClearHistory: () => _confirmClearHistory(),
       ),
     );
+  }
+
+  Future<void> _confirmClearHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Очистить историю?'),
+        content: const Text(
+          'Все сообщения этого чата будут удалены у всех участников.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Очистить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _chat.clearHistory();
+    }
   }
 
   void _openMedia() {

@@ -79,6 +79,7 @@ abstract class VibeBackendApi {
   Future<List<MessageEdit>> listMessageEdits(String messageId);
   Future<bool> deleteMessage(String messageId);
   Future<void> hideMessageForMe(String messageId);
+  Future<void> clearHistory(String chatId);
 
   // ─── Действия ───
   Future<void> setReaction(String chatId, String messageId, String emoji);
@@ -232,6 +233,9 @@ class LiveVibeBackend implements VibeBackendApi {
   @override
   Future<void> hideMessageForMe(String messageId) =>
       _b.hideMessageForMe(messageId);
+
+  @override
+  Future<void> clearHistory(String chatId) => _b.clearHistory(chatId);
 
   @override
   Future<void> setReaction(String chatId, String messageId, String emoji) =>

@@ -333,4 +333,28 @@ void main() {
     expect(find.text('первая версия'), findsOneWidget);
     expect(fake.calls, contains('listMessageEdits(m1)'));
   });
+
+  testWidgets('очистить историю: меню чата → подтверждение → clearHistory',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'старое сообщение'),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Очистить историю'), findsOneWidget);
+    await tester.tap(find.text('Очистить историю'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Очистить историю?'), findsOneWidget);
+
+    await tester.tap(find.text('Очистить'));
+    await tester.pumpAndSettle();
+
+    expect(fake.clearHistoryCalls, ['c1']);
+    expect(find.text('старое сообщение'), findsNothing);
+  });
 }

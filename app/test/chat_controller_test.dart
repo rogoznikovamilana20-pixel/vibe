@@ -192,15 +192,15 @@ void main() {
       expect(controller.editingIdx, isNull);
     });
 
-    test('send(): ошибка бэкенда — onError без падения', () async {
+    test('send(): ошибка бэкенда — onError + статус failed (реальный поток)', () async {
       await controller.load();
       fake.throwOnSendText = true;
 
       await controller.send('привет');
       expect(errors, ['Не удалось отправить сообщение']);
-      // Оптимистичный пузырь остаётся в ленте (не падаем, статус sending).
       expect(controller.messages.first.text, 'привет');
-      expect(controller.messages.first.status, MsgStatus.sending);
+      expect(controller.messages.first.status, MsgStatus.failed,
+          reason: 'сбой сети должен помечать исходящее failed (не sending)');
     });
 
     test('sendSticker(): эмодзи-стикер уходит и подтверждается', () async {

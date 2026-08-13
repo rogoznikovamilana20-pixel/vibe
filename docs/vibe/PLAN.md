@@ -328,6 +328,22 @@
 ### Следующее
 - Фаза 9.8: тесты реального потока сообщений (send/read-confirm/erase/«безопасный UID»); Aurion: после Фаз A/B/C (D7)
 
+## Phase 3 — Фаза C (порция 12): тесты реального потока сообщений (9.8) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 100/100)
+- **Erase (очистить историю) — из заглушки в фичу**:
+  - `ChatMenuSheet.onClearHistory` (nullable; без него — прежняя заглушка «в v2.0»)
+  - `chat_screen` → диалог подтверждения («Очистить историю?» → «Очистить»/«Отмена») → `ChatController.clearHistory()`: сервер `clearHistory(chatId)` + очистка ленты локально (не жду realtime)
+  - `VibeBackendApi` += `clearHistory`; `FakeVibeBackend` журналирует
+- **Фикс реального потока (пойман при аудите 9.8)**: при сбое отправки исходящее оставалось `sending` навсегда — теперь `send`/`sendSticker`/`sendVoice`/`sendVideo` помечают сообщение `MsgStatus.failed` (пузырь показывает «повторить»)
+- Тесты: `chat_screen_test` +1 «очистить историю» (меню → подтверждение → clearHistory + лента пуста); `chat_controller_test` send-ошибка теперь проверяет `failed`
+
+### Проверка
+- `flutter analyze` — 0 issues; `flutter test` — 100/100
+
+### Следующее
+- Фаза 9.9: логика и фиксы (навигация по чатам, вложенные ответы >50, стейт-менеджмент); Aurion: после Фаз A/B/C (D7)
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list

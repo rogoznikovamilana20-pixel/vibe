@@ -329,6 +329,10 @@ class ChatController extends ChangeNotifier {
       );
       clearDraft();
     } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
       onError('Не удалось отправить сообщение');
     }
   }
@@ -348,6 +352,10 @@ class ChatController extends ChangeNotifier {
     try {
       await backend.sendSticker(chatId, emoji, localId: localId);
     } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
       onError('Не удалось отправить стикер');
     }
   }
@@ -398,6 +406,10 @@ class ChatController extends ChangeNotifier {
         voiceSeconds: seconds,
       );
     } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
       onError('Не удалось отправить голосовое');
     }
   }
@@ -418,6 +430,10 @@ class ChatController extends ChangeNotifier {
       await backend
           .sendVideo(chatId, file, localId: localId, localPath: file.path);
     } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
       onError('Не удалось отправить видеокружок');
     }
   }
@@ -514,6 +530,19 @@ class ChatController extends ChangeNotifier {
     pinMsgId = serverId;
     SettingsService.instance.setPinnedMessageId(chatId, serverId);
     notifyListeners();
+  }
+
+  /// «Очистить историю»: сервер удаляет сообщения чата, лента очищается
+  /// локально сразу (не дожидаясь realtime-подтверждения).
+  Future<void> clearHistory() async {
+    try {
+      await backend.clearHistory(chatId);
+      if (_disposed) return;
+      messages.clear();
+      notifyListeners();
+    } catch (_) {
+      onError('Не удалось очистить историю');
+    }
   }
 
   /// Прыжок к закреплённому: сообщение временно поднимается к низу экрана
