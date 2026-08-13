@@ -36,10 +36,11 @@
 | 1.6 PIN: хэш+соль, блокировка 5 попыток | ✅ (+тесты 3) | 13.08.2026 |
 | 2.8 Ключи локализации шапок настроек | ✅ (generalSettings + тесты 2) | 13.08.2026 |
 | 2.10 Демо-сториз за флагом | ✅ (showDemoStories=false) | 13.08.2026 |
+| 2.11 Кликабельная аватарка profile_setup | ✅ (AvatarActionSheet DRY + тесты 3) | 13.08.2026 |
 
 ## Тестовый щит (на 13.08.2026)
 - `flutter analyze` — **0 issues**
-- `flutter test` — **112/112**
+- `flutter test` — **115/115**
 - `flutter build apk --release` — OK (65.9 MB)
 - CI-гейт `app/tool/verify.ps1` — passed (EXIT=0)
 

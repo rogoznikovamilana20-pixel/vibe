@@ -1,14 +1,19 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../core/profile_avatar.dart';
 import '../core/services/notification_service.dart';
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
+import '../core/widgets/avatar_action_sheet.dart';
 import '../core/widgets/vibe_button.dart';
 import '../core/widgets/vibe_input.dart';
 import '../data/backend.dart';
+import 'avatar_editor_screen.dart';
 import 'root_shell.dart';
 
 /// Создание профиля: имя + эмодзи-аватарка.
@@ -90,6 +95,35 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  /// Клик по аватарке: галерея / камера / удалить (как в профиле).
+  Future<void> _changeAvatar() async {
+    HapticFeedback.lightImpact();
+    final action = await AvatarActionSheet.show(context);
+    if (action == null || !mounted) return;
+    Uint8List? bytes;
+    if (action == 'gal') {
+      bytes = await AvatarEditorScreen.pickAndEdit(context);
+    } else if (action == 'cam') {
+      bytes = await AvatarEditorScreen.takeAndEdit(context);
+    } else if (action == 'del') {
+      await ProfileAvatar.remove();
+      try {
+        await VibeBackend.instance.removeRemoteAvatar();
+      } catch (_) {}
+      if (mounted) _snack('Аватар удалён');
+      return;
+    }
+    if (bytes != null) {
+      await ProfileAvatar.save(bytes);
+      try {
+        await VibeBackend.instance.uploadAvatar(bytes);
+        if (mounted) _snack('Аватар обновлён · синхронизирован');
+      } catch (_) {
+        if (mounted) _snack('Аватар обновлён (без синхронизации)');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,18 +144,30 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 style: VibeTypography.body.copyWith(color: context.vibeTextSecondary),
               ),
               const SizedBox(height: 40),
-              Center(
-                child: GestureDetector(
-                  onTap: () {}, // Аватарка пока только из эмодзи
-                  child: Container(
+              GestureDetector(
+                onTap: _changeAvatar,
+                child: ValueListenableBuilder<Uint8List?>(
+                  valueListenable: ProfileAvatar.myPhoto,
+                  builder: (context, photo, _) => Container(
                     width: 100,
                     height: 100,
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: context.vibeSurfaceVariant,
-                      border: Border.all(color: context.vibePrimary, width: 1.5),
+                      border: Border.all(
+                        color: context.vibePrimary,
+                        width: photo == null ? 1.5 : 2,
+                      ),
                     ),
-                    child: Center(child: Text(_emoji ?? '🙂', style: const TextStyle(fontSize: 48))),
+                    child: photo != null
+                        ? Image.memory(photo, fit: BoxFit.cover)
+                        : Center(
+                            child: Text(
+                              _emoji ?? '🙂',
+                              style: const TextStyle(fontSize: 48),
+                            ),
+                          ),
                   ),
                 ),
               ),

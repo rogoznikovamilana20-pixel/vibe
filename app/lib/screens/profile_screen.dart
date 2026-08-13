@@ -9,6 +9,7 @@ import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_avatar.dart';
+import '../core/widgets/avatar_action_sheet.dart';
 import '../core/widgets/vibe_button.dart';
 import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
@@ -517,12 +518,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _changeAvatar(BuildContext context) async {
     HapticFeedback.lightImpact();
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _AvatarSheet(),
-    );
+    final action = await AvatarActionSheet.show(context);
     if (action == null || !context.mounted) return;
     Uint8List? bytes;
     if (action == 'gal') {
@@ -694,47 +690,6 @@ class _SectionHeader extends StatelessWidget {
             color: context.vibeTextSecondary,
             fontWeight: FontWeight.w600,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarSheet extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    Widget item(IconData icon, String label, String value, Color color) =>
-        ListTile(
-          leading: Icon(icon, color: color),
-          title: Text(
-            label,
-            style: VibeTypography.bodyMedium.copyWith(color: color),
-          ),
-          trailing: const Icon(
-            Icons.chevron_right_rounded,
-            color: VibeColors.textTertiaryDark,
-          ),
-          onTap: () => Navigator.of(context).pop(value),
-        );
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.all(VibeSpacing.md),
-        padding: const EdgeInsets.all(VibeSpacing.xs),
-        decoration: BoxDecoration(
-          color: context.vibeSurfaceHigh,
-          borderRadius: BorderRadius.circular(VibeRadius.bottomSheet),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            item(Icons.photo_library_outlined, 'Выбрать из галереи', 'gal',
-                context.vibeTextPrimary),
-            item(Icons.photo_camera_outlined, 'Сделать фото', 'cam',
-                context.vibeTextPrimary),
-            item(Icons.delete_outline_rounded, 'Удалить аватар', 'del',
-                VibeColors.error),
-          ],
         ),
       ),
     );

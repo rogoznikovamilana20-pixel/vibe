@@ -456,6 +456,22 @@
 ### Следующее
 - Фаза 2: остался 2.11 (кликабельная аватарка в profile_setup); 1.7/1.8 крипто; 3.x персистентность; 5.x скорость; 8.x UX
 
+## Phase 3 — Фаза C (порция 21): кликабельная аватарка (2.11) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 115/115, CI-гейт EXIT=0)
+- **2.11**: аватарка в `ProfileSetupScreen` стала рабочей (была заглушка `onTap: () {}`):
+  - новый общий виджет `AvatarActionSheet` (core/widgets) — шит «Выбрать из галереи / Сделать фото / Удалить аватар»; из `profile_screen` дубль `_AvatarSheet` удалён (DRY)
+  - в profile_setup: тап → шит → `pickAndEdit`/`takeAndEdit` (editor) → `ProfileAvatar.save` + `uploadAvatar` (сбой синка — честный snack «без синхронизации»); `del` → `remove` + `removeRemoteAvatar`
+  - аватарка рендерит фото из `ProfileAvatar.myPhoto` (или эмодзи), рамка толще при фото
+- `test/profile_setup_screen_test.dart` (3): шит открывается/закрывается, выбор эмодзи обновляет аватар, фото показывается
+- Попутно починен assert: ListTile в DecoratedBox без Material (было бы видно и в профиле на debug-сборках) — обёртка `Material(type: transparency)`
+
+### Проверка
+- analyze 0; `verify.ps1` passed; 115/115 (+3)
+
+### Следующее
+- Фаза 2 закрыта полностью. Далее: 3.x (персистентность), 5.x (скорость), 1.7/1.8 (крипто), 8.x UX
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list

@@ -36,7 +36,7 @@
 - [x] 2.8 Кривые ключи локализации в шапках секций настроек ✅ (13.08.2026): секция «Настройки» дублировала заголовок экрана — новый ключ `generalSettings` («Основные настройки»/«General Settings»); test/settings_screen_test.dart (2: ru/en без дублей)
 - [x] 2.9 Дубли DND/архива (свайп ↔ меню) — единый обработчик
 - [x] 2.10 Демо-сториз `MockData.storyNames` за флаг ✅ (флаг `showDemoStories = false`, ветка в chat_list_screen за флагом, 13.08.2026 — аудит)
-- [ ] 2.11 Кликабельная аватарка в `profile_setup_screen`
+- [x] 2.11 Кликабельная аватарка в `profile_setup_screen` ✅ (13.08.2026): общий виджет `AvatarActionSheet` (галерея/камера/удалить — как в профиле), фото из ProfileAvatar показывается; test/profile_setup_screen_test.dart (3)
 
 ## ФАЗА 3 — Персистентность «как облако ТГ»
 - [x] 3.1 Реакции на сервер (`message_reactions`) + realtime + счётчики
