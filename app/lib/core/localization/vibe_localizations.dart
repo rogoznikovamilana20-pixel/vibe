@@ -90,6 +90,7 @@ class VibeLocalizations {
       'auto_lock_off': 'Выключено',
       'auto_lock_immediately': 'Сразу',
       'languages_available': 'Доступные сейчас: Русский и English. Остальные — скоро.',
+      'general_settings': 'Основные настройки',
     },
     'en': {
       'settings': 'Settings',
@@ -171,6 +172,7 @@ class VibeLocalizations {
       'auto_lock_off': 'Disabled',
       'auto_lock_immediately': 'Immediately',
       'languages_available': 'Available now: Russian and English. Others coming soon.',
+      'general_settings': 'General Settings',
     },
   };
 
@@ -255,6 +257,7 @@ class VibeLocalizations {
   String get autoLockOff => _get('auto_lock_off');
   String get autoLockImmediately => _get('auto_lock_immediately');
   String get languagesAvailable => _get('languages_available');
+  String get generalSettings => _get('general_settings');
 }
 
 class VibeLocalizationsDelegate extends LocalizationsDelegate<VibeLocalizations> {

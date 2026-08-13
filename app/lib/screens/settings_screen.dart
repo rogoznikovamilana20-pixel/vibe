@@ -63,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildAccountCard(context),
                 const SizedBox(height: VibeSpacing.lg),
                 SettingsSection(
-                  title: l.settings,
+                  title: l.generalSettings,
                   children: [
                     SettingsTile(
                       icon: Icons.notifications_none_rounded,

@@ -19,7 +19,7 @@
 - [x] 1.3 Скрыть `password_hash` из публичного чтения (column grants / суб-select)
 - [x] 1.4 Серверная сессия вместо `_randomUuid()` + revoke (`sessions` + `auth_logout`)
 - [x] 1.5 Приватные подписанные URL медиа (вместо публичных): edge-функция `media-sign` (проверка прав по JWT: avatars — любой auth, stories/media/messages — участник pm-чата/чата; прямой fetch `/storage/v1/object/sign` с секретом `VIBE_SVC_KEY`, т.к. ротированный `SUPABASE_SERVICE_ROLE_KEY` в env функций даёт 403 Invalid Compact JWS); клиент: `VibeBackend.mediaUrl()` (кеш 50 мин) + виджет `VibeNetImage`, upload-пути хранятся в БД относительными. Матрица прав e2e: avatars→200, media чужого чата→403, anon→401. Осталось: заменить select-политику на `media_select_owner` (SQL-доступ к БД недоступен — pooler auth failed, db-хост IPv6-only, `supabase link` падает с LegacyLinkApiKeysNetworkError)
-- [ ] 1.6 PIN: хэш+соль в SecureStorage, блокировка после 5 попыток
+- [x] 1.6 PIN: хэш+соль в SecureStorage, блокировка после 5 попыток ✅ (13.08.2026): PasscodeService (sha256+salt, maxAttempts 5, lock 30s) + test/passcode_service_test.dart (3: соль/хэш не хранит пароль, сброс попыток, блокировка)
 - [ ] 1.7 E2E на Dart: X25519 + ChaCha20-Poly1305 (`package:cryptography`), ключи на устройстве, тест-векторы
 - [ ] 1.8 X3DH + Double Ratchet (собственный модуль, тест-векторы)
 - [ ] 1.9 Честный щит: показ только при реальном шифровании, иначе «Защита скоро»
@@ -33,9 +33,9 @@
 - [x] 2.5 Двоение контента (аудит Stack/Overlay)
 - [x] 2.6 «Поиск в чате — в v2.0» из меню — убрать/связать с рабочим поиском
 - [x] 2.7 Подпись архива «Чаты с выключенными уведомлениями» → согласовать
-- [ ] 2.8 Кривые ключи локализации в шапках секций настроек
+- [x] 2.8 Кривые ключи локализации в шапках секций настроек ✅ (13.08.2026): секция «Настройки» дублировала заголовок экрана — новый ключ `generalSettings` («Основные настройки»/«General Settings»); test/settings_screen_test.dart (2: ru/en без дублей)
 - [x] 2.9 Дубли DND/архива (свайп ↔ меню) — единый обработчик
-- [ ] 2.10 Демо-сториз `MockData.storyNames` за флаг
+- [x] 2.10 Демо-сториз `MockData.storyNames` за флаг ✅ (флаг `showDemoStories = false`, ветка в chat_list_screen за флагом, 13.08.2026 — аудит)
 - [ ] 2.11 Кликабельная аватарка в `profile_setup_screen`
 
 ## ФАЗА 3 — Персистентность «как облако ТГ»

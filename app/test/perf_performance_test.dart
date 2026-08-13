@@ -7,7 +7,6 @@ import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
 import 'package:vibe_app/screens/chat_list_screen.dart';
 import 'package:vibe_app/screens/chat_screen.dart';
-import 'package:vibe_app/chat/models.dart';
 
 import 'fake_vibe_backend.dart';
 
@@ -79,14 +78,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final sw = Stopwatch()..start();
-    var total = 0.0;
     for (var i = 0; i < 5; i++) {
       await tester.fling(
           find.byType(CustomScrollView).hitTestable().first,
           const Offset(0, -1200),
           6000);
       await tester.pumpAndSettle();
-      total += 1200;
     }
     sw.stop();
 
