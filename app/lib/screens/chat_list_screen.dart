@@ -30,6 +30,7 @@ import '../../main.dart';
 import 'aurion_screen.dart';
 import 'chat_screen.dart';
 import 'create_group_screen.dart';
+import 'folders_screen.dart';
 import 'lock_screen.dart';
 import 'new_message_screen.dart';
 import 'search_screen.dart';
@@ -60,8 +61,6 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-enum _Folder { all, personal, groups, channels, business }
-
 class _ChatListScreenState extends State<ChatListScreen>
     with WidgetsBindingObserver {
   /// Поверхность данных экрана: живой бэкенд или фейк из теста.
@@ -70,7 +69,9 @@ class _ChatListScreenState extends State<ChatListScreen>
   /// Data-plane списка чатов: лента, статусы, realtime (Single Writer).
   late final ChatListController _chat;
 
-  _Folder _folder = _Folder.all;
+  /// Активная вкладка: 'all' | 'personal' | 'groups' | 'channels' |
+  /// 'business' | id пользовательской папки (8.3.7).
+  String _selectedTab = 'all';
 
   // Лента сториз (живёт на экране — не входит в data-plane чатов).
   final _stories = <Uint8List>[];
@@ -247,6 +248,24 @@ class _ChatListScreenState extends State<ChatListScreen>
                 }
               },
             ),
+            ListTile(
+              leading: Icon(
+                Icons.folder_rounded,
+                color: Colors.grey,
+              ),
+              title: Text(
+                _folderLabel(chat) ?? 'В папку',
+                style: TextStyle(color: sheetText, fontSize: 16),
+              ),
+              subtitle: const Text(
+                'Разложите чаты по своим папкам',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _pickFolder(chat);
+              },
+            ),
             Divider(color: Color(0x1FFFFFFF).withValues(alpha: 0.4)),
             ListTile(
               leading: const Icon(Icons.checklist_rounded, color: Colors.grey),
@@ -267,24 +286,135 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   static const _folders = [
-    (_Folder.all, 'Все'),
-    (_Folder.personal, 'Личные'),
-    (_Folder.groups, 'Группы'),
-    (_Folder.channels, 'Каналы'),
-    (_Folder.business, 'Бизнес'),
+    ('all', 'Все'),
+    ('personal', 'Личные'),
+    ('groups', 'Группы'),
+    ('channels', 'Каналы'),
+    ('business', 'Бизнес'),
   ];
 
-  _Folder _folderOf(VibeChat chat) {
+  /// Умная вкладка чата по типу (для пользовательских папок — назначение).
+  String _tabOf(VibeChat chat) {
     switch (chat.kind) {
       case 'group':
-        return _Folder.groups;
+        return 'groups';
       case 'channel':
-        return _Folder.channels;
+        return 'channels';
       case 'biz':
-        return _Folder.business;
+        return 'business';
       default:
-        return _Folder.personal;
+        return 'personal';
     }
+  }
+
+  /// Попадает ли чат в активную вкладку (8.3.7: пользовательские папки
+  /// учитывают ручное назначение папки).
+  bool _inSelectedTab(VibeChat chat) {
+    if (_selectedTab == 'all') return true;
+    final settings = SettingsService.instance;
+    if (settings.folderOf(chat.id) == _selectedTab) return true;
+    return _tabOf(chat) == _selectedTab;
+  }
+
+  /// Название папки чата (для меню «В папку») или null.
+  String? _folderLabel(VibeChat chat) {
+    final settings = SettingsService.instance;
+    final id = settings.folderOf(chat.id);
+    if (id == null) return null;
+    for (final f in settings.chatFolders) {
+      if (f.id == id) return 'Папка: ${f.emoji} ${f.title}';
+    }
+    return 'В папку';
+  }
+
+  /// Подшит выбора папки для чата (8.3.7).
+  Future<void> _pickFolder(VibeChat chat) async {
+    final settings = SettingsService.instance;
+    final current = settings.folderOf(chat.id);
+    final sheetTheme = Theme.of(context);
+    final sheetBg = sheetTheme.brightness == Brightness.dark
+        ? VibeColors.surface2Dark
+        : VibeColors.surface2Light;
+    final sheetText = Color(
+      sheetTheme.brightness == Brightness.dark ? 0xFFF5F3FA : 0xFF1C1B22,
+    );
+    final folders = settings.chatFolders;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: sheetBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Icon(
+                current == null
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: Colors.grey,
+              ),
+              title: Text(
+                'Без папки',
+                style: TextStyle(color: sheetText, fontSize: 16),
+              ),
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                if (current != null) {
+                  await settings.setFolderForChat(chat.id, null);
+                }
+              },
+            ),
+            for (final f in folders)
+              ListTile(
+                leading: Icon(
+                  current == f.id
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  color: current == f.id ? context.vibePrimary : Colors.grey,
+                ),
+                title: Text(
+                  '${f.emoji} ${f.title}',
+                  style: TextStyle(color: sheetText, fontSize: 16),
+                ),
+                onTap: () async {
+                  Navigator.of(sheetCtx).pop();
+                  if (current != f.id) {
+                    await settings.setFolderForChat(chat.id, f.id);
+                  }
+                },
+              ),
+            if (folders.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(VibeSpacing.lg),
+                child: Text(
+                  'Папок пока нет — создайте их на экране «Папки»',
+                  style: VibeTypography.caption.copyWith(
+                    color: context.vibeTextTertiary,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.manage_search_rounded,
+                  color: Colors.grey),
+              title: Text(
+                'Управление папками',
+                style: TextStyle(color: sheetText, fontSize: 16),
+              ),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _openFoldersScreen(context);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -296,12 +426,10 @@ class _ChatListScreenState extends State<ChatListScreen>
         builder: (context, _) {
           // Заблокированные пользователи: их личные чаты скрыты из списка.
           final blocked = SettingsService.instance.blockedUsers;
-          final inFolder = _folder == _Folder.all
-              ? _chat.chats.where((c) => !blocked.contains(c.peerId)).toList()
-              : _chat.chats
-                  .where((c) =>
-                      !blocked.contains(c.peerId) && _folderOf(c) == _folder)
-                  .toList();
+          final inFolder = _chat.chats
+              .where((c) =>
+                  !blocked.contains(c.peerId) && _inSelectedTab(c))
+              .toList();
 
           // Режим просмотра: архив / скрытые / основной список.
           final List<VibeChat> visible;
@@ -336,7 +464,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               (_chat.archived.isNotEmpty &&
                   !_showArchive &&
                   !_showHidden &&
-                  _folder == _Folder.all)
+                  _selectedTab == 'all')
               ? 1
               : 0;
           final savedExtra =
@@ -761,6 +889,15 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             _drawerTile(
               context,
+              icon: Icons.folder_outlined,
+              label: 'Папки',
+              onTap: () {
+                Navigator.of(context).pop();
+                _openFoldersScreen(context);
+              },
+            ),
+            _drawerTile(
+              context,
               icon: Icons.lock_outline_rounded,
               label: 'Скрытые',
               onTap: () => setState(() {
@@ -1082,26 +1219,44 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   Widget _buildTab(BuildContext context) {
+    final settings = SettingsService.instance;
     return SizedBox(
       height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.lg),
-        itemCount: _folders.length,
-        itemBuilder: (context, i) {
-          final f = _folders[i];
-          final active = f.$1 == _folder;
-          return Padding(
-            padding: const EdgeInsets.only(right: 24),
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick(); // ТАКТИЛЬНЫЙ ОТКЛИК
-                setState(() => _folder = f.$1);
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+      child: ListenableBuilder(
+        listenable: settings.foldersVersion,
+        builder: (context, _) {
+          final userFolders = settings.chatFolders;
+          final itemCount = _folders.length + userFolders.length + 1;
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.lg),
+            itemCount: itemCount,
+            itemBuilder: (context, i) {
+              if (i >= _folders.length + userFolders.length) {
+                return _buildAddTabChip(context);
+              }
+              final String id;
+              final String label;
+              if (i < _folders.length) {
+                id = _folders[i].$1;
+                label = _folders[i].$2;
+              } else {
+                final f = userFolders[i - _folders.length];
+                id = f.id;
+                label = '${f.emoji} ${f.title}';
+              }
+              final active = id == _selectedTab;
+              return Padding(
+                padding: const EdgeInsets.only(right: 24),
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick(); // ТАКТИЛЬНЫЙ ОТКЛИК
+                    setState(() => _selectedTab = id);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                   AnimatedDefaultTextStyle(
                     duration: VibeAnimations.fast,
                     style: VibeTypography.bodyMedium.copyWith(
@@ -1111,7 +1266,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                       fontWeight: active ? FontWeight.w800 : FontWeight.w500,
                       fontSize: 15,
                     ),
-                    child: Text(f.$2),
+                    child: Text(label),
                   ),
                   const Spacer(),
                   AnimatedContainer(
@@ -1129,6 +1284,51 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
           );
         },
+      );
+        },
+      ),
+    );
+  }
+
+  /// Чип «+» в конце вкладок — управление папками (8.3.7).
+  Widget _buildAddTabChip(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 24),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _openFoldersScreen(context);
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Spacer(),
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: context.vibePrimary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.add_rounded,
+                size: 18,
+                color: context.vibePrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Экран управления папками (8.3.7).
+  Future<void> _openFoldersScreen(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FoldersScreen(chats: [..._chat.chats]),
       ),
     );
   }

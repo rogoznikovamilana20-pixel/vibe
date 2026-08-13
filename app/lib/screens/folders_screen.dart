@@ -1,0 +1,421 @@
+import 'package:flutter/material.dart';
+
+import '../core/theme/vibe_animations.dart';
+import '../core/theme/vibe_spacing.dart';
+import '../core/theme/vibe_theme.dart';
+import '../core/theme/vibe_typography.dart';
+import '../core/widgets/vibe_button.dart';
+import '../core/widgets/vibe_icon_button.dart';
+import '../core/widgets/vibe_input.dart';
+import '../core/widgets/vibe_top_bar.dart';
+import '../data/backend.dart';
+import '../data/chat_folder.dart';
+import '../data/settings_service.dart';
+
+/// 8.3.7: экран «Папки» — список пользовательских папок чатов.
+/// Каждая папка — название + эмодзи; состав чатов назначается вручную.
+class FoldersScreen extends StatefulWidget {
+  const FoldersScreen({super.key, required this.chats});
+
+  /// Снимок списка чатов для показа состава папок.
+  final List<VibeChat> chats;
+
+  @override
+  State<FoldersScreen> createState() => _FoldersScreenState();
+}
+
+class _FoldersScreenState extends State<FoldersScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final settings = SettingsService.instance;
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: VibeTopBarAppBar(
+        topInset: MediaQuery.paddingOf(context).top,
+        child: VibeTopBar(
+          leading: VibeIconButton(
+            icon: Icons.arrow_back_rounded,
+            onPressed: () => Navigator.of(context).maybePop(),
+            tooltip: 'Назад',
+          ),
+          title: const VibeTopBarTitle('Папки'),
+        ),
+      ),
+      body: ListenableBuilder(
+        listenable: settings.foldersVersion,
+        builder: (context, _) {
+          final folders = settings.chatFolders;
+          if (folders.isEmpty) {
+            return _buildEmpty(context);
+          }
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(
+              VibeSpacing.lg,
+              VibeSpacing.sm,
+              VibeSpacing.lg,
+              VibeSpacing.xxl,
+            ),
+            children: [
+              for (final f in folders) _folderTile(context, f),
+              const SizedBox(height: VibeSpacing.lg),
+              VibeButton(
+                label: 'Новая папка',
+                icon: Icons.create_new_folder_outlined,
+                size: VibeButtonSize.s,
+                expand: true,
+                onPressed: () => _openEditor(context, null),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmpty(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.xxl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: context.vibePrimary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.folder_open_rounded,
+                size: 40,
+                color: context.vibePrimary,
+              ),
+            ),
+            const SizedBox(height: VibeSpacing.lg),
+            Text(
+              'Папок пока нет',
+              style: VibeTypography.subtitle.copyWith(
+                color: context.vibeTextPrimary,
+              ),
+            ),
+            const SizedBox(height: VibeSpacing.sm),
+            Text(
+              'Разложите чаты по темам: работа, учёба, свои',
+              textAlign: TextAlign.center,
+              style: VibeTypography.bodyMedium.copyWith(
+                color: context.vibeTextSecondary,
+              ),
+            ),
+            const SizedBox(height: VibeSpacing.xl),
+            VibeButton(
+              label: 'Создать папку',
+              icon: Icons.create_new_folder_outlined,
+              onPressed: () => _openEditor(context, null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _folderTile(BuildContext context, VibeChatFolder folder) {
+    final settings = SettingsService.instance;
+    final count = widget.chats
+        .where((c) => settings.folderOf(c.id) == folder.id)
+        .length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: VibeSpacing.sm),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(VibeRadius.card),
+          onTap: () => _openEditor(context, folder.id),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: VibeSpacing.lg,
+              vertical: VibeSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: context.vibeSurfaceHigh,
+              borderRadius: BorderRadius.circular(VibeRadius.card),
+            ),
+            child: Row(
+              children: [
+                Text(folder.emoji, style: const TextStyle(fontSize: 24)),
+                const SizedBox(width: VibeSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        folder.title,
+                        style: VibeTypography.body.copyWith(
+                          color: context.vibeTextPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _plural(count),
+                        style: VibeTypography.caption.copyWith(
+                          color: context.vibeTextTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: context.vibeTextTertiary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _plural(int n) {
+    if (n % 10 == 1 && n % 100 != 11) return '$n чат';
+    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) {
+      return '$n чата';
+    }
+    return '$n чатов';
+  }
+
+  Future<void> _openEditor(BuildContext context, String? folderId) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FolderEditScreen(
+          folderId: folderId,
+          chats: widget.chats,
+        ),
+      ),
+    );
+  }
+}
+
+/// Редактор папки: название, эмодзи, состав чатов (и удаление).
+class FolderEditScreen extends StatefulWidget {
+  const FolderEditScreen({
+    super.key,
+    required this.folderId,
+    required this.chats,
+  });
+
+  /// null — создание новой папки.
+  final String? folderId;
+  final List<VibeChat> chats;
+
+  @override
+  State<FolderEditScreen> createState() => _FolderEditScreenState();
+}
+
+class _FolderEditScreenState extends State<FolderEditScreen> {
+  static const _emojis = ['📁', '⭐', '💼', '🎮', '🎵', '📚', '✈️', '❤️', '🌙'];
+
+  late final TextEditingController _title;
+  late String _emoji;
+  late final Set<String> _assigned;
+
+  bool get _isNew => widget.folderId == null;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = SettingsService.instance;
+    final folder = _isNew
+        ? null
+        : settings.chatFolders.where((f) => f.id == widget.folderId).firstOrNull;
+    _title = TextEditingController(text: folder?.title ?? '');
+    _emoji = folder?.emoji ?? _emojis.first;
+    _assigned = {
+      for (final c in widget.chats)
+        if (settings.folderOf(c.id) == widget.folderId) c.id,
+    };
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final settings = SettingsService.instance;
+    final title = _title.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Назовите папку')));
+      return;
+    }
+    if (_isNew) {
+      // Новая папка: сначала создаём, затем назначаем выбранные чаты.
+      final before = settings.chatFolders.length;
+      await settings.addFolder(title, emoji: _emoji);
+      if (settings.chatFolders.length == before) return;
+      final newId = settings.chatFolders.last.id;
+      for (final c in widget.chats) {
+        await settings.setFolderForChat(c.id, _assigned.contains(c.id) ? newId : null);
+      }
+    } else {
+      await settings.renameFolder(widget.folderId!, title, emoji: _emoji);
+      for (final c in widget.chats) {
+        final inThis = _assigned.contains(c.id);
+        final now = settings.folderOf(c.id);
+        if (inThis && now != widget.folderId) {
+          // Перемещение из другой папки: снимаем старое назначение.
+          await settings.setFolderForChat(c.id, widget.folderId);
+        } else if (!inThis && now == widget.folderId) {
+          await settings.setFolderForChat(c.id, null);
+        }
+      }
+    }
+    if (mounted) Navigator.of(context).maybePop();
+  }
+
+  Future<void> _delete() async {
+    final settings = SettingsService.instance;
+    await settings.removeFolder(widget.folderId!);
+    if (mounted) Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: VibeTopBarAppBar(
+        topInset: MediaQuery.paddingOf(context).top,
+        child: VibeTopBar(
+          leading: VibeIconButton(
+            icon: Icons.arrow_back_rounded,
+            onPressed: () => Navigator.of(context).maybePop(),
+            tooltip: 'Назад',
+          ),
+          title: VibeTopBarTitle(_isNew ? 'Новая папка' : 'Папка'),
+          actions: [
+            if (!_isNew)
+              VibeIconButton(
+                icon: Icons.delete_outline_rounded,
+                onPressed: _delete,
+                tooltip: 'Удалить папку',
+                color: context.vibeError,
+              ),
+          ],
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          VibeSpacing.lg,
+          VibeSpacing.sm,
+          VibeSpacing.lg,
+          VibeSpacing.xxl,
+        ),
+        children: [
+          VibeInput(
+            hint: 'Название папки',
+            controller: _title,
+            autofocus: _isNew,
+          ),
+          const SizedBox(height: VibeSpacing.md),
+          Text(
+            'Эмодзи папки',
+            style: VibeTypography.caption.copyWith(
+              color: context.vibeTextTertiary,
+            ),
+          ),
+          const SizedBox(height: VibeSpacing.sm),
+          Wrap(
+            spacing: VibeSpacing.sm,
+            runSpacing: VibeSpacing.sm,
+            children: [
+              for (final e in _emojis)
+                GestureDetector(
+                  onTap: () => setState(() => _emoji = e),
+                  child: AnimatedContainer(
+                    duration: VibeAnimations.fast,
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _emoji == e
+                          ? context.vibePrimary.withValues(alpha: 0.18)
+                          : context.vibeSurfaceHigh,
+                      borderRadius: BorderRadius.circular(VibeRadius.card),
+                      border: Border.all(
+                        color: _emoji == e
+                            ? context.vibePrimary
+                            : Colors.transparent,
+                      ),
+                    ),
+                    child: Text(e, style: const TextStyle(fontSize: 22)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          Text(
+            'Чаты в папке — ${_assigned.length}',
+            style: VibeTypography.caption.copyWith(
+              color: context.vibeTextTertiary,
+            ),
+          ),
+          const SizedBox(height: VibeSpacing.sm),
+          if (widget.chats.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(VibeSpacing.lg),
+              child: Text(
+                'Чатов пока нет — напишите кому-нибудь',
+                style: VibeTypography.bodyMedium.copyWith(
+                  color: context.vibeTextSecondary,
+                ),
+              ),
+            ),
+          for (final c in widget.chats)
+            InkWell(
+              onTap: () => setState(() {
+                if (_assigned.contains(c.id)) {
+                  _assigned.remove(c.id);
+                } else {
+                  _assigned.add(c.id);
+                }
+              }),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: VibeSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _assigned.contains(c.id)
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      color: _assigned.contains(c.id)
+                          ? context.vibePrimary
+                          : context.vibeTextTertiary,
+                    ),
+                    const SizedBox(width: VibeSpacing.md),
+                    Expanded(
+                      child: Text(
+                        c.title,
+                        style: VibeTypography.body.copyWith(
+                          color: context.vibeTextPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: VibeSpacing.xl),
+          VibeButton(
+            label: _isNew ? 'Создать папку' : 'Сохранить',
+            onPressed: _save,
+          ),
+        ],
+      ),
+    );
+  }
+}

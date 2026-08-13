@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'backend.dart';
 import 'backend_api.dart';
+import 'chat_folder.dart';
 
 class SettingsService {
   SettingsService._();
@@ -67,6 +69,8 @@ class SettingsService {
   static const _keyMutedChats = 'vibe_muted_chats';
   static const _keyDeletedChats = 'vibe_deleted_chats';
   static const _keyBlockedUsers = 'vibe_blocked_users';
+  static const _keyFolders = 'vibe_folders';
+  static const _keyFolderAssign = 'vibe_folder_assign';
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -357,5 +361,92 @@ class SettingsService {
     } else {
       await _prefs.setString('$_keyDrafts:$chatId', text);
     }
+  }
+
+  // 8.3.7: пользовательские папки чатов (локально, персистентно).
+  // Состав папок — ручное назначение: один чат в одной папке
+  // («Без папки» — просто отсутствие назначения).
+  List<VibeChatFolder> get chatFolders {
+    final raw = _prefs.getStringList(_keyFolders);
+    if (raw == null) return const [];
+    return raw
+        .map((s) {
+          try {
+            return VibeChatFolder.fromJson(
+              jsonDecode(s) as Map<String, dynamic>,
+            );
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<VibeChatFolder>()
+        .toList();
+  }
+
+  /// Сигнал об изменении папок/назначений — лента обновляет чипы на лету.
+  final ValueNotifier<int> foldersVersion = ValueNotifier<int>(0);
+
+  Future<void> _saveFolders(List<VibeChatFolder> folders) async {
+    await _prefs.setStringList(_keyFolders, [
+      for (final f in folders) jsonEncode(f.toJson()),
+    ]);
+  }
+
+  Future<void> addFolder(String title, {String emoji = '📁'}) async {
+    final folders = [...chatFolders];
+    folders.add(
+      VibeChatFolder(
+        id: 'folder_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        emoji: emoji,
+      ),
+    );
+    await _saveFolders(folders);
+    foldersVersion.value++;
+  }
+
+  Future<void> renameFolder(
+    String id,
+    String title, {
+    String? emoji,
+  }) async {
+    final folders = [
+      for (final f in chatFolders)
+        if (f.id == id)
+          VibeChatFolder(id: f.id, title: title, emoji: emoji ?? f.emoji)
+        else
+          f,
+    ];
+    await _saveFolders(folders);
+    foldersVersion.value++;
+  }
+
+  /// Удалить папку: вместе с ней убираются все назначения чатов.
+  Future<void> removeFolder(String id) async {
+    await _saveFolders(
+      chatFolders.where((f) => f.id != id).toList(),
+    );
+    final stale = _prefs.getKeys().where((k) {
+      if (!k.startsWith('$_keyFolderAssign:')) return false;
+      return _prefs.getString(k) == id;
+    }).toList();
+    for (final k in stale) {
+      await _prefs.remove(k);
+    }
+    foldersVersion.value++;
+  }
+
+  /// Папка чата (null — «Без папки»).
+  String? folderOf(String chatId) =>
+      _prefs.getString('$_keyFolderAssign:$chatId');
+
+  Future<void> setFolderForChat(String chatId, String? folderId) async {
+    final key = '$_keyFolderAssign:$chatId';
+    if (folderId == null) {
+      await _prefs.remove(key);
+    } else {
+      await _prefs.setString(key, folderId);
+    }
+    foldersVersion.value++;
   }
 }
