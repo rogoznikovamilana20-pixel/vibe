@@ -59,10 +59,10 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
               _buildLangTile('Español', 'es', comingSoon: true),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: VibeSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.only(top: VibeSpacing.sm),
             child: Text(
-              'Доступные сейчас: Русский и English. Остальные — скоро.',
+              l.languagesAvailable,
               style: VibeTypography.caption,
             ),
           ),

@@ -89,6 +89,7 @@ class VibeLocalizations {
       'lock_attempts_left': 'Неверный код-пароль. Осталось попыток: ',
       'auto_lock_off': 'Выключено',
       'auto_lock_immediately': 'Сразу',
+      'languages_available': 'Доступные сейчас: Русский и English. Остальные — скоро.',
     },
     'en': {
       'settings': 'Settings',
@@ -169,6 +170,7 @@ class VibeLocalizations {
       'lock_attempts_left': 'Wrong passcode. Attempts left: ',
       'auto_lock_off': 'Disabled',
       'auto_lock_immediately': 'Immediately',
+      'languages_available': 'Available now: Russian and English. Others coming soon.',
     },
   };
 
@@ -252,6 +254,7 @@ class VibeLocalizations {
   String lockAttemptsLeft(int count) => '${_get('lock_attempts_left')}$count';
   String get autoLockOff => _get('auto_lock_off');
   String get autoLockImmediately => _get('auto_lock_immediately');
+  String get languagesAvailable => _get('languages_available');
 }
 
 class VibeLocalizationsDelegate extends LocalizationsDelegate<VibeLocalizations> {
