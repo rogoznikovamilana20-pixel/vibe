@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Фирменная иконка Vibe: фиолетовый орб + искра (ночной клуб, 8.1.3). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Ореол орба -->
+    <path
+        android:fillColor="#339B55FF"
+        android:pathData="M52,26 a24,24 0 1,1 -0.01,0 z" />
+
+    <!-- Орб: градиент TL(#A66BFF) → BR(#6E38D8) -->
+    <path
+        android:pathData="M52,32 a19,19 0 1,1 -0.01,0 z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt"
+            name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="33"
+                android:startY="32"
+                android:endX="71"
+                android:endY="51"
+                android:startColor="#A66BFF"
+                android:endColor="#6E38D8" />
+        </aapt:attr>
+    </path>
+
+    <!-- Блик сверху-слева -->
+    <path
+        android:fillColor="#59FFFFFF"
+        android:pathData="M41,38 a6,6 0 1,1 -0.01,0 z" />
+
+    <!-- Искра ✦ (4 луча, центр 52,45) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,30 L55,42 L67,45 L55,48 L52,60 L49,48 L37,45 L49,42 Z" />
+</vector>

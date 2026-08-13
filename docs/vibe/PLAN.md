@@ -695,6 +695,17 @@
 ### Следующее
 - **8.3.3 вложения: блокирован серверной схемой** — messages хранит специализированные колонки (photo_url/voice_url/video_url); для Файла/Локации/Контактa/Опроса нужны новые колонки/типы в БД (миграция не деплоится окружением). Запросы: 8.1 иконки; 4.x Cloud Pinning; 1.7/1.8 крипто
 
+## Phase 8 — UX (порция 40): 8.1.3 иконка приложения ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 172/172, assembleDebug OK)
+- **8.1.3**: фирменная иконка «ночной клуб»: фиолетовый орб (градиент #A66BFF→#6E38D8, ореол, блик) + белая искра ✦ на фоне #0D0A1E. Android: adaptive-вектор `mipmap-anydpi-v26/ic_launcher_foreground.xml` (градиент через `aapt:attr`; первая сборка падала `Cannot find attribute fillColor` — конфликт `android:fillColor`+gradient, убран) + legacy PNG mdpi–xxxhdpi (launcher/round/foreground, ген. GDI+ скриптом); iOS AppIcon 15 размеров (20–1024); web icons 192/512 + maskable. Все 29 PNG валидны (System.Drawing-проверка).
+
+### Проверка
+- flutter analyze 0; flutter test 172/172; flutter build apk --debug успешна (ресурсы компилируются)
+
+### Следующее
+- **8.1.1** иконочный шрифт (120 иконок, фирменные) + **8.1.2** замена материальных; 8.3.3 вложения (блокирован серверной схемой); 4.x Cloud Pinning; 1.7/1.8 крипто
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list
