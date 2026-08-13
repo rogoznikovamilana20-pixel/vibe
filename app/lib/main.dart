@@ -36,6 +36,8 @@ void main() async {
   await PasscodeService.instance.init();
   await ProfileAvatar.load();
   await ScheduledService.instance.init();
+  // Облачное зеркало приватности (3.7) — best-effort.
+  await SettingsService.instance.loadPrivacyFromServer();
 
   // Временный E2E-хелпер: позволяет установить PIN без UI-навигации.
   const e2ePin = String.fromEnvironment('E2E_PIN');

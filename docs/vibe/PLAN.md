@@ -555,6 +555,21 @@
 ### Следующее
 - 3.7 приватность → сервер; 4.x Cloud Pinning рефактор; 5.x скорость; 1.7/1.8 крипто
 
+## Phase 3 — Фаза C (порция 28): 3.7 приватность в облако ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 146/146, CI-гейт EXIT=0)
+- **SQL** `supabase/migrate_v1_11_0_privacy.sql`: `profile_privacy(user_id PK → profiles, last_seen/photo/forward/calls/groups smallint, updated_at)`, RLS-политика как у chat_pins.
+- **Backend**: модель `PrivacySettings` (+fromMap/toMap); `fetchPrivacy()` (maybeSingle, при сбое null), `savePrivacy()` (upsert onConflict 'user_id'); абстракции + LiveVibeBackend в backend_api.
+- **SettingsService**: каждый privacy-сеттер зеркалит настройку целиком в облако (best-effort, молча, без потери локального значения при сбое); `loadPrivacyFromServer()` — вызывается из main.dart, облако перезаписывает локальный кеш; при недоступности сервера (или отсутствии записи) локальные значения не тронуты.
+- Enforcement на сервере — миграцией подготовлено (RLS/данные), деплой недоступен (практика проекта).
+- Тесты +5: зеркало целиком, облако перезаписывает кеш, null-запись, сбой зеркала, сбой загрузки.
+
+### Проверка
+- analyze 0; verify.ps1 passed; 146/146 (+5)
+
+### Следующее
+- 4.x Cloud Pinning рефактор; 5.x скорость; 1.7/1.8 крипто; 2.x закрыто, Фаза 3 закрыта
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list

@@ -1,11 +1,32 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'backend.dart';
+import 'backend_api.dart';
 
 class SettingsService {
   SettingsService._();
   static final instance = SettingsService._();
 
   late SharedPreferences _prefs;
+
+  // 3.7: зеркало приватности — локальный кеш остаётся главным,
+  // облако — best-effort (как закрепы): при изменении пишем целиком,
+  // при старте приложения (main) — забираем актуальные значения.
+  VibeBackendApi? _privacySyncer;
+
+  @visibleForTesting
+  void setPrivacySyncerForTest(VibeBackendApi b) => _privacySyncer = b;
+
+  VibeBackendApi? get _privacyBackend {
+    try {
+      return _privacySyncer ??= LiveVibeBackend();
+    } catch (_) {
+      return null;
+    }
+  }
 
   // Ключи
   static const _keyTheme = 'vibe_theme';
@@ -172,31 +193,72 @@ class SettingsService {
   int get privacyPhone => _prefs.getInt(_keyPrivacyPhone) ?? 0;
   Future<void> setPrivacyPhone(int val) async {
     await _prefs.setInt(_keyPrivacyPhone, val);
+    _pushPrivacy();
   }
 
   int get privacyLastSeen => _prefs.getInt(_keyPrivacyLastSeen) ?? 0;
   Future<void> setPrivacyLastSeen(int val) async {
     await _prefs.setInt(_keyPrivacyLastSeen, val);
+    _pushPrivacy();
   }
 
   int get privacyPhoto => _prefs.getInt(_keyPrivacyPhoto) ?? 0;
   Future<void> setPrivacyPhoto(int val) async {
     await _prefs.setInt(_keyPrivacyPhoto, val);
+    _pushPrivacy();
   }
 
   int get privacyForward => _prefs.getInt(_keyPrivacyForward) ?? 0;
   Future<void> setPrivacyForward(int val) async {
     await _prefs.setInt(_keyPrivacyForward, val);
+    _pushPrivacy();
   }
 
   int get privacyCalls => _prefs.getInt(_keyPrivacyCalls) ?? 0;
   Future<void> setPrivacyCalls(int val) async {
     await _prefs.setInt(_keyPrivacyCalls, val);
+    _pushPrivacy();
   }
 
   int get privacyGroups => _prefs.getInt(_keyPrivacyGroups) ?? 0;
   Future<void> setPrivacyGroups(int val) async {
     await _prefs.setInt(_keyPrivacyGroups, val);
+    _pushPrivacy();
+  }
+
+  /// 3.7: синхронизация приватности в облако (best-effort, молча).
+  void _pushPrivacy() {
+    final b = _privacyBackend;
+    if (b == null) return;
+    final settings = PrivacySettings(
+      lastSeen: privacyLastSeen,
+      photo: privacyPhoto,
+      forward: privacyForward,
+      calls: privacyCalls,
+      groups: privacyGroups,
+    );
+    unawaited(() async {
+      try {
+        await b.savePrivacy(settings);
+      } catch (_) {}
+    }());
+  }
+
+  /// 3.7: забрать облачные настройки приватности при старте (best-effort);
+  /// вызывается из main.dart после init. При недоступности сервера
+  /// локальные значения остаются нетронутыми.
+  Future<void> loadPrivacyFromServer() async {
+    final b = _privacyBackend;
+    if (b == null) return;
+    try {
+      final p = await b.fetchPrivacy();
+      if (p == null) return;
+      await setPrivacyLastSeen(p.lastSeen);
+      await setPrivacyPhoto(p.photo);
+      await setPrivacyForward(p.forward);
+      await setPrivacyCalls(p.calls);
+      await setPrivacyGroups(p.groups);
+    } catch (_) {}
   }
 
   // Автоудаление аккаунта (в месяцах: 1, 3, 6, 12)

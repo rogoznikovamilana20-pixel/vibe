@@ -229,6 +229,40 @@ class PinChanged {
   final bool pinned;
 }
 
+/// Настройки приватности владельца (3.7): 0 — Все, 1 — Мои контакты,
+/// 2 — Никто. Зеркалируются в таблицу `profile_privacy`.
+class PrivacySettings {
+  const PrivacySettings({
+    this.lastSeen = 0,
+    this.photo = 0,
+    this.forward = 0,
+    this.calls = 0,
+    this.groups = 0,
+  });
+
+  final int lastSeen;
+  final int photo;
+  final int forward;
+  final int calls;
+  final int groups;
+
+  factory PrivacySettings.fromMap(Map<String, dynamic> m) => PrivacySettings(
+        lastSeen: (m['last_seen'] as num?)?.toInt() ?? 0,
+        photo: (m['photo'] as num?)?.toInt() ?? 0,
+        forward: (m['forward'] as num?)?.toInt() ?? 0,
+        calls: (m['calls'] as num?)?.toInt() ?? 0,
+        groups: (m['groups'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'last_seen': lastSeen,
+        'photo': photo,
+        'forward': forward,
+        'calls': calls,
+        'groups': groups,
+      };
+}
+
 /// Модель профиля пользователя/контакта.
 class VibeProfile {
   const VibeProfile({
@@ -825,6 +859,32 @@ class VibeBackend {
         .neq('id', myProfileId ?? '')
         .maybeSingle();
     return res == null;
+  }
+
+  /// 3.7: облачное зеркало настроек приватности (best-effort; клиент
+  /// держит локальный кеш и деградирует при недоступности сервера).
+  Future<PrivacySettings?> fetchPrivacy() async {
+    if (myProfileId == null) return null;
+    try {
+      final row = await _client
+          .from('profile_privacy')
+          .select()
+          .eq('user_id', myProfileId!)
+          .maybeSingle();
+      if (row == null) return null;
+      return PrivacySettings.fromMap(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> savePrivacy(PrivacySettings settings) async {
+    if (myProfileId == null) return;
+    await _client.from('profile_privacy').upsert({
+      'user_id': myProfileId,
+      ...settings.toMap(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'user_id');
   }
 
   /// Мои контакты: только те, с кем у меня уже есть личные чаты.

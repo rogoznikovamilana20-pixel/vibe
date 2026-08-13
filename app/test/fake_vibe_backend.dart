@@ -64,6 +64,27 @@ class FakeVibeBackend implements VibeBackendApi {
   /// Если true — `sendText` бросает исключение (эмуляция сетевой ошибки).
   bool throwOnSendText = false;
 
+  // ─── Приватность (3.7) ───
+  PrivacySettings? privacySettings;
+  bool throwOnFetchPrivacy = false;
+  bool throwOnSavePrivacy = false;
+  final List<PrivacySettings> savedPrivacy = [];
+
+  @override
+  Future<PrivacySettings?> fetchPrivacy() async {
+    calls.add('fetchPrivacy');
+    if (throwOnFetchPrivacy) throw Exception('no profile_privacy table');
+    return privacySettings;
+  }
+
+  @override
+  Future<void> savePrivacy(PrivacySettings settings) async {
+    calls.add('savePrivacy');
+    if (throwOnSavePrivacy) throw Exception('network');
+    privacySettings = settings;
+    savedPrivacy.add(settings);
+  }
+
   /// Если true — `sendText` эмитит подтверждённое сообщение в `stream`
   /// (как живой бэкенд). Выключите, чтобы проверить оптимистичный статус.
   bool emitOnSend = true;

@@ -113,6 +113,10 @@ abstract class VibeBackendApi {
     String? bio,
   });
 
+  // ─── Приватность (3.7) ───
+  Future<PrivacySettings?> fetchPrivacy();
+  Future<void> savePrivacy(PrivacySettings settings);
+
   /// Форматирование времени (в `VibeBackend` — статика, здесь — метод).
   String formatTime(dynamic raw);
 }
@@ -311,6 +315,13 @@ class LiveVibeBackend implements VibeBackendApi {
         emoji: emoji,
         bio: bio,
       );
+
+  @override
+  Future<PrivacySettings?> fetchPrivacy() => _b.fetchPrivacy();
+
+  @override
+  Future<void> savePrivacy(PrivacySettings settings) =>
+      _b.savePrivacy(settings);
 
   @override
   String formatTime(dynamic raw) => VibeBackend.formatTime(raw);
