@@ -462,4 +462,38 @@ void main() {
     expect(bubbles[3].isLastInGroup, isTrue,
         reason: 'одиночное исходящее — и первое, и последнее');
   });
+
+  testWidgets('сведения о чате: тип, участник, счётчик вместо заглушки v2.0',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'привет'),
+      msg(id: 'm2', text: 'как дела'),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сведения о чате'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Личный чат'), findsOneWidget);
+    expect(find.text('Участник'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('Иван'),
+      ),
+      findsWidgets,
+      reason: 'название и участник в шапке сведений',
+    );
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('2'),
+      ),
+      findsOneWidget,
+      reason: 'счётчик сообщений из загруженной истории',
+    );
+  });
 }

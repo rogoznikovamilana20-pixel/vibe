@@ -455,6 +455,93 @@ class _ChatScreenState extends State<ChatScreen> {
           _openMedia();
         },
         onClearHistory: () => _confirmClearHistory(),
+        onChatInfo: _showChatInfo,
+      ),
+    );
+  }
+
+  /// 2.12: сведения о чате — тип, участник, число сообщений (локальные данные).
+  void _showChatInfo() {
+    final chat = widget.chat;
+    final kind = switch (chat.kind) {
+      'pm' => 'Личный чат',
+      'group' => 'Группа',
+      'channel' => 'Канал',
+      _ => 'Чат',
+    };
+    final peer = chat.peerName != null && chat.peerName!.isNotEmpty
+        ? chat.peerName!
+        : chat.title;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+          VibeSpacing.xl,
+          VibeSpacing.xs,
+          VibeSpacing.xl,
+          VibeSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                VibeAvatar(
+                  name: chat.title,
+                  size: VibeSizes.avatarMd,
+                  online: chat.peerOnline,
+                  photoUrl: chat.peerAvatar,
+                ),
+                const SizedBox(width: VibeSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chat.title,
+                        style: VibeTypography.subtitle.copyWith(
+                          color: context.vibeTextPrimary,
+                        ),
+                      ),
+                      Text(
+                        kind,
+                        style: VibeTypography.caption.copyWith(
+                          color: context.vibeTextTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: VibeSpacing.md),
+            const Divider(height: 1),
+            const SizedBox(height: VibeSpacing.xs),
+            if (chat.kind == 'pm')
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.person_outline_rounded,
+                    color: context.vibePrimary),
+                title: const Text('Участник'),
+                trailing: Text(
+                  peer,
+                  style: VibeTypography.bodyMedium,
+                ),
+              ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.forum_outlined,
+                  color: context.vibePrimary),
+              title: const Text('Сообщений'),
+              trailing: Text(
+                '${_chat.messages.length}',
+                style: VibeTypography.bodyMedium,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -21,6 +21,7 @@ class ChatMenuSheet extends StatefulWidget {
     this.onTapSearch,
     this.onTapMedia,
     this.onClearHistory,
+    this.onChatInfo,
   });
 
   final VibeChat chat;
@@ -28,6 +29,9 @@ class ChatMenuSheet extends StatefulWidget {
   final VoidCallback? onTapSearch;
   final VoidCallback? onTapMedia;
   final VoidCallback? onClearHistory;
+
+  /// 2.12: открыть «Сведения о чате» (вместо заглушки «в v2.0»).
+  final VoidCallback? onChatInfo;
 
   @override
   State<ChatMenuSheet> createState() => _ChatMenuSheetState();
@@ -173,7 +177,12 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           title: const Text('Сведения о чате'),
           onTap: () {
             Navigator.of(context).pop();
-            widget.onSnack('Сведения о чате — в v2.0');
+            final info = widget.onChatInfo;
+            if (info != null) {
+              info();
+            } else {
+              widget.onSnack('Сведения о чате — в v2.0');
+            }
           },
         ),
         ListTile(
