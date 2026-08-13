@@ -9,6 +9,7 @@ import 'package:vibe_app/core/widgets/vibe_avatar.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
 import 'package:vibe_app/screens/chat_screen.dart';
+import 'package:vibe_app/screens/peer_profile_screen.dart';
 
 import 'fake_vibe_backend.dart';
 
@@ -590,5 +591,25 @@ void main() {
         ))
         .data;
     expect(label, isNotEmpty);
+  });
+
+  testWidgets('8.4.5: Hero-переход чат ↔ профиль по общему тегу',
+      (tester) async {
+    fake.messagesByChat['c1'] = [msg(id: 'm1', text: 'привет')];
+    await pumpChat(tester);
+
+    Finder heroOf(String tag) => find.byWidgetPredicate(
+          (w) => w is Hero && w.tag == tag,
+        );
+
+    expect(heroOf('avatar_c1'), findsOneWidget,
+        reason: 'аватар в шапке чата — Hero с тегом avatar_<id>');
+
+    await tester.tap(heroOf('avatar_c1'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PeerProfileScreen), findsOneWidget);
+    expect(heroOf('avatar_c1'), findsOneWidget,
+        reason: 'профиль использует тот же Hero-тег — анимация перехода живая');
   });
 }

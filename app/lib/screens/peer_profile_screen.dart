@@ -165,7 +165,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
               children: [
                 const SizedBox(height: VibeSpacing.lg),
                 Hero(
-                  tag: 'peer_profile_${chat.id}',
+                  tag: 'avatar_${chat.id}',
                   child: VibeAvatar(
                     name: chat.title,
                     size: VibeSizes.avatarXl,
