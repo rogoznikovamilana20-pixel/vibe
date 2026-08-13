@@ -345,6 +345,35 @@ class FakeVibeBackend implements VibeBackendApi {
     return !takenUsernames.contains(username.trim().toLowerCase());
   }
 
+  // ─── Контакты (8.3.1) ───
+  List<VibeProfile> searchResults = [];
+  final Map<String, String> pmChatForPeer = {};
+
+  @override
+  Future<List<VibeProfile>> searchUsers(String query) async {
+    calls.add('searchUsers($query)');
+    final q = query.trim().toLowerCase();
+    return searchResults
+        .where((p) =>
+            p.displayName.toLowerCase().contains(q) ||
+            p.username.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
+  Future<String> ensurePmChat(String peerId) async {
+    calls.add('ensurePmChat($peerId)');
+    return pmChatForPeer[peerId] ?? 'pm_$peerId';
+  }
+
+  @override
+  Future<VibeChat?> chatById(String chatId) async {
+    for (final c in chatList) {
+      if (c.id == chatId) return c;
+    }
+    return null;
+  }
+
   @override
   Future<void> updateProfile({
     required String username,

@@ -113,6 +113,11 @@ abstract class VibeBackendApi {
     String? bio,
   });
 
+  // ─── Контакты (8.3.1) ───
+  Future<List<VibeProfile>> searchUsers(String query);
+  Future<String> ensurePmChat(String peerId);
+  Future<VibeChat?> chatById(String chatId);
+
   // ─── Приватность (3.7) ───
   Future<PrivacySettings?> fetchPrivacy();
   Future<void> savePrivacy(PrivacySettings settings);
@@ -325,4 +330,14 @@ class LiveVibeBackend implements VibeBackendApi {
 
   @override
   String formatTime(dynamic raw) => VibeBackend.formatTime(raw);
+
+  @override
+  Future<List<VibeProfile>> searchUsers(String query) =>
+      _b.searchUsers(query);
+
+  @override
+  Future<String> ensurePmChat(String peerId) => _b.ensurePmChat(peerId);
+
+  @override
+  Future<VibeChat?> chatById(String chatId) => _b.chatById(chatId);
 }

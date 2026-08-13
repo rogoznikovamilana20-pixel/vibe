@@ -11,6 +11,7 @@ import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_input.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
+import 'add_contact_screen.dart';
 import 'chat_screen.dart';
 
 /// Вкладка «Контакты» — как в Telegram: поиск и список людей.
@@ -100,6 +101,30 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
   }
 
+  void _openAddContact() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => const AddContactScreen(),
+        transitionsBuilder: (_, animation, _, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.05, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: VibeAnimations.standard,
+              )),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: VibeAnimations.fadeIn,
+      ),
+    );
+  }
+
   void _snack(String msg) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -116,7 +141,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             child: VibeTopBar(
               leading: IconButton(
                 icon: const Icon(Icons.person_add_alt_1_rounded),
-                onPressed: () => _snack('Добавление контакта — скоро'),
+                onPressed: _openAddContact,
                 color: context.vibeTextPrimary,
                 tooltip: 'Добавить контакт',
               ),

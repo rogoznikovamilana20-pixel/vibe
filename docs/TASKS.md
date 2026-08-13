@@ -66,10 +66,11 @@
 | 8.2.3 Фирменный FAB | ✅ (VibeFab: градиент + 0.86; ComposeFAB делегирует) | 13.08.2026 |
 | 8.2.4 Switch/SegmentedButton | ✅ (switchTheme уже был; segmented не используется) | 13.08.2026 |
 | 8.2.5 Кнопки композера | ✅ (пилюли + rolling-анимации реализованы ранее) | 13.08.2026 |
+| 8.3.1 Контакты «+» | ✅ (AddContactScreen: поиск→«Написать», приглашение; тесты 2) | 13.08.2026 |
 
 ## Тестовый щит (на 13.08.2026)
 - `flutter analyze` — **0 issues**
-- `flutter test` — **169/169**
+- `flutter test` — **171/171**
 - `flutter build apk --release` — OK (65.9 MB)
 - CI-гейт `app/tool/verify.ps1` — passed (EXIT=0)
 
