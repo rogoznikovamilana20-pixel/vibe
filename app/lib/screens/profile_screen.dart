@@ -17,6 +17,7 @@ import '../data/backend.dart';
 import 'avatar_editor_screen.dart';
 import 'chat_screen.dart';
 import 'edit_profile_screen.dart';
+import 'my_links_screen.dart';
 import 'settings_screen.dart';
 
 /// Вкладка «Профиль» — как раздел профиля в Telegram:
@@ -221,6 +222,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: 'Имя пользователя',
                   trailing: _username(),
                   onTap: () => _copyProfileLink(context),
+                ),
+                _ProfileActionTile(
+                  icon: Icons.link_rounded,
+                  title: 'Мои ссылки',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MyLinksScreen(
+                        userName: widget.userName,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             );
