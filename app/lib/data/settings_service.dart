@@ -42,6 +42,7 @@ class SettingsService {
   static const _keyPrivacyGroups = 'vibe_privacy_groups';
   static const _keyAutoDelete = 'vibe_auto_delete';
   static const _keyPinnedChats = 'vibe_pinned_chats';
+  static const _keyHiddenChats = 'vibe_hidden_chats';
   static const _keyMutedChats = 'vibe_muted_chats';
   static const _keyBlockedUsers = 'vibe_blocked_users';
 
@@ -208,6 +209,19 @@ class SettingsService {
   List<String> get pinnedChats => _prefs.getStringList(_keyPinnedChats) ?? const [];
   Future<void> setPinnedChats(List<String> ids) async {
     await _prefs.setStringList(_keyPinnedChats, ids);
+  }
+
+  // Скрытые чаты (id чатов, локально + защита пасскодом на экране)
+  List<String> get hiddenChats =>
+      _prefs.getStringList(_keyHiddenChats) ?? const [];
+
+  /// Сигнал об изменении списка скрытых чатов (список чатов обновляет
+  /// чип-счётчик и ленту скрытых на лету).
+  final ValueNotifier<int> hiddenVersion = ValueNotifier<int>(0);
+
+  Future<void> setHiddenChats(List<String> ids) async {
+    await _prefs.setStringList(_keyHiddenChats, ids);
+    hiddenVersion.value++;
   }
 
   // Чаты с выключенным звуком уведомлений («Не беспокоить»), локально

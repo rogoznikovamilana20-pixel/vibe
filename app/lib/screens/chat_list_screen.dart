@@ -31,6 +31,7 @@ import 'create_group_screen.dart';
 import 'lock_screen.dart';
 import 'new_message_screen.dart';
 import 'search_screen.dart';
+import 'settings/privacy/passcode_screen.dart';
 import 'story_composer_screen.dart';
 import 'story_player.dart';
 
@@ -59,7 +60,8 @@ class ChatListScreen extends StatefulWidget {
 
 enum _Folder { all, personal, groups, channels, business }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen>
+    with WidgetsBindingObserver {
   /// Поверхность данных экрана: живой бэкенд или фейк из теста.
   late final VibeBackendApi _backend = widget.backend ?? LiveVibeBackend();
 
@@ -78,6 +80,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   // Режим просмотра: архив / скрытые / основной список.
   bool _showArchive = false;
   bool _showHidden = false;
+  // Скрытые чаты показываются только после ввода пасскода в сессии экрана.
+  bool _hiddenUnlocked = false;
   // Защита от повторного входа в «Избранное» (двойной тап = двойной push).
   bool _openingSaved = false;
 
@@ -90,6 +94,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _chat = ChatListController(
       onSnack: _snack,
       onReloadStories: _loadStories,
@@ -100,7 +105,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Сворачивание приложения: скрытые чаты снова под замком.
+    if (state == AppLifecycleState.paused) {
+      _hiddenUnlocked = false;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _chat.dispose();
     super.dispose();
   }
@@ -135,6 +149,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final pinned = _chat.pinned.contains(chat.id);
     final archived = _chat.archived.contains(chat.id);
     final dnd = _chat.dnd.contains(chat.id);
+    final hidden = _chat.hidden.contains(chat.id);
     final sheetTheme = Theme.of(context);
     final sheetBg = sheetTheme.brightness == Brightness.dark
         ? VibeColors.surface2Dark
@@ -195,6 +210,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
               onTap: () {
                 Navigator.of(sheetCtx).pop();
                 _chat.setArchived(chat.id, archivedNow: !archived);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                hidden ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                color: Colors.grey,
+              ),
+              title: Text(
+                hidden ? 'Показать чат' : 'Скрыть чат',
+                style: TextStyle(color: sheetText, fontSize: 16),
+              ),
+              subtitle: hidden
+                  ? null
+                  : const Text(
+                      'Прячет чат из списка; доступ по пасскоду',
+                      style: TextStyle(fontSize: 12),
+                    ),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _chat.setHidden(chat.id, hiddenNow: !hidden);
               },
             ),
             ListTile(
@@ -1022,10 +1057,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return Padding(
       padding: const EdgeInsets.only(right: VibeSpacing.sm),
       child: GestureDetector(
-        onTap: () => setState(() {
-          _showArchive = label == 'Архив';
-          _showHidden = label == 'Скрытые чаты';
-        }),
+        onTap: () => _openFolder(label),
         child: VibeGlassSurface(
           radius: VibeRadius.badge,
           blur: VibeBlur.nav,
@@ -1065,6 +1097,53 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       ),
     );
+  }
+
+  /// Открыть папку «Архив» или «Скрытые чаты». Скрытые охраняются
+  /// пасскодом: без установленного ПИНа — предложение установить,
+  /// иначе полноэкранный ввод кода (LockScreen) перед показом.
+  Future<void> _openFolder(String label) async {
+    if (label == 'Скрытые чаты') {
+      final pass = PasscodeService.instance;
+      if (!pass.hasPasscode) {
+        final setup = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            title: const Text('Защита скрытых чатов'),
+            content: const Text(
+              'Скрытые чаты охраняются код-паролем. '
+              'Установите пасскод в настройках приватности.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: const Text('Позже'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                child: const Text('Установить'),
+              ),
+            ],
+          ),
+        );
+        if (setup != true || !mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PasscodeSettingsScreen()),
+        );
+        return;
+      }
+      if (!_hiddenUnlocked) {
+        final ok = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => const LockScreen()),
+        );
+        if (ok != true || !mounted) return;
+        _hiddenUnlocked = true;
+      }
+    }
+    setState(() {
+      _showArchive = label == 'Архив';
+      _showHidden = label == 'Скрытые чаты';
+    });
   }
 
   Widget _buildAurionCard(BuildContext context) {

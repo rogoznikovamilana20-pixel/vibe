@@ -153,6 +153,44 @@ void main() {
       expect(snacks.single, startsWith('Скрыто'));
     });
 
+    test('скрытие персистится: новый контроллер восстанавливает список',
+        () async {
+      controller.toggleSelect('c1');
+      controller.markHidden();
+      await pump();
+
+      final restored = ChatListController(
+        onSnack: (_) {},
+        backend: fake,
+      );
+      await restored.load();
+      await pump();
+
+      expect(restored.hidden, {'c1'},
+          reason: 'скрытые чаты сохраняются между сессиями');
+      restored.dispose();
+    });
+
+    test('setHidden: скрыть/показать один чат + персистентность', () async {
+      controller.setHidden('c1', hiddenNow: true);
+      expect(controller.hidden, {'c1'});
+      await pump();
+      expect(SettingsService.instance.hiddenChats, ['c1']);
+
+      controller.setHidden('c1', hiddenNow: false);
+      expect(controller.hidden, isEmpty);
+      await pump();
+      expect(SettingsService.instance.hiddenChats, isEmpty);
+    });
+
+    test('syncHidden: изменение в другом месте синхронизируется', () async {
+      await controller.load();
+      await pump();
+      await SettingsService.instance.setHiddenChats(['c7']);
+      await pump();
+      expect(controller.hidden, {'c7'});
+    });
+
     test('removeSelected: чаты удаляются из ленты', () async {
       fake.chatList = [chat('c1'), chat('c2')];
       await controller.load();

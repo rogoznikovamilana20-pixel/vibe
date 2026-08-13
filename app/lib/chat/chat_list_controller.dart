@@ -54,9 +54,11 @@ class ChatListController extends ChangeNotifier {
       ..addAll(SettingsService.instance.mutedChats)
       ..addAll(backend.mutedNotifier.value);
     archived.addAll(backend.archivedNotifier.value);
+    hidden.addAll(SettingsService.instance.hiddenChats);
 
     SettingsService.instance.mutedVersion.addListener(syncMuted);
     SettingsService.instance.blockedVersion.addListener(syncBlocked);
+    SettingsService.instance.hiddenVersion.addListener(syncHidden);
     backend.archivedNotifier.addListener(syncCloudArchive);
     backend.mutedNotifier.addListener(syncCloudMuted);
     backend.presenceVersion.addListener(onPresenceChanged);
@@ -85,6 +87,18 @@ class ChatListController extends ChangeNotifier {
       dnd
         ..clear()
         ..addAll(muted);
+      notifyListeners();
+    }
+  }
+
+  /// Синхронизация скрытых чатов (другой экран скрыл/показал).
+  void syncHidden() {
+    if (_disposed) return;
+    final hiddenNow = SettingsService.instance.hiddenChats.toSet();
+    if (hiddenNow.length != hidden.length || hiddenNow.difference(hidden).isNotEmpty) {
+      hidden
+        ..clear()
+        ..addAll(hiddenNow);
       notifyListeners();
     }
   }
@@ -222,12 +236,28 @@ class ChatListController extends ChangeNotifier {
     onSnack('В архив: ${archived.length}');
   }
 
-  /// Спрятать выделенные чаты (в HMS-список).
+  /// Спрятать выделенные чаты (в скрытую папку, защищённую пасскодом).
   void markHidden() {
     hidden.addAll(selected);
     selected.clear();
+    _persistHidden();
     notifyListeners();
     onSnack('Скрыто: ${hidden.length}');
+  }
+
+  /// Скрыть/показать один чат (из меню чата).
+  void setHidden(String id, {required bool hiddenNow}) {
+    if (hiddenNow) {
+      hidden.add(id);
+    } else {
+      hidden.remove(id);
+    }
+    _persistHidden();
+    notifyListeners();
+  }
+
+  void _persistHidden() {
+    SettingsService.instance.setHiddenChats(hidden.toList());
   }
 
   void togglePin(String id) {
@@ -306,6 +336,7 @@ class ChatListController extends ChangeNotifier {
     _chatSub?.cancel();
     SettingsService.instance.mutedVersion.removeListener(syncMuted);
     SettingsService.instance.blockedVersion.removeListener(syncBlocked);
+    SettingsService.instance.hiddenVersion.removeListener(syncHidden);
     backend.archivedNotifier.removeListener(syncCloudArchive);
     backend.mutedNotifier.removeListener(syncCloudMuted);
     backend.presenceVersion.removeListener(onPresenceChanged);

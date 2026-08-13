@@ -157,6 +157,9 @@ class NotificationService {
 
     final s = SettingsService.instance;
 
+    // Скрытые чаты — тишина: ни превью, ни уведомления (приватность).
+    if (s.hiddenChats.contains(msg.chatId)) return;
+
     // Настройка «Уведомления из чатов»: личные/группы можно выключить.
     // Тип чата берём с кешем (без лишних запросов на каждое сообщение).
     unawaited(() async {
