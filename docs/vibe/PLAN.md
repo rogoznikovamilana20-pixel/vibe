@@ -371,6 +371,19 @@
 ### Следующее
 - Фаза 9.11: мелочи перед prod + финальные прогоны; локализация чата — отдельный флайт (known gap)
 
+## Phase 3 — Фаза C (порция 15): мелочи перед prod + финальные прогоны (9.11) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 102/102)
+- **Release-прогон**: `flutter build apk --release` успешно (65.9MB, Gradle 8.13 / Kotlin 2.1.20 — предупреждения о будущем drop, не блокируют)
+- **Prod-мусор**: в lib/ только `debugPrint` (no-op в release), `print(`/`kDebugMode`-артефактов нет
+- Строки/версия: `vibe_app` 1.6.3+1
+
+### Проверка
+- `flutter analyze` — 0 issues; `flutter test` — 102/102; `flutter build apk --release` — OK
+
+### Следующее
+- По master-списку далее: фазы 9.12–9.13 (определения в master-промпте) + официальные пункты MASTER_PLAN: 9.3 Golden-тесты тем, 9.4 integration-тесты, 9.5 CI, 9.6 PERF, 9.7 TASKS; Aurion — после Фаз A/B/C (D7)
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list
