@@ -57,6 +57,8 @@ void main() {
 
     expect(fake.updateProfileCalls, 0, reason: 'занятый ник не уходит на сервер');
     expect(find.text('Этот никнейм уже занят'), findsWidgets);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('свободный ник: ошибки нет, сохранение уходит с выбранным ником',
@@ -76,5 +78,7 @@ void main() {
 
     expect(fake.updateProfileCalls, 1);
     expect(fake.lastUsernameUpdated, 'ivan_petrov');
+
+    await tester.pump(const Duration(seconds: 3));
   });
 }

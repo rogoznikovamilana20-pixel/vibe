@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/widgets/vibe_button.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Результат композера: фото истории (байты PNG/JPEG).
 class StoryComposerResult {
@@ -102,9 +103,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

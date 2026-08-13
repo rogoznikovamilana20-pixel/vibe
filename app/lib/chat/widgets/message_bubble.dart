@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -18,6 +18,7 @@ import '../../data/backend.dart';
 import '../../data/settings_service.dart';
 import '../models.dart';
 import 'message_status_tick.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Пузырь сообщения: текст/медиа/стикер/голосовое/видеокружок, свайп-ответ,
 /// двойной тап — сердечко с искрами, реакции и статусные галочки.
@@ -723,9 +724,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     var url = widget.msg.voiceUrl;
     if ((localPath == null || localPath.isEmpty) &&
         (url == null || url.isEmpty)) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Нет аудиофайла')));
+      VibeToast.show(context, 'Нет аудиофайла');
       return;
     }
     setState(() => _playing = !_playing);

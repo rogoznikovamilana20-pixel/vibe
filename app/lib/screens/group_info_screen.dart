@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
@@ -9,6 +9,7 @@ import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Результат закрытия инфо-группы.
 class GroupInfoResult {
@@ -176,9 +177,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
   }
 
   void _snack(String text) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text)));
+    VibeToast.show(context, text);
   }
 
   Widget _groupAvatar(BuildContext context) {

@@ -83,6 +83,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Скопировано: vibe.me/@ivan_petrov'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('QR: шит с кодом и кнопкой копирования', (tester) async {

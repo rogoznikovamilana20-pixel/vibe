@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/vibe_animations.dart';
@@ -13,6 +13,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import '../data/backend_api.dart';
 import 'chat_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// 8.3.1: добавление контакта — как в Telegram: имя/@ник → поиск
 /// → «Написать» (открывает pm-чат). Если никого не нашли — приглашение
@@ -98,9 +99,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

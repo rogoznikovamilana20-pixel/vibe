@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/localization/vibe_localizations.dart';
 import '../../core/theme/vibe_spacing.dart';
@@ -133,9 +134,7 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
                 title: l.resetNotifications,
                 destructive: true,
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l.resetNotifications)),
-                  );
+                  VibeToast.show(context, l.resetNotifications);
                 },
               ),
             ],

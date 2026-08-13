@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
 import '../../../core/localization/vibe_localizations.dart';
 import '../../../core/theme/vibe_colors.dart';
 import '../../../core/theme/vibe_spacing.dart';
@@ -68,9 +69,7 @@ class DevicesScreen extends StatelessWidget {
                 title: l.terminateAllSessions,
                 destructive: true,
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l.terminateAllSessions)),
-                  );
+                  VibeToast.show(context, l.terminateAllSessions);
                 },
               ),
             ],

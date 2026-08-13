@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/localization/vibe_localizations.dart';
 import '../../core/theme/vibe_spacing.dart';
@@ -202,11 +203,9 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
         HapticFeedback.selectionClick();
         SettingsService.instance.setAccentColor(displayColor.toARGB32());
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.locale.languageCode == 'ru'
-            ? 'Акцентный цвет обновлён'
-            : 'Accent color updated')),
-        );
+        VibeToast.show(context, l.locale.languageCode == 'ru'
+? 'Акцентный цвет обновлён'
+: 'Accent color updated');
       },
       child: Container(
         width: 40,

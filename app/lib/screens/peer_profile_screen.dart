@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +13,7 @@ import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import '../data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Один медиафайл из переписки (фото или видеокружок).
 class PeerMedia {
@@ -66,11 +67,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
         : [...current, id];
     SettingsService.instance.setBlockedUsers(next);
     setState(() => _isBlocked = !_isBlocked);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(_isBlocked ? 'Пользователь заблокирован' : 'Пользователь разблокирован')),
-      );
+    VibeToast.show(context, _isBlocked ? 'Пользователь заблокирован' : 'Пользователь разблокирован');
   }
 
   Future<void> _load() async {
@@ -238,11 +235,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                       icon: Icons.call_rounded,
                       label: 'Аудио',
                       onTap: () {
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            const SnackBar(content: Text('Аудиозвонок — в v2.0')),
-                          );
+                        VibeToast.show(context, 'Аудиозвонок — в v2.0');
                       },
                     ),
                   ),
@@ -252,11 +245,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                       icon: Icons.videocam_rounded,
                       label: 'Видео',
                       onTap: () {
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            const SnackBar(content: Text('Видеозвонок — в v2.0')),
-                          );
+                        VibeToast.show(context, 'Видеозвонок — в v2.0');
                       },
                     ),
                   ),

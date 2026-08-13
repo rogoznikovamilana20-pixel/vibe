@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1879,8 +1880,6 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   void _snack(String msg) {
     HapticFeedback.lightImpact(); // ЛЕГКОЕ ВИБРО ПРИ УВЕДОМЛЕНИИ
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 }

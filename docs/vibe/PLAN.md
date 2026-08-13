@@ -715,7 +715,18 @@
 - analyze 0; flutter test 179/179 (+7)
 
 ### Следующее
-- **8.1.1** иконочный шрифт (120 иконок) + **8.1.2** замена материальных; 8.3.3 вложения (блокирован серверной схемой); 8.4.6 снэки (62 шт); 1.7/1.8 крипто
+- **8.1.1** иконочный шрифт (120 иконок) + **8.1.2** замена материальных; 8.3.3 вложения (блокирован серверной схемой); 1.7/1.8 крипто
+
+## Phase 8 — UX (порция 42): 8.4.6 тосты вместо SnackBar ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 183/183, +4)
+- **8.4.6**: фирменный тост `VibeToast` (core/widgets/vibe_toast.dart) — тёмная стеклянная капсула тоста ТГ: blur 24, border белый 0.10, тень, анимация входа (fast + easeOutCubic), root-overlay (работает и без Scaffold), один тост за раз (новый заменяет предыдущий), авто-исчезание 2.2 с, пре-сеты иконок `VibeToastIcons` (success/error/info). Заменены ВСЕ SnackBar: ~102 вызова `_snack()` в 15 экранах (add_contact, aurion, chat_list, chat, contacts, create_group, edit_profile, group_info, new_message, profile, profile_setup, settings, story_composer, video_round_recorder, two_step_verification) — тела переведены на `VibeToast.show(context, msg)` (Haptic сохранён); 11 прямых `showSnackBar` в 8 файлах (message_bubble «Нет доступа», folders «Назовите папку», my_links «Скопировано», peer_profile блокировка/фичи v2.0, appearance «Акцентный цвет» с локализацией, notifications/devices/passcode) — в lib/ 0 SnackBar. Тесты 4 (показ+таймер, замена вторым, без Scaffold, с иконкой); тесты, зависевшие от SnackBar/висящих таймеров, поправлены (chat_screen 4, edit_profile 2, my_links 1, chat_list 1, add_contact 1 — проверка тоста по тексту).
+
+### Проверка
+- analyze 0; flutter test 183/183 (+4); `grep SnackBar lib/` = 0
+
+### Следующее
+- **8.1.1** иконочный шрифт (120 иконок) + **8.1.2** замена материальных; 8.3.3 вложения (блокирован серверной схемой); 1.7/1.8 крипто
 
 ## Следующие фазы (из master-промпта)
 

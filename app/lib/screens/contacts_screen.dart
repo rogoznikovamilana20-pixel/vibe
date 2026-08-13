@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
@@ -13,6 +13,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'add_contact_screen.dart';
 import 'chat_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Вкладка «Контакты» — как в Telegram: поиск и список людей.
 /// Тап по контакту открывает чат с ним.
@@ -126,9 +127,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pinput/pinput.dart';
 import '../../../core/localization/vibe_localizations.dart';
@@ -201,9 +202,7 @@ class _PasscodeSettingsScreenState extends State<PasscodeSettingsScreen> {
                         final can = await PasscodeService.instance.canUseBiometrics();
                         if (!context.mounted) return;
                         if (!can) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Биометрия не поддерживается вашим устройством')),
-                          );
+                          VibeToast.show(context, 'Биометрия не поддерживается вашим устройством');
                           return;
                         }
                       }
@@ -311,9 +310,7 @@ class _PasscodePromptState extends State<_PasscodePrompt> {
                   } else {
                     _controller.clear();
                     HapticFeedback.vibrate();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Коды не совпадают')),
-                    );
+                    VibeToast.show(context, 'Коды не совпадают');
                   }
                 }
               }

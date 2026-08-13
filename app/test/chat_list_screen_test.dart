@@ -163,6 +163,8 @@ void main() {
     expect(fake.setArchivedCalls, isNotEmpty);
     expect(fake.setArchivedCalls.first.id, 'c1');
     expect(fake.setArchivedCalls.first.archived, isTrue);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('длинное нажатие → меню → «Выбрать чаты» → режим выбора',

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
@@ -11,6 +11,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import '../data/chat_folder.dart';
 import '../data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// 8.3.7: экран «Папки» — список пользовательских папок чатов.
 /// Каждая папка — название + эмодзи; состав чатов назначается вручную.
@@ -247,8 +248,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
     final settings = SettingsService.instance;
     final title = _title.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Назовите папку')));
+      VibeToast.show(context, 'Назовите папку');
       return;
     }
     if (_isNew) {

@@ -161,6 +161,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('плашка «Непрочитанные: N» видна и прыгает к первому',
@@ -367,6 +369,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fake.forwardCalls, [(chatId: 'c2', text: 'перешли меня')]);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('история правок: меню у изменённого → снимки текста в шите',
@@ -533,6 +537,8 @@ void main() {
       hasLength(1),
     );
     ScheduledService.instance.debugReset();
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('отложенная отправка: отмена из списка снимает план',
@@ -557,6 +563,8 @@ void main() {
     expect(ScheduledService.instance.pendingFor('c1'), isEmpty);
     expect(find.textContaining('Запланировано ·'), findsNothing);
     ScheduledService.instance.debugReset();
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('8.4.1: липкая плашка даты появляется при скролле от низа',

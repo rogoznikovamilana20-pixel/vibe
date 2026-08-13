@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'dart:async';
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -1998,9 +1999,7 @@ Expanded(
 
   void _snack(String msg) {
     HapticFeedback.lightImpact(); // ЛЕГКОЕ ВИБРО ПРИ УВЕДОМЛЕНИИ
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   // ─── Видеокружок: inline-запись (удержание камеры, как в TG) ───

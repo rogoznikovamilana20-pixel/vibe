@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +14,7 @@ import '../core/widgets/vibe_input.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'chat_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// «Создать группу» как в Telegram: выбираем участников из контактов,
 /// создаём групповой чат и сразу открываем его.
@@ -107,9 +108,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   List<VibeProfile> get _filtered {

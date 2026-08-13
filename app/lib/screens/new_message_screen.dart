@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_colors.dart';
@@ -11,6 +11,7 @@ import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'chat_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Экран «Новое сообщение» — как в Telegram: поле поиска контакта сверху
 /// и список контактов; тап открывает переписку.
@@ -89,9 +90,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

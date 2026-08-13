@@ -87,6 +87,9 @@ void main() {
 
     await tester.tap(find.text('Пригласить друга'));
     await tester.pump();
-    expect(find.byType(SnackBar), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Приглашение скопировано — отправьте его другу'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/vibe_colors.dart';
@@ -22,6 +22,7 @@ import 'settings/notifications_settings.dart';
 import 'settings/privacy_settings.dart';
 import 'settings/data_settings.dart';
 import 'settings/language_settings.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Настройки в стиле Telegram (вкладка «Настройки»).
 class SettingsScreen extends StatefulWidget {
@@ -286,9 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   Future<void> _askQuestion(BuildContext context, VibeLocalizations l) async {

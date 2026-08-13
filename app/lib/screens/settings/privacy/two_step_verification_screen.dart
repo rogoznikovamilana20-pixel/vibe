@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿
+import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
 import '../../../core/localization/vibe_localizations.dart';
 import '../../../core/theme/vibe_spacing.dart';
 import '../../../core/theme/vibe_theme.dart';
@@ -58,7 +59,7 @@ class _TwoStepVerificationScreenState extends State<TwoStepVerificationScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

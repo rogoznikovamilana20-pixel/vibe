@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/aurion/aurion_service.dart';
@@ -10,6 +10,7 @@ import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_input.dart';
 import '../core/widgets/vibe_top_bar.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Aurion — персональный AI-ассистент (слой, отдельной вкладки нет).
 ///
@@ -109,9 +110,7 @@ class _AurionScreenState extends State<AurionScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -10,6 +10,7 @@ import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Результат записи видеокружка.
 class VideoRoundResult {
@@ -137,9 +138,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   void _onTapDown(TapDownDetails d) {

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +15,7 @@ import '../core/widgets/vibe_input.dart';
 import '../data/backend.dart';
 import 'avatar_editor_screen.dart';
 import 'root_shell.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Создание профиля: имя + эмодзи-аватарка.
 class ProfileSetupScreen extends StatefulWidget {
@@ -92,7 +93,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   /// Клик по аватарке: галерея / камера / удалить (как в профиле).

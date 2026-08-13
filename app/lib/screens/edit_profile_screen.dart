@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -11,6 +11,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import '../data/backend_api.dart';
 import 'aurion_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Редактирование данных аккаунта — аналог экрана
 /// «Изменить данные» в профиле Telegram.
@@ -97,9 +98,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 
   @override

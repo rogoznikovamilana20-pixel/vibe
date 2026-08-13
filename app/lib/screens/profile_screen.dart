@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -20,6 +20,7 @@ import 'chat_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_links_screen.dart';
 import 'settings_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Вкладка «Профиль» — как раздел профиля в Telegram:
 /// QR-код, аватарка, имя, кнопки «Выбрать фото / Изменить данные /
@@ -575,9 +576,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    VibeToast.show(context, msg);
   }
 }
 

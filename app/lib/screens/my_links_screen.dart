@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -7,6 +7,7 @@ import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// «Мои ссылки» — список ссылок на профиль (как в Telegram
 /// «Расширенные права» → ссылки): vibe.me-ссылка, @ник, телефон, QR-код.
@@ -32,9 +33,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
   Future<void> _copy(BuildContext context, String text, String snack) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(snack)));
+    VibeToast.show(context, snack);
   }
 
   void _showQrSheet(BuildContext context, VibeProfile? p) {
