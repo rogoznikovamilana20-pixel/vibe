@@ -636,6 +636,17 @@
 ### Следующее
 - 8.4.4 превью ссылок; 8.2 кнопочная система; 4.x Cloud Pinning; 1.7/1.8 крипто
 
+## Phase 3 — Фаза C (порция 35): UX 8.4.4 LinkPreview ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 166/166, CI-гейт EXIT=0)
+- **8.4.4 Превью ссылок**: сервис `VibeLinkPreview` (core/services/link_preview.dart) — первая ссылка в тексте → GET страницы (http, таймаут 6 с, лимит 512 КБ) → парсинг OpenGraph (`og:title|description|image`, fallback `<title>`/meta description, относительный image против базового URL) → кэш по URL на память; пустой результат кэшируется как «без превью» (честная деградация). Карточка `_LinkPreviewCard` под текстом в MessageBubble (thumb 54px через VibeNetImage + title/domain, InkWell → onOpenUrl), обновляется через ListenableBuilder. `customFetcher` инъектируется из тестов; юнит-тесты 4 (firstUrl/parseOg/кэш) + widget-тест 1.
+
+### Проверка
+- analyze 0; verify.ps1 passed; 166/166 (+5)
+
+### Следующее
+- 8.2 кнопочная система; 4.x Cloud Pinning; 1.7/1.8 крипто; 8.3.7 папки чатов
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list

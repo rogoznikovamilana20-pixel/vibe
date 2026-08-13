@@ -12,6 +12,7 @@ import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
+import '../../core/services/link_preview.dart';
 import '../../core/widgets/vibe_avatar.dart';
 import '../../data/backend.dart';
 import '../../data/settings_service.dart';
@@ -348,6 +349,13 @@ class _MessageBubbleState extends State<MessageBubble>
             ),
           ),
         ),
+        // 8.4.4: превью ссылки под текстом (OpenGraph-карточка).
+        if (VibeLinkPreview.instance.firstUrl(msg.text) != null)
+          _LinkPreviewCard(
+            text: msg.text,
+            incoming: isIncoming,
+            onOpen: widget.onOpenUrl,
+          ),
         const SizedBox(height: 1),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -1071,6 +1079,113 @@ class _EqualizerWaveState extends State<EqualizerWave>
               ),
             );
           }),
+        );
+      },
+    );
+  }
+}
+
+/// 8.4.4: карточка превью ссылки (OpenGraph) под текстом сообщения.
+/// Показывается когда первая ссылка в тексте дала данные; пустой ответ
+/// (нет меты / сеть недоступна) — честная деградация без карточки.
+class _LinkPreviewCard extends StatelessWidget {
+  const _LinkPreviewCard({
+    required this.text,
+    required this.incoming,
+    required this.onOpen,
+  });
+
+  final String text;
+  final bool incoming;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: VibeLinkPreview.instance,
+      builder: (context, _) {
+        final meta = VibeLinkPreview.instance.metaFor(text);
+        if (meta == null || meta.isEmpty) return const SizedBox.shrink();
+        final thumb = meta.imageUrl == null
+            ? null
+            : ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(10),
+                  bottomLeft: Radius.circular(10),
+                ),
+                child: SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: VibeNetImage(
+                    source: meta.imageUrl!,
+                    placeholder: Container(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      child: const Icon(
+                        Icons.image_outlined,
+                        size: 20,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+        return Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 2),
+          child: Material(
+            color: incoming
+                ? context.vibeSurfaceHighlight
+                : Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => onOpen(meta.url),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ?thumb,
+                  Flexible(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: thumb != null || meta.title != null ? 8 : 12,
+                        right: 10,
+                        top: 4,
+                        bottom: 4,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (meta.title != null)
+                            Text(
+                              meta.title!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: incoming
+                                    ? context.vibeTextPrimary
+                                    : Colors.white,
+                              ),
+                            ),
+                          if (meta.domain.isNotEmpty)
+                            Text(
+                              meta.domain,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: incoming
+                                    ? context.vibeTextSecondary
+                                    : Colors.white60,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );

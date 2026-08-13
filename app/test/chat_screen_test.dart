@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vibe_app/chat/widgets/message_bubble.dart';
+import 'package:vibe_app/core/services/link_preview.dart';
 import 'package:vibe_app/core/services/scheduled_service.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/core/widgets/vibe_avatar.dart';
@@ -23,6 +24,7 @@ void main() {
     await SettingsService.instance.init();
     fake = FakeVibeBackend();
     VibeNetImage.resolveUrl = (_) async => null;
+    VibeLinkPreview.instance.customFetcher = null;
     ScheduledService.instance.debugReset();
     ScheduledService.instance.backendProvider = () => fake;
   });
@@ -611,5 +613,25 @@ void main() {
     expect(find.byType(PeerProfileScreen), findsOneWidget);
     expect(heroOf('avatar_c1'), findsOneWidget,
         reason: 'профиль использует тот же Hero-тег — анимация перехода живая');
+  });
+
+  testWidgets('8.4.4: превью ссылки под текстом сообщения', (tester) async {
+    VibeLinkPreview.instance.customFetcher = (uri) async => LinkMeta(
+          url: uri.toString(),
+          domain: uri.host,
+          title: 'Открытые данные на GitHub',
+          description: 'descr',
+        );
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'код тут https://github.com/opencode/docs'),
+    ];
+
+    await pumpChat(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Открытые данные на GitHub'), findsOneWidget);
+    expect(find.text('github.com'), findsOneWidget);
+
+    VibeLinkPreview.instance.customFetcher = null;
   });
 }
