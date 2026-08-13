@@ -59,6 +59,38 @@ class ChatListController extends ChangeNotifier {
     }
   }
 
+  /// 5.8: дельта-обновление ленты — полная замена только при реальных
+  /// изменениях (новый/выбывший чат, сдвиг порядка, смена превью/статусов).
+  /// Идентичная копия (одинаковые id, превью, онлайн-статусы) не вызывает
+  /// пересборку списка.
+  void _mergeChats(List<VibeChat> fresh) {
+    if (_sameChats(chats, fresh)) return;
+    chats = fresh;
+    notifyListeners();
+  }
+
+  static bool _sameChats(List<VibeChat> a, List<VibeChat> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.id != y.id ||
+          x.title != y.title ||
+          x.kind != y.kind ||
+          x.lastMessage != y.lastMessage ||
+          x.lastTime != y.lastTime ||
+          x.unread != y.unread ||
+          x.peerName != y.peerName ||
+          x.peerAvatar != y.peerAvatar ||
+          x.peerId != y.peerId ||
+          x.peerOnline != y.peerOnline ||
+          x.peerLastSeen != y.peerLastSeen) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /// Старт: локальные статусы + слушатели + realtime + первая загрузка.
   Future<void> load() async {
     pinned.addAll(SettingsService.instance.pinnedChats);
@@ -178,8 +210,7 @@ class ChatListController extends ChangeNotifier {
     _lastPresenceReload = DateTime.now();
     final fresh = await backend.listChats();
     if (_disposed) return;
-    chats = fresh;
-    notifyListeners();
+    _mergeChats(fresh);
   }
 
   void scheduleReload() {
@@ -205,8 +236,7 @@ class ChatListController extends ChangeNotifier {
     try {
       final fresh = await backend.listChats();
       if (_disposed) return;
-      chats = fresh;
-      notifyListeners();
+      _mergeChats(fresh);
     } catch (_) {
       // Сеть недоступна — остаёмся на кэше.
     }

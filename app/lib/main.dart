@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -36,8 +38,6 @@ void main() async {
   await PasscodeService.instance.init();
   await ProfileAvatar.load();
   await ScheduledService.instance.init();
-  // Облачное зеркало приватности (3.7) — best-effort.
-  await SettingsService.instance.loadPrivacyFromServer();
 
   // Временный E2E-хелпер: позволяет установить PIN без UI-навигации.
   const e2ePin = String.fromEnvironment('E2E_PIN');
@@ -59,6 +59,10 @@ void main() async {
   );
   
   runApp(const VibeApp());
+  // 5.9: облачное зеркало приватности (3.7) — фоновая догонялка уже
+  // после первого кадра: локальный кеш готов ещё до runApp, серверная
+  // перезапись не должна тянуть сплэш (best-effort, сеть может висеть).
+  unawaited(SettingsService.instance.loadPrivacyFromServer());
 }
 
 class VibeApp extends StatefulWidget {

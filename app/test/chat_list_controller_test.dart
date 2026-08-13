@@ -313,4 +313,46 @@ void main() {
       expect(listChatsCalls(), 3);
     });
   });
+
+  group('дельта-обновление ленты (5.8)', () {
+    test('идентичная копия с сервера — без notify и пересборки', () async {
+      var notifies = 0;
+      controller.addListener(() => notifies++);
+      fake.chatList = [chat('c1'), chat('c2')];
+      await controller.load();
+      notifies = 0;
+
+      await controller.loadChats();
+      expect(notifies, 0);
+      expect(controller.chats.length, 2);
+      expect(controller.chats[1].id, 'c2');
+    });
+
+    test('изменение одной карточки — один notify со свежими данными',
+        () async {
+      var notifies = 0;
+      controller.addListener(() => notifies++);
+      fake.chatList = [chat('c1'), chat('c2')];
+      await controller.load();
+      notifies = 0;
+
+      fake.chatList = [chat('c1', unread: 3), chat('c2')];
+      await controller.loadChats();
+      expect(notifies, 1);
+      expect(controller.chats.first.unread, 3);
+    });
+
+    test('новый чат в ленте — полная замена с пересборкой', () async {
+      var notifies = 0;
+      controller.addListener(() => notifies++);
+      fake.chatList = [chat('c1')];
+      await controller.load();
+      notifies = 0;
+
+      fake.chatList = [chat('c2'), chat('c1')];
+      await controller.loadChats();
+      expect(notifies, 1);
+      expect(controller.chats.first.id, 'c2');
+    });
+  });
 }

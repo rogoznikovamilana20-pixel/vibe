@@ -51,10 +51,13 @@
 | 5.4 Disk-кэш изображений | ✅ (MediaCache + cacheWidth; тесты 5) | 13.08.2026 |
 | 5.5 Стриминг загрузки медиа | ✅ (storage.upload(File) в sendVoice/sendVideo) | 13.08.2026 |
 | 5.6 Таймеры записи в пилюлях | ✅ (RollingPill/VideoRollPill тикают сами; тест 1) | 13.08.2026 |
+| 5.7 Realtime-каналы | ✅ (по факту: дубль postgres_changes отсутствует) | 13.08.2026 |
+| 5.8 Дельта-обновление ленты | ✅ (_mergeChats/_sameChats, без пустых notify; тесты 3) | 13.08.2026 |
+| 5.9 Ленивая инициализация | ✅ (privacy-зеркало после runApp, сплэш не ждёт сети) | 13.08.2026 |
 
 ## Тестовый щит (на 13.08.2026)
 - `flutter analyze` — **0 issues**
-- `flutter test` — **154/154**
+- `flutter test` — **157/157**
 - `flutter build apk --release` — OK (65.9 MB)
 - CI-гейт `app/tool/verify.ps1` — passed (EXIT=0)
 
