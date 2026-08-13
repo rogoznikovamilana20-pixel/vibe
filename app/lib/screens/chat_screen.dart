@@ -92,6 +92,22 @@ class _ChatScreenState extends State<ChatScreen> {
   // Аудиоплеер голосовых сообщений.
   final _player = AudioPlayer();
 
+  // ─── 8.4.1: липкая плашка даты при скролле от низа ───
+  // GlobalKey по сообщению: находим верхнее видимое через render-объекты
+  // построенных элементов (lazy-список строит только видимые).
+  final Map<String, GlobalKey> _msgKeys = {};
+  Timer? _stickTimer;
+  String? _stickDateLabel;
+  int _noIdSeq = 0;
+
+  GlobalKey _keyOf(dynamic id) {
+    final key = _msgKeys[id];
+    if (key != null) return key;
+    final fresh = GlobalKey();
+    _msgKeys[id] = fresh;
+    return fresh;
+  }
+
   String get _chatId => widget.chat.id;
 
   @override
@@ -129,6 +145,8 @@ class _ChatScreenState extends State<ChatScreen> {
     NotificationService.instance.exitChat(_chatId);
     _chat.dispose();
     _holdTimer?.cancel();
+    _stickTimer?.cancel();
+    _msgKeys.clear();
     _camCtrl?.dispose();
     _recorder.dispose();
     _player.dispose();
@@ -156,6 +174,48 @@ class _ChatScreenState extends State<ChatScreen> {
     if (pos.maxScrollExtent > 0 && pos.pixels >= pos.maxScrollExtent - 120) {
       _chat.loadOlderIfNeeded();
     }
+    // 8.4.1: липкая дата — дешёвый расчёт с троттлингом 80 мс.
+    if (_stickTimer?.isActive ?? false) return;
+    _stickTimer = Timer(const Duration(milliseconds: 80), _updateStickDate);
+  }
+
+  /// 8.4.1: вычисляет дату верхнего видимого сообщения и обновляет плашку.
+  void _updateStickDate() {
+    if (!mounted || !_scroll.hasClients) return;
+    final pos = _scroll.position;
+    if (pos.pixels < 80) {
+      if (_stickDateLabel != null) {
+        setState(() => _stickDateLabel = null);
+      }
+      return;
+    }
+    final msgs = _chat.messages;
+    final screenH = MediaQuery.sizeOf(context).height;
+    double? bestTop;
+    int best = -1;
+    for (var i = 0; i < msgs.length; i++) {
+      final ctx = _keyOf(_bubbleKeyFor(i)).currentContext;
+      if (ctx == null) continue;
+      final ro = ctx.findRenderObject();
+      if (ro is! RenderBox || !ro.attached) continue;
+      final top = ro.localToGlobal(Offset.zero).dy;
+      if (top >= screenH || top + ro.size.height <= 0) continue;
+      if (bestTop == null || top < bestTop) {
+        bestTop = top;
+        best = i;
+      }
+    }
+    final label = best < 0 ? null : fmtDateLabel(msgs[best].date);
+    if (label != _stickDateLabel) {
+      setState(() => _stickDateLabel = label);
+    }
+  }
+
+  /// 8.4.1: ключ пузыря сообщения (по id, а не по индексу — индексы
+  /// сдвигаются при вставке новых сообщений сверху).
+  Object _bubbleKeyFor(int i) {
+    final m = _chat.messages[i];
+    return m.localId ?? m.serverId ?? '__noId_${_noIdSeq++}';
   }
 
   Future<void> _send() async {
@@ -1337,9 +1397,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                         ),
                                       MessageBubble(
                                         msg: _chat.messages[i],
-                                        key: ValueKey(
-                                          'msg_${_chat.messages[i].localId ?? i}',
-                                        ),
+                                        key: _keyOf(_bubbleKeyFor(i)),
                                         isFirstInGroup:
                                             ChatController.isFirstInGroup(
                                               _chat.messages,
@@ -1455,6 +1513,19 @@ class _ChatScreenState extends State<ChatScreen> {
                         _scrollToEnd();
                       },
                     ),
+                  ),
+                ),
+              // 8.4.1: липкая плашка даты — верхнее видимое сообщение
+              // (видна, пока лента прокручена от низа).
+              if (_stickDateLabel != null && !_chat.atBottom)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: VibeSpacing.md +
+                      MediaQuery.of(context).viewPadding.bottom +
+                      56,
+                  child: Center(
+                    child: _StickDatePlank(label: _stickDateLabel!),
                   ),
                 ),
               // Кнопка «новые сообщения» (прыжок вниз, как в Telegram).
@@ -2082,6 +2153,41 @@ class _UnreadPlank extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 8.4.1: липкая плашка даты — показывает дату верхнего видимого
+/// сообщения, пока лента прокручена от низа (как в Telegram).
+class _StickDatePlank extends StatelessWidget {
+  const _StickDatePlank({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('stick_date'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.vibeSurfaceElevated,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.vibeBorder.withValues(alpha: 0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: VibeTypography.caption.copyWith(
+          color: context.vibeTextPrimary,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

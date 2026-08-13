@@ -555,4 +555,40 @@ void main() {
     expect(find.textContaining('Запланировано ·'), findsNothing);
     ScheduledService.instance.debugReset();
   });
+
+  testWidgets('8.4.1: липкая плашка даты появляется при скролле от низа',
+      (tester) async {
+    final now = DateTime(2026, 8, 13, 12);
+    final day2 = DateTime(2026, 8, 12, 9);
+    final day1 = DateTime(2026, 8, 11, 9);
+    final many = <VibeMessage>[];
+    for (var i = 59; i >= 0; i--) {
+      final created = i < 10
+          ? day1.add(Duration(minutes: i))
+          : i < 30
+              ? day2.add(Duration(minutes: i - 10))
+              : now.subtract(Duration(minutes: 29 - (i - 30) + 1));
+      many.add(msg(id: 'm$i', text: 'сообщение $i', created: created));
+    }
+    fake.messagesByChat['c1'] = many;
+
+    await pumpChat(tester);
+
+    expect(find.byKey(const Key('stick_date')), findsNothing,
+        reason: 'у низа ленты плашка даты не показывается');
+
+    await tester.drag(find.byType(ChatScreen), const Offset(0, 2600));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const Key('stick_date')), findsOneWidget,
+        reason: 'при прокрутке от низа появляется липкая дата');
+    final label = tester
+        .widget<Text>(find.descendant(
+          of: find.byKey(const Key('stick_date')),
+          matching: find.byType(Text),
+        ))
+        .data;
+    expect(label, isNotEmpty);
+  });
 }

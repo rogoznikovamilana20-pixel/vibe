@@ -24,7 +24,7 @@ class MessageDateDivider extends StatelessWidget {
             borderRadius: BorderRadius.circular(VibeRadius.pill),
           ),
           child: Text(
-            _label(),
+            fmtDateLabel(date),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.vibeTextSecondary,
                   fontWeight: FontWeight.w600,
@@ -34,18 +34,18 @@ class MessageDateDivider extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _label() {
-    final d = date;
-    if (d == null) return '';
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(d.year, d.month, d.day);
-    if (day == today) return 'Сегодня';
-    final yesterday = today.subtract(const Duration(days: 1));
-    if (day == yesterday) return 'Вчера';
-    return '${d.day.toString().padLeft(2, '0')}.'
-        '${d.month.toString().padLeft(2, '0')}.'
-        '${d.year}';
-  }
+/// Короткая подпись даты: Сегодня / Вчера / дд.мм.гггг.
+String fmtDateLabel(DateTime? d) {
+  if (d == null) return '';
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(d.year, d.month, d.day);
+  if (day == today) return 'Сегодня';
+  final yesterday = today.subtract(const Duration(days: 1));
+  if (day == yesterday) return 'Вчера';
+  return '${d.day.toString().padLeft(2, '0')}.'
+      '${d.month.toString().padLeft(2, '0')}.'
+      '${d.year}';
 }
