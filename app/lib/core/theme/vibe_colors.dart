@@ -51,6 +51,10 @@ class VibeColors {
   static const warning = Color(0xFFF5B942);
   static const warningGlow = Color(0xFFF5B942);
   static const error = Color(0xFFFF5A64);
+
+  /// Ошибки на светлой теме: контраст ≥4.5:1 на всех светлых поверхностях
+  /// (AA). Тёмный вариант [error] для тёмной темы.
+  static const errorLight = Color(0xFFB3261E);
   static const info = Color(0xFF4DA3FF);
   static const teal = Color(0xFF45D483);
 

@@ -363,7 +363,7 @@ class _AurionScreenState extends State<AurionScreen> {
             Text(
               _error!,
               style: VibeTypography.body.copyWith(
-                color: VibeColors.error,
+                color: context.vibeError,
                 fontSize: 13,
               ),
             ),
@@ -520,13 +520,13 @@ class _ErrorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(VibeSpacing.md),
       decoration: BoxDecoration(
-        color: VibeColors.error.withValues(alpha: 0.08),
+        color: context.vibeError.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(VibeRadius.card),
-        border: Border.all(color: VibeColors.error.withValues(alpha: 0.3)),
+        border: Border.all(color: context.vibeError.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded, color: VibeColors.error, size: 20),
+          Icon(Icons.error_outline_rounded, color: context.vibeError, size: 20),
           const SizedBox(width: VibeSpacing.sm),
           Expanded(
             child: Text(

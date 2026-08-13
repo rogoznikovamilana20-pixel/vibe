@@ -36,6 +36,9 @@ class VibeTheme {
     final textTertiary =
         isDark ? VibeColors.textTertiaryDark : VibeColors.textTertiaryLight;
 
+    // Ошибки: тёмная тема — яркий красный, светлая — тёмный (контраст AA).
+    final errorColor = isDark ? VibeColors.error : VibeColors.errorLight;
+
     final scheme = ColorScheme(
       brightness: brightness,
       primary: accent,
@@ -48,10 +51,10 @@ class VibeTheme {
       onSecondaryContainer: accentLight,
       tertiary: VibeColors.workBlue,
       onTertiary: Colors.white,
-      error: VibeColors.error,
+      error: errorColor,
       onError: Colors.white,
-      errorContainer: VibeColors.error.withValues(alpha: 0.15),
-      onErrorContainer: VibeColors.error,
+      errorContainer: errorColor.withValues(alpha: 0.15),
+      onErrorContainer: errorColor,
       surface: surface2,
       onSurface: textPrimary,
       surfaceContainerLowest: bg,
@@ -168,11 +171,11 @@ class VibeTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(VibeRadius.input),
-          borderSide: const BorderSide(color: VibeColors.error),
+          borderSide: BorderSide(color: errorColor),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(VibeRadius.input),
-          borderSide: const BorderSide(color: VibeColors.error, width: 1.5),
+          borderSide: BorderSide(color: errorColor, width: 1.5),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -350,6 +353,9 @@ extension VibeContext on BuildContext {
       : VibeColors.borderLight;
 
   Color get vibePrimary => Theme.of(this).colorScheme.primary;
+
+  /// Цвет ошибок темы (тёмная тема — яркий, светлая — тёмный, AA).
+  Color get vibeError => Theme.of(this).colorScheme.error;
 
   Color get vibeAccent => Theme.of(this).colorScheme.secondary;
 

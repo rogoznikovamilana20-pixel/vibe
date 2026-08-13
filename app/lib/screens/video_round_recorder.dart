@@ -251,10 +251,10 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.circle_rounded,
                               size: 8,
-                              color: VibeColors.error,
+                              color: context.vibeError,
                             ),
                             const SizedBox(width: VibeSpacing.sm),
                             Text(
@@ -291,7 +291,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                     IconButton(
                       onPressed: _cancel,
                       icon: const Icon(Icons.close_rounded, size: 26),
-                      color: VibeColors.error,
+                      color: context.vibeError,
                       tooltip: 'Отмена',
                     ),
                   const SizedBox(width: VibeSpacing.xl),
@@ -307,7 +307,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                       height: 64,
                       decoration: BoxDecoration(
                         color: _recording
-                            ? VibeColors.error.withValues(alpha: 0.85)
+                            ? context.vibeError.withValues(alpha: 0.85)
                             : context.vibePrimary.withValues(alpha: 0.9),
                         shape: BoxShape.circle,
                         border: Border.all(

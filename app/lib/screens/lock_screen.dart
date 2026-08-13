@@ -153,7 +153,7 @@ class _LockScreenState extends State<LockScreen> {
                               enabled: !locked,
                               errorText: _showError ? l.lockWrongPasscode : null,
                               errorTextStyle: VibeTypography.caption.copyWith(
-                                color: VibeColors.error,
+                                color: context.vibeError,
                               ),
                               defaultPinTheme: PinTheme(
                                 width: 36,
@@ -249,7 +249,7 @@ class _LockedPill extends StatelessWidget {
           Text(
             l.lockTooManyAttempts,
             style: VibeTypography.body.copyWith(
-              color: VibeColors.error,
+              color: context.vibeError,
             ),
             textAlign: TextAlign.center,
           ),
@@ -281,16 +281,16 @@ class _ErrorPill extends StatelessWidget {
         vertical: VibeSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: VibeColors.error.withValues(alpha: 0.10),
+        color: context.vibeError.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(VibeRadius.pill),
         border: Border.all(
-          color: VibeColors.error.withValues(alpha: 0.25),
+          color: context.vibeError.withValues(alpha: 0.25),
         ),
       ),
       child: Text(
         text,
         style: VibeTypography.captionMedium.copyWith(
-          color: VibeColors.error,
+          color: context.vibeError,
         ),
       ),
     );

@@ -67,7 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     SettingsTile(
                       icon: Icons.notifications_none_rounded,
-                      iconColor: VibeColors.error,
+                      iconColor: context.vibeError,
                       title: l.notifications,
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const NotificationsSettingsScreen()),
@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
               }
             },
-            child: Text(l.logout, style: const TextStyle(color: VibeColors.error)),
+            child: Text(l.logout, style: TextStyle(color: context.vibeError)),
           ),
         ],
       ),

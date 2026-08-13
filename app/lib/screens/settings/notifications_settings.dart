@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/localization/vibe_localizations.dart';
-import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/widgets/settings_widgets.dart';
@@ -130,7 +129,7 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
             children: [
               SettingsTile(
                 icon: Icons.refresh_rounded,
-                iconColor: VibeColors.error,
+                iconColor: context.vibeError,
                 title: l.resetNotifications,
                 destructive: true,
                 onTap: () {

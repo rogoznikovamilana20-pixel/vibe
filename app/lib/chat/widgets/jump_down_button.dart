@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/vibe_animations.dart';
-import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_theme.dart';
 
 /// Кнопка «прокрутить вниз» с бейджем количества новых сообщений,
@@ -71,7 +70,7 @@ class JumpDownButton extends StatelessWidget {
                     ),
                     constraints: const BoxConstraints(minWidth: 20),
                     decoration: BoxDecoration(
-                      color: VibeColors.error,
+                      color: context.vibeError,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

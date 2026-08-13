@@ -75,7 +75,7 @@ List<_Pair> _pairsFor(ThemeData t, bool isDark, List<double?> goldens) {
   final s = t.colorScheme;
   final bg = t.scaffoldBackgroundColor;
   final tertiary = isDark ? VibeColors.textTertiaryDark : VibeColors.textTertiaryLight;
-  final error = VibeColors.error;
+  final error = isDark ? VibeColors.error : VibeColors.errorLight;
   final accent = s.primary;
 
   final raw = <_Pair>[
@@ -92,11 +92,11 @@ List<_Pair> _pairsFor(ThemeData t, bool isDark, List<double?> goldens) {
     // ── Осознанные компромиссы дизайна (под AA, документированы) ──
     // accent/фон: dark 4.65 (ok), light 3.94 — достаточно для крупного/UI;
     // onPrimary: 4.23 — чуть ниже 4.5 (крупный текст filledBtn);
-    // error/фон: dark 6.47 (ok), light 2.83 — ИЗВЕСТНЫЙ ДЕФЕКТ светлой темы
-    //   (текст ошибок ниже 3:1); улучшение — отдельный дизайн-флайт.
+    // error/фон: dark 6.47, light 6.08 — оба ≥4.5 (AA) с 13.08.2026
+    //   (светлая тема переведена на errorLight #B3261E, 8.4.8).
     _Pair('accent / фон (textButton, ссылки)', accent, bg),
     _Pair('onPrimary(белый) / primary (filledBtn)', s.onPrimary, s.primary),
-    _Pair('error / фон (текст ошибок)', error, bg),
+    _Pair('error / фон (текст ошибок)', error, bg, guarantee: 4.5),
   ];
 
   assert(goldens.length == raw.length, 'число эталонов = числу пар');
@@ -137,7 +137,7 @@ void main() {
       11.14, // onInverseSurface / inverseSurface
       3.94, // accent / фон
       4.23, // onPrimary / primary
-      2.83, // error / фон (известный дефект светлой темы)
+      6.08, // error / фон (errorLight с 13.08.2026, AA)
     ]));
   });
 }

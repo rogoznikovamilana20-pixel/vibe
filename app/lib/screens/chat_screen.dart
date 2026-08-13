@@ -401,7 +401,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       _snack('Отправка отменена');
                     },
                     icon: const Icon(Icons.close_rounded, size: 20),
-                    color: VibeColors.error,
+                    color: context.vibeError,
                     tooltip: 'Отменить отправку',
                   ),
                 ),
@@ -1851,7 +1851,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: _videoRolling
-                          ? VibeColors.error.withValues(alpha: 0.85)
+                          ? context.vibeError.withValues(alpha: 0.85)
                           : context.isDarkMode
                           ? context.vibeSurfaceVariant
                           : Colors.white,

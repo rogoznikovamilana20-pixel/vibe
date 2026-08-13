@@ -53,7 +53,7 @@ class AvatarActionSheet extends StatelessWidget {
               item(Icons.photo_camera_outlined, 'Сделать фото', 'cam',
                   context.vibeTextPrimary),
               item(Icons.delete_outline_rounded, 'Удалить аватар', 'del',
-                  VibeColors.error),
+                  context.vibeError),
             ],
           ),
         ),

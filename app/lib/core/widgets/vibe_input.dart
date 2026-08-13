@@ -127,7 +127,7 @@ class _VibeInputState extends State<VibeInput> {
           const SizedBox(height: VibeSpacing.xs),
           Text(
             error,
-            style: VibeTypography.caption.copyWith(color: VibeColors.error),
+            style: VibeTypography.caption.copyWith(color: context.vibeError),
           ),
         ],
       ],

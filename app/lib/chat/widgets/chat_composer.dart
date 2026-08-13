@@ -370,7 +370,7 @@ class _RollingPillState extends State<RollingPill> {
           IconButton(
             onPressed: widget.onCancel,
             icon: const Icon(Icons.close_rounded, size: 22),
-            color: VibeColors.error,
+            color: context.vibeError,
             tooltip: 'Отмена',
           ),
           if (locked)
@@ -489,7 +489,7 @@ class _VideoRollPillState extends State<VideoRollPill> {
           IconButton(
             onPressed: widget.onCancel,
             icon: const Icon(Icons.close_rounded, size: 22),
-            color: VibeColors.error,
+            color: context.vibeError,
             tooltip: 'Отмена',
           ),
           if (locked)

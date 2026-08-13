@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/profile_avatar.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/theme/vibe_animations.dart';
-import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
@@ -228,14 +227,14 @@ class _AuthScreenState extends State<AuthScreen> {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(VibeSpacing.md),
                                 decoration: BoxDecoration(
-                                  color: VibeColors.error.withValues(
+                                  color: context.vibeError.withValues(
                                     alpha: 0.12,
                                   ),
                                   borderRadius: BorderRadius.circular(
                                     VibeRadius.card,
                                   ),
                                   border: Border.all(
-                                    color: VibeColors.error.withValues(
+                                    color: context.vibeError.withValues(
                                       alpha: 0.4,
                                     ),
                                   ),
@@ -244,7 +243,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   _error,
                                   textAlign: TextAlign.center,
                                   style: VibeTypography.bodyMedium.copyWith(
-                                    color: VibeColors.error,
+                                    color: context.vibeError,
                                   ),
                                 ),
                               ),

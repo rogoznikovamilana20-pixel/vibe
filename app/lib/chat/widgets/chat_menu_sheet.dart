@@ -149,7 +149,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           contentPadding: EdgeInsets.zero,
           leading: Icon(
             _muted ? Icons.volume_off_rounded : Icons.volume_up_outlined,
-            color: _muted ? VibeColors.error : context.vibePrimary,
+            color: _muted ? context.vibeError : context.vibePrimary,
           ),
           title: Text(_muted ? 'Звук выключен' : 'Не беспокоить'),
           trailing: Switch(
@@ -208,8 +208,8 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.delete_outline_rounded, color: VibeColors.error),
-          title: const Text('Удалить чат', style: TextStyle(color: VibeColors.error)),
+          leading: Icon(Icons.delete_outline_rounded, color: context.vibeError),
+          title: Text('Удалить чат', style: TextStyle(color: context.vibeError)),
           onTap: () async {
             Navigator.of(context).pop();
             final del = widget.onDelete;
@@ -285,10 +285,10 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.notifications_off_rounded, color: VibeColors.error),
-          title: const Text(
+          leading: Icon(Icons.notifications_off_rounded, color: context.vibeError),
+          title: Text(
             'Выключить уведомления',
-            style: TextStyle(color: VibeColors.error),
+            style: TextStyle(color: context.vibeError),
           ),
           onTap: () {
             _setMuted(true);

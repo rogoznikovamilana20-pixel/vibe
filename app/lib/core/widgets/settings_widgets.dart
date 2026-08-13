@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/vibe_colors.dart';
 import '../theme/vibe_spacing.dart';
 import '../theme/vibe_theme.dart';
 import '../theme/vibe_typography.dart';
@@ -93,7 +92,7 @@ class SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? VibeColors.error : context.vibeTextPrimary;
+    final color = destructive ? context.vibeError : context.vibeTextPrimary;
     
     return Material(
       color: Colors.transparent,

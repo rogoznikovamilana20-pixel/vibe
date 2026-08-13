@@ -64,7 +64,7 @@ class DevicesScreen extends StatelessWidget {
             children: [
               SettingsTile(
                 icon: Icons.cancel_outlined,
-                iconColor: VibeColors.error,
+                iconColor: context.vibeError,
                 title: l.terminateAllSessions,
                 destructive: true,
                 onTap: () {

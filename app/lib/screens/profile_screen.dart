@@ -567,7 +567,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }
             },
             child:
-                Text(l.logout, style: const TextStyle(color: VibeColors.error)),
+                Text(l.logout, style: TextStyle(color: context.vibeError)),
           ),
         ],
       ),
@@ -599,7 +599,7 @@ class _ProfileActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? VibeColors.error : context.vibePrimary;
+    final color = destructive ? context.vibeError : context.vibePrimary;
     return Container(
       margin: const EdgeInsets.only(bottom: VibeSpacing.sm),
       decoration: BoxDecoration(
@@ -633,7 +633,7 @@ class _ProfileActionTile extends StatelessWidget {
                     title,
                     style: VibeTypography.bodyMedium.copyWith(
                       color: destructive
-                          ? VibeColors.error
+                          ? context.vibeError
                           : context.vibeTextPrimary,
                       fontWeight: FontWeight.w500,
                     ),
@@ -657,7 +657,7 @@ class _ProfileActionTile extends StatelessWidget {
                   Icons.chevron_right_rounded,
                   size: 20,
                   color: destructive
-                      ? VibeColors.error.withValues(alpha: 0.6)
+                      ? context.vibeError.withValues(alpha: 0.6)
                       : context.vibeTextTertiary,
                 ),
               ],

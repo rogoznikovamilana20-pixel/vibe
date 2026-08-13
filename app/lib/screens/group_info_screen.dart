@@ -149,7 +149,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               child: FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 style: FilledButton.styleFrom(
-                  backgroundColor: VibeColors.error,
+                  backgroundColor: context.vibeError,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(VibeRadius.button),
@@ -295,7 +295,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                     child: _GroupAction(
                       icon: Icons.logout_rounded,
                       label: 'Выйти',
-                      color: VibeColors.error,
+                      color: context.vibeError,
                       onTap: _busy ? null : _leave,
                     ),
                   ),

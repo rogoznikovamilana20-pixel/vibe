@@ -330,13 +330,13 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                   child: ListTile(
                     leading: Icon(
                       Icons.block_rounded,
-                      color: _isBlocked ? VibeColors.success : VibeColors.error,
+                      color: _isBlocked ? VibeColors.success : context.vibeError,
                     ),
                     title: Text(
                       _isBlocked ? 'Разблокировать' : 'Заблокировать',
                       style: VibeTypography.body.copyWith(
                         color:
-                            _isBlocked ? VibeColors.success : VibeColors.error,
+                            _isBlocked ? VibeColors.success : context.vibeError,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

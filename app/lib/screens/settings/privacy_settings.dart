@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/localization/vibe_localizations.dart';
-import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
@@ -200,7 +199,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             children: [
               SettingsTile(
                 icon: Icons.delete_sweep_outlined,
-                iconColor: VibeColors.error,
+                iconColor: context.vibeError,
                 title: l.deleteIfInactive,
                 subtitle: l.locale.languageCode == 'ru' 
                     ? 'Если не заходил ${s.autoDeleteMonths} мес.' 
