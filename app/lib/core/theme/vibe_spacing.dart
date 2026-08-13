@@ -25,7 +25,7 @@ class VibeRadius {
   static const card = 16.0;
   static const lg = 16.0;
   static const xl = 20.0;
-  static const button = 16.0;
+  static const button = 14.0;
   static const input = 20.0;
   static const badge = 8.0;
   static const bottomSheet = 20.0;

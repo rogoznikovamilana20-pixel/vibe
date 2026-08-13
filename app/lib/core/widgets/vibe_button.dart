@@ -8,6 +8,17 @@ import '../theme/vibe_typography.dart';
 
 enum VibeButtonType { primary, secondary, ghost, outline }
 
+/// 8.2.1: пресеты высоты по DESIGN_SYSTEM (56 / 44 / 36).
+enum VibeButtonSize {
+  l(56),
+  m(44),
+  s(36);
+
+  const VibeButtonSize(this.height);
+
+  final double height;
+}
+
 /// Кнопка Vibe v2: градиент, свечение, пружинное нажатие, ripple.
 class VibeButton extends StatefulWidget {
   const VibeButton({
@@ -17,7 +28,8 @@ class VibeButton extends StatefulWidget {
     this.type = VibeButtonType.primary,
     this.icon,
     this.expand = true,
-    this.height = VibeSizes.buttonHeight,
+    this.height,
+    this.size = VibeButtonSize.m,
   });
 
   final String label;
@@ -25,7 +37,8 @@ class VibeButton extends StatefulWidget {
   final VibeButtonType type;
   final IconData? icon;
   final bool expand;
-  final double height;
+  final double? height;
+  final VibeButtonSize size;
 
   @override
   State<VibeButton> createState() => _VibeButtonState();
@@ -84,7 +97,7 @@ class _VibeButtonState extends State<VibeButton> {
           onTapCancel: () => setState(() => _pressed = false),
           onTap: enabled ? widget.onPressed : null,
           child: Container(
-            height: widget.height,
+            height: widget.height ?? widget.size.height,
             width: widget.expand ? double.infinity : null,
             decoration: decoration,
             child: Material(

@@ -7,6 +7,7 @@ import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_avatar.dart';
+import '../../core/widgets/vibe_icon_button.dart';
 import '../../data/backend.dart';
 
 /// Стеклянная пилюля шапки чата — как в Telegram: одна плавающая капсула.
@@ -106,12 +107,12 @@ class ChatAppBar extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Row(
             children: [
-              _HeaderPill(
-                onTap: onBack,
-                child: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  size: 20,
-                ),
+              VibeIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                onPressed: onBack,
+                iconSize: 18,
+                tooltip: 'Назад',
+                color: context.vibeTextPrimary,
               ),
               const SizedBox(width: VibeSpacing.xs),
               Expanded(
@@ -163,19 +164,11 @@ class ChatAppBar extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: onOpenSearch,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            child: Icon(Icons.search_rounded, size: 20),
-                          ),
-                        ),
+                      VibeIconButton(
+                        icon: Icons.search_rounded,
+                        onPressed: onOpenSearch,
+                        tooltip: 'Поиск',
+                        color: context.vibeTextPrimary,
                       ),
                       VerticalDivider(
                         width: 1,
@@ -185,16 +178,11 @@ class ChatAppBar extends StatelessWidget {
                             ? Colors.white24
                             : const Color(0x1F1C1B22),
                       ),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: onChooseCall,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            child: Icon(Icons.call_outlined, size: 20),
-                          ),
-                        ),
+                      VibeIconButton(
+                        icon: Icons.call_outlined,
+                        onPressed: onChooseCall,
+                        tooltip: 'Позвонить',
+                        color: context.vibeTextPrimary,
                       ),
                       VerticalDivider(
                         width: 1,
@@ -204,16 +192,11 @@ class ChatAppBar extends StatelessWidget {
                             ? Colors.white24
                             : const Color(0x1F1C1B22),
                       ),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: onShowMenu,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            child: Icon(Icons.more_vert_rounded, size: 20),
-                          ),
-                        ),
+                      VibeIconButton(
+                        icon: Icons.more_vert_rounded,
+                        onPressed: onShowMenu,
+                        tooltip: 'Ещё',
+                        color: context.vibeTextPrimary,
                       ),
                     ],
                   ),
