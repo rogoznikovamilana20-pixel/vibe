@@ -15,6 +15,7 @@ abstract class VibeBackendApi {
   Stream<VibeMsgEvent> get msgEvents;
   Stream<String> get typingEvents;
   Stream<void> get chatEvents;
+  Stream<PinChanged> get pinEvents;
 
   // ─── Публикаторы статусов ───
   ValueListenable<int> get presenceVersion;
@@ -81,6 +82,12 @@ abstract class VibeBackendApi {
   Future<void> hideMessageForMe(String messageId);
   Future<void> clearHistory(String chatId);
 
+  // ─── Закреплённые сообщения (облако, множественные) ───
+  /// Список закрепов чата (новые сверху).
+  Future<List<String>> fetchChatPins(String chatId);
+  Future<void> pinMessage(String chatId, String messageId);
+  Future<void> unpinMessage(String chatId, String messageId);
+
   // ─── Действия ───
   Future<void> setReaction(String chatId, String messageId, String emoji);
   Future<void> refreshChatReactions(String chatId);
@@ -127,6 +134,9 @@ class LiveVibeBackend implements VibeBackendApi {
 
   @override
   Stream<void> get chatEvents => _b.chatEvents;
+
+  @override
+  Stream<PinChanged> get pinEvents => _b.pinEvents;
 
   @override
   ValueListenable<int> get presenceVersion => _b.presenceVersion;
@@ -236,6 +246,18 @@ class LiveVibeBackend implements VibeBackendApi {
 
   @override
   Future<void> clearHistory(String chatId) => _b.clearHistory(chatId);
+
+  @override
+  Future<List<String>> fetchChatPins(String chatId) =>
+      _b.fetchChatPins(chatId);
+
+  @override
+  Future<void> pinMessage(String chatId, String messageId) =>
+      _b.pinMessage(chatId, messageId);
+
+  @override
+  Future<void> unpinMessage(String chatId, String messageId) =>
+      _b.unpinMessage(chatId, messageId);
 
   @override
   Future<void> setReaction(String chatId, String messageId, String emoji) =>

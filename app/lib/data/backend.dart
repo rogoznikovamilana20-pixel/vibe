@@ -216,6 +216,19 @@ class VibeMsgEvent {
   final Map<String, int>? reactions;
 }
 
+/// Закреплённое сообщение изменилось (поставлено/снято в реальном времени).
+class PinChanged {
+  const PinChanged({
+    required this.chatId,
+    required this.messageId,
+    required this.pinned,
+  });
+
+  final String chatId;
+  final String messageId;
+  final bool pinned;
+}
+
 /// Модель профиля пользователя/контакта.
 class VibeProfile {
   const VibeProfile({
@@ -350,6 +363,11 @@ class VibeBackend {
   /// перезагружается сразу (мгновенные появления чатов).
   final _chatsController = StreamController<void>.broadcast();
   Stream<void> get chatEvents => _chatsController.stream;
+
+  /// Закреплённые сообщения в реальном времени: кто-то пинит/снимает —
+  /// открытые чаты обновляют плашку сразу.
+  final _pinEventsController = StreamController<PinChanged>.broadcast();
+  Stream<PinChanged> get pinEvents => _pinEventsController.stream;
 
   /// Дедупликация: одно и то же сообщение может прийти и по realtime
   /// postgres_changes, и по broadcast — показываем только один раз.
@@ -2093,6 +2111,45 @@ peerName: peer?.displayName,
           await refreshChatReactions(chatId);
         },
       ).subscribe();
+
+      // Закрепы в реальном времени: свои пины приходят тоже (отсекаем
+      // дубли на стороне контроллера по факту изменения списка).
+      _client.channel('public:chat_pins:insert').onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'chat_pins',
+        callback: (payload) async {
+          final myId = myProfileId;
+          final r = payload.newRecord;
+          if (myId == null || '${r['pinned_by']}' == myId) return;
+          final chatId = '${r['chat_id']}';
+          if (chatId == 'null' || !await _isMyChat(chatId)) return;
+          if (_pinEventsController.isClosed) return;
+          _pinEventsController.add(PinChanged(
+            chatId: chatId,
+            messageId: '${r['message_id']}',
+            pinned: true,
+          ));
+        },
+      ).subscribe();
+      _client.channel('public:chat_pins:delete').onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'chat_pins',
+        callback: (payload) async {
+          final myId = myProfileId;
+          final r = payload.oldRecord;
+          if (myId == null || '${r['pinned_by']}' == myId) return;
+          final chatId = '${r['chat_id']}';
+          if (chatId == 'null' || !await _isMyChat(chatId)) return;
+          if (_pinEventsController.isClosed) return;
+          _pinEventsController.add(PinChanged(
+            chatId: chatId,
+            messageId: '${r['message_id']}',
+            pinned: false,
+          ));
+        },
+      ).subscribe();
     }
   }
 
@@ -2421,6 +2478,41 @@ unawaited(() async {
         ));
       }
     } catch (_) {}
+  }
+
+  /// Закрепы чата (новые сверху). Если таблица chat_pins недоступна
+  /// (миграция не применена) — бросает, контроллер остаётся на локальном
+  /// списке (деградация без фейков).
+  Future<List<String>> fetchChatPins(String chatId) async {
+    final rows = await _client
+        .from('chat_pins')
+        .select('message_id')
+        .eq('chat_id', chatId)
+        .order('created_at', ascending: false);
+    return rows.map((r) => '${(r as Map)['message_id']}').toList();
+  }
+
+  /// Закрепить сообщение в облаке (новый закреп — сверху).
+  Future<void> pinMessage(String chatId, String messageId) async {
+    final myId = myProfileId;
+    if (myId == null) return;
+    await _client.from('chat_pins').upsert({
+      'chat_id': chatId,
+      'message_id': messageId,
+      'pinned_by': myId,
+    }, onConflict: 'chat_id,message_id');
+  }
+
+  /// Снять закреп в облаке.
+  Future<void> unpinMessage(String chatId, String messageId) async {
+    final myId = myProfileId;
+    if (myId == null) return;
+    await _client
+        .from('chat_pins')
+        .delete()
+        .eq('chat_id', chatId)
+        .eq('message_id', messageId)
+        .eq('pinned_by', myId);
   }
 
   /// Отправить broadcast событие на ЧУЖОЙ личный канал `u_<id>`.

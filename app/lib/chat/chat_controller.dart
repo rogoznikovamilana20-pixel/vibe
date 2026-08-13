@@ -53,13 +53,22 @@ class ChatController extends ChangeNotifier {
   int newIncoming = 0;
   int? editingIdx;
   int? replyTo;
-  String? pinMsgId;
   String? pinFlashId;
   String? groupTitle;
   bool peerTyping = false;
 
   // ─── Черновик (как в Telegram: сохраняется локально) ───
   String draft = '';
+
+  // ─── Закреплённые сообщения (множественные, облако) ───
+  /// serverId закреплённых сообщений, новые сверху.
+  List<String> pins = [];
+
+  /// Верхний закреп (для меню/бейджа «Открепить»).
+  String? get pinMsgId => pins.isEmpty ? null : pins.first;
+
+  /// Локальные изменения списка закрепов не перетираются ответом облака.
+  bool _pinsTouchedLocally = false;
 
   // ─── Unread-jump: плашка «N непрочитанных» + подсветка первого ───
   /// Индекс первого непрочитанного в ленте (reverse: 0 = низ).
@@ -70,6 +79,7 @@ class ChatController extends ChangeNotifier {
   // ─── Realtime-подписки ───
   StreamSubscription<VibeMessage>? _sub;
   StreamSubscription<VibeMsgEvent>? _msgEventsSub;
+  StreamSubscription<PinChanged>? _pinSub;
   StreamSubscription<String>? _typingSub;
   Timer? _typingReset;
   Timer? _pinTimer;
@@ -80,11 +90,12 @@ class ChatController extends ChangeNotifier {
 
   /// Начальная загрузка: подписки + первая страница + отметка прочитано.
   Future<void> load() async {
-    pinMsgId = SettingsService.instance.pinnedMessageId(chatId);
+    pins = List.of(SettingsService.instance.pinnedMessageIds(chatId));
     draft = SettingsService.instance.draftFor(chatId) ?? '';
     backend.markChatRead(chatId);
     _subscribe();
     await loadMessages();
+    unawaited(_refreshPinsFromServer());
   }
 
   Future<void> loadMessages() async {
@@ -193,6 +204,19 @@ class ChatController extends ChangeNotifier {
             [for (final e in reac.entries) ChatReaction(e.key, e.value)],
           );
       }
+      notifyListeners();
+    });
+
+    _pinSub = backend.pinEvents.listen((ev) {
+      if (ev.chatId != chatId || _disposed) return;
+      _pinsTouchedLocally = true;
+      if (ev.pinned) {
+        if (pins.any((p) => p == ev.messageId)) return;
+        pins.insert(0, ev.messageId);
+      } else {
+        pins.remove(ev.messageId);
+      }
+      SettingsService.instance.setPinnedMessageIds(chatId, pins);
       notifyListeners();
     });
   }
@@ -526,10 +550,56 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPin(String? serverId) {
-    pinMsgId = serverId;
-    SettingsService.instance.setPinnedMessageId(chatId, serverId);
+  /// Закрепить/открепить сообщение. `serverId == null` — снять верхний
+  /// закреп (как кнопка «×» на плашке). Облако обновляется best-effort:
+  /// миграция не применена/сеть упала — остаёмся на локальном списке.
+  Future<void> setPin(String? serverId) async {
+    if (serverId == null) {
+      if (pins.isNotEmpty) {
+        await unpin(pins.first);
+      }
+      return;
+    }
+    if (pins.contains(serverId)) {
+      await unpin(serverId);
+      return;
+    }
+    _pinsTouchedLocally = true;
+    pins.insert(0, serverId);
+    _persistPins();
     notifyListeners();
+    try {
+      await backend.pinMessage(chatId, serverId);
+    } catch (_) {
+      // Облако недоступно — закреп остаётся локальным (не фейк).
+    }
+  }
+
+  Future<void> unpin(String serverId) async {
+    if (!pins.remove(serverId)) return;
+    _pinsTouchedLocally = true;
+    _persistPins();
+    notifyListeners();
+    try {
+      await backend.unpinMessage(chatId, serverId);
+    } catch (_) {}
+  }
+
+  /// Облако — источник правды: если оно ответило (таблица есть), локальный
+  /// список заменяется облачным; при сбое остаётся локальный (деградация).
+  /// Локальные пины, сделанные во время запроса, не перетираются.
+  Future<void> _refreshPinsFromServer() async {
+    try {
+      final list = await backend.fetchChatPins(chatId);
+      if (_disposed || _pinsTouchedLocally) return;
+      pins = list;
+      _persistPins();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void _persistPins() {
+    SettingsService.instance.setPinnedMessageIds(chatId, pins);
   }
 
   /// «Очистить историю»: сервер удаляет сообщения чата, лента очищается
@@ -686,6 +756,7 @@ class ChatController extends ChangeNotifier {
     _unreadTimer?.cancel();
     _sub?.cancel();
     _msgEventsSub?.cancel();
+    _pinSub?.cancel();
     _typingSub?.cancel();
     _typingReset?.cancel();
     _pinTimer?.cancel();

@@ -37,10 +37,12 @@
 | 2.8 Ключи локализации шапок настроек | ✅ (generalSettings + тесты 2) | 13.08.2026 |
 | 2.10 Демо-сториз за флагом | ✅ (showDemoStories=false) | 13.08.2026 |
 | 2.11 Кликабельная аватарка profile_setup | ✅ (AvatarActionSheet DRY + тесты 3) | 13.08.2026 |
+| 3.5 Закрепы: множественные, в облаке | ✅ (chat_pins + realtime + шит, тесты 5) | 13.08.2026 |
+| 3.6 Пасскод-блокировка при запуске | ✅ (1.6 earlier: splash + resume-lock) | 13.08.2026 |
 
 ## Тестовый щит (на 13.08.2026)
 - `flutter analyze` — **0 issues**
-- `flutter test` — **115/115**
+- `flutter test` — **120/120**
 - `flutter build apk --release` — OK (65.9 MB)
 - CI-гейт `app/tool/verify.ps1` — passed (EXIT=0)
 

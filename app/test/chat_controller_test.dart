@@ -477,11 +477,61 @@ void main() {
           reason: '«удалить для меня» помечает сообщение на сервере');
     });
 
-    test('setPin: сохраняет в SettingsService', () async {
+    test('setPin: множественные закрепы, новый сверху, синхрон в облако',
+        () async {
       await controller.load();
-      controller.setPin('m1');
-      expect(controller.pinMsgId, 'm1');
-      expect(SettingsService.instance.pinnedMessageId('c1'), 'm1');
+      await controller.setPin('m1');
+      await controller.setPin('m2');
+      expect(controller.pins, ['m2', 'm1']);
+      expect(controller.pinMsgId, 'm2');
+      expect(SettingsService.instance.pinnedMessageIds('c1'), ['m2', 'm1']);
+      expect(fake.pinCalls, [
+        (chatId: 'c1', messageId: 'm1'),
+        (chatId: 'c1', messageId: 'm2'),
+      ]);
+    });
+
+    test('setPin: повторный пин — открепить; null — снять верхний', () async {
+      await controller.load();
+      await controller.setPin('m1');
+      await controller.setPin('m1');
+      expect(controller.pins, isEmpty);
+      expect(fake.unpinCalls, [(chatId: 'c1', messageId: 'm1')]);
+
+      await controller.setPin('m2');
+      await controller.setPin(null);
+      expect(controller.pins, isEmpty);
+      expect(fake.unpinCalls.length, 2);
+    });
+
+    test('загрузка: облачные закрепы заменяют локальный кеш', () async {
+      fake.pinsByChat['c1'] = ['m9', 'm3'];
+      await controller.load();
+      await pump();
+      expect(controller.pins, ['m9', 'm3']);
+      expect(SettingsService.instance.pinnedMessageIds('c1'), ['m9', 'm3']);
+    });
+
+    test('облачные закрепы недоступны — остаётся локальный список', () async {
+      await SettingsService.instance.setPinnedMessageIds('c1', ['m1']);
+      fake.throwOnFetchPins = true;
+      await controller.load();
+      await pump();
+      expect(controller.pins, ['m1']);
+    });
+
+    test('pinEvents: чужой пин и откреп применяются в реальном времени',
+        () async {
+      await controller.load();
+      fake.pinEventsCtrl
+          .add(PinChanged(chatId: 'c1', messageId: 'm7', pinned: true));
+      await pump();
+      expect(controller.pins, ['m7']);
+
+      fake.pinEventsCtrl
+          .add(PinChanged(chatId: 'c1', messageId: 'm7', pinned: false));
+      await pump();
+      expect(controller.pins, isEmpty);
     });
 
     test('notifyTyping: троттлинг 2.5с и пустая строка не отправляются',

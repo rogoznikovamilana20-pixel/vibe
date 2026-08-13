@@ -722,13 +722,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
               if (_chat.messages[i].serverId != null &&
-                  _chat.messages[i].serverId == _chat.pinMsgId)
+                  _chat.pins.contains(_chat.messages[i].serverId))
                 ActionRow(
                   icon: Icons.push_pin_rounded,
                   label: 'Открепить',
                   onTap: () {
                     Navigator.of(context).pop();
-                    _chat.setPin(null);
+                    _chat.unpin(_chat.messages[i].serverId!);
                   },
                 )
               else if (_chat.messages[i].serverId != null)
@@ -1123,20 +1123,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   /// Плашка «Закреплённое сообщение» под шапкой (как в Telegram).
+  /// При нескольких закрепах показывает «+N ещё» и открывает список.
   Widget _buildPinnedBanner(BuildContext context) {
-    final pinned = _chat.messages
-        .where((m) => m.serverId == _chat.pinMsgId)
-        .toList();
-    final m = pinned.isEmpty
-        ? null
-        : _chat.messages[_chat.messages.indexWhere(
-            (x) => x.serverId == _chat.pinMsgId,
-          )];
-    final preview = m == null
-        ? 'Закреплённое сообщение'
-        : (m.type == MsgType.text && m.text.isNotEmpty
-              ? m.text
-              : 'Закреплённое медиа');
+    final topId = _chat.pinMsgId;
+    if (topId == null) return const SizedBox.shrink();
+    final extra = _chat.pins.length - 1;
+    final preview = _pinPreview(topId);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         VibeSpacing.md,
@@ -1149,7 +1141,11 @@ class _ChatScreenState extends State<ChatScreen> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
-            if (m?.serverId != null) _jumpToPinned(m!.serverId!);
+            if (extra > 0) {
+              _showAllPins();
+            } else {
+              _jumpToPinned(topId);
+            }
           },
           child: Container(
             color: context.vibeSurfaceVariant.withValues(alpha: 0.92),
@@ -1175,6 +1171,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
+                if (extra > 0) ...[
+                  const SizedBox(width: VibeSpacing.sm),
+                  Text(
+                    'ещё $extra',
+                    style: VibeTypography.caption.copyWith(
+                      color: context.vibePrimary,
+                    ),
+                  ),
+                ],
                 const SizedBox(width: VibeSpacing.sm),
                 GestureDetector(
                   onTap: () => _chat.setPin(null),
@@ -1187,6 +1192,69 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  String _pinPreview(String serverId) {
+    for (final m in _chat.messages) {
+      if (m.serverId == serverId) {
+        return (m.type == MsgType.text && m.text.isNotEmpty)
+            ? m.text
+            : 'Закреплённое медиа';
+      }
+    }
+    return 'Закреплённое сообщение';
+  }
+
+  /// Список всех закреплённых сообщений чата.
+  void _showAllPins() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(VibeSpacing.md),
+              child: Text(
+                'Закреплённые сообщения',
+                style: VibeTypography.title,
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _chat.pins.length,
+                itemBuilder: (context, i) {
+                  final id = _chat.pins[i];
+                  final preview = _pinPreview(id);
+                  return ListTile(
+                    leading: const Icon(Icons.push_pin_rounded, size: 20),
+                    title: Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      tooltip: 'Открепить',
+                      onPressed: () {
+                        Navigator.of(sheetContext).pop();
+                        _chat.unpin(id);
+                      },
+                    ),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _jumpToPinned(id);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

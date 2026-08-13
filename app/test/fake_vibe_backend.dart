@@ -14,6 +14,7 @@ class FakeVibeBackend implements VibeBackendApi {
   final msgEventsCtrl = StreamController<VibeMsgEvent>.broadcast();
   final typingCtrl = StreamController<String>.broadcast();
   final chatEventsCtrl = StreamController<void>.broadcast();
+  final pinEventsCtrl = StreamController<PinChanged>.broadcast();
 
   final presenceNotifier = ValueNotifier<int>(0);
   @override
@@ -78,6 +79,35 @@ class FakeVibeBackend implements VibeBackendApi {
 
   @override
   Stream<void> get chatEvents => chatEventsCtrl.stream;
+
+  @override
+  Stream<PinChanged> get pinEvents => pinEventsCtrl.stream;
+
+  /// Закрепы чата: messageId → «закреплён». Новые пины — в конец списка.
+  final Map<String, List<String>> pinsByChat = {};
+  /// Если true — fetchChatPins бросает (миграция не применена / сеть).
+  bool throwOnFetchPins = false;
+  final List<({String chatId, String messageId})> pinCalls = [];
+  final List<({String chatId, String messageId})> unpinCalls = [];
+
+  @override
+  Future<List<String>> fetchChatPins(String chatId) async {
+    calls.add('fetchChatPins:$chatId');
+    if (throwOnFetchPins) throw Exception('no chat_pins table');
+    return List.of(pinsByChat[chatId] ?? const []);
+  }
+
+  @override
+  Future<void> pinMessage(String chatId, String messageId) async {
+    pinCalls.add((chatId: chatId, messageId: messageId));
+    pinsByChat.putIfAbsent(chatId, () => []).add(messageId);
+  }
+
+  @override
+  Future<void> unpinMessage(String chatId, String messageId) async {
+    unpinCalls.add((chatId: chatId, messageId: messageId));
+    pinsByChat[chatId]?.remove(messageId);
+  }
 
   @override
   ValueListenable<int> get presenceVersion => presenceNotifier;

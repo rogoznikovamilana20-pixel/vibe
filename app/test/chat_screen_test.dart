@@ -265,6 +265,39 @@ void main() {
     expect(find.text('закрепи меня'), findsOneWidget);
   });
 
+  testWidgets('два закрепа: баннер «ещё 1», тап → список всех, откреп',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'первый закреп'),
+      msg(id: 'm2', text: 'второй закреп'),
+    ];
+    fake.pinsByChat['c1'] = ['m2', 'm1'];
+
+    await pumpChat(tester);
+
+    expect(find.text('ещё 1'), findsOneWidget,
+        reason: 'баннер: верхний закреп + счётчик остальных');
+
+    await tester.tap(find.byIcon(Icons.push_pin_rounded).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Закреплённые сообщения'), findsOneWidget);
+    final inSheet = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.textContaining('закреп'),
+    );
+    expect(inSheet, findsNWidgets(2), reason: 'в шите обе строки закрепов');
+
+    await tester.tap(find.descendant(
+      of: find.widgetWithText(ListTile, 'первый закреп'),
+      matching: find.byIcon(Icons.close_rounded),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Закреплённые сообщения'), findsNothing);
+    expect(fake.unpinCalls, [(chatId: 'c1', messageId: 'm1')]);
+  });
+
   testWidgets('пересылка: меню → выбор чата → forwardMessage в цель',
       (tester) async {
     fake.messagesByChat['c1'] = [

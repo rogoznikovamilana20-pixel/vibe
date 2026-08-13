@@ -213,18 +213,15 @@ class SettingsService {
   // Чаты с выключенным звуком уведомлений («Не беспокоить»), локально
   List<String> get mutedChats => _prefs.getStringList(_keyMutedChats) ?? const [];
 
-  /// Закреплённые сообщения: chatId → serverId сообщения (локально, один на чат).
+  /// Закреплённые сообщения: chatId → список serverId (локальный кеш
+  /// облачных закрепов; новые сверху).
   static const _keyChatPins = 'vibe_chat_pins';
 
-  String? pinnedMessageId(String chatId) =>
-      _prefs.getString('$_keyChatPins:$chatId');
+  List<String> pinnedMessageIds(String chatId) =>
+      _prefs.getStringList('$_keyChatPins:$chatId') ?? const [];
 
-  Future<void> setPinnedMessageId(String chatId, String? serverId) async {
-    if (serverId == null) {
-      await _prefs.remove('$_keyChatPins:$chatId');
-    } else {
-      await _prefs.setString('$_keyChatPins:$chatId', serverId);
-    }
+  Future<void> setPinnedMessageIds(String chatId, List<String> ids) async {
+    await _prefs.setStringList('$_keyChatPins:$chatId', ids);
   }
 
   /// Сигнал об изменении списка приглушённых чатов (например, из экрана чата),
