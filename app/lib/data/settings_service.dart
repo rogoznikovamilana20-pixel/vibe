@@ -65,6 +65,7 @@ class SettingsService {
   static const _keyPinnedChats = 'vibe_pinned_chats';
   static const _keyHiddenChats = 'vibe_hidden_chats';
   static const _keyMutedChats = 'vibe_muted_chats';
+  static const _keyDeletedChats = 'vibe_deleted_chats';
   static const _keyBlockedUsers = 'vibe_blocked_users';
 
   Future<void> init() async {
@@ -307,6 +308,19 @@ class SettingsService {
   Future<void> setMutedChats(List<String> ids) async {
     await _prefs.setStringList(_keyMutedChats, ids);
     mutedVersion.value++;
+  }
+
+  // 8.3.2: удалённые для себя чаты (локально, как в TG — исчезают из ленты,
+  // пока не напишет собеседник заново). Серверного deleteChat нет — честная
+  // локальная деградация.
+  List<String> get deletedChats =>
+      _prefs.getStringList(_keyDeletedChats) ?? const [];
+
+  final ValueNotifier<int> deletedVersion = ValueNotifier<int>(0);
+
+  Future<void> setDeletedChats(List<String> ids) async {
+    await _prefs.setStringList(_keyDeletedChats, ids);
+    deletedVersion.value++;
   }
 
   // Заблокированные пользователи (id профилей). Локально, как в TG:

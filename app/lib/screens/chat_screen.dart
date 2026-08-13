@@ -710,13 +710,53 @@ class _ChatScreenState extends State<ChatScreen> {
         },
         onClearHistory: () => _confirmClearHistory(),
         onChatInfo: _showChatInfo,
+        onArchive: _archiveChat,
+        onDelete: _deleteChat,
       ),
     );
   }
 
+    /// 8.3.2: «Архивировать» из меню чата — чат уходит в облачный архив.
+  void _archiveChat() {
+    _backend.setChatArchived(widget.chat.id, archived: true);
+    _snack('Чат в архиве');
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  /// 8.3.2: «Удалить чат» — для себя, локально (как в TG: чат исчезает
+  /// из ленты; у собеседника история остаётся). Серверного deleteChat нет.
+  Future<bool> _deleteChat() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Удалить чат?'),
+        content: const Text(
+          'Чат исчезнет из вашего списка. История останется '
+          'у собеседника — удаление локальное, для этого устройства.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return false;
+    final ids = [...SettingsService.instance.deletedChats, widget.chat.id];
+    await SettingsService.instance.setDeletedChats(ids);
+    if (mounted) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    }
+    return true;
+  }
+
   /// 2.12: сведения о чате — тип, участник, число сообщений (локальные данные).
-  void _showChatInfo() {
-    final chat = widget.chat;
+  void _showChatInfo() {    final chat = widget.chat;
     final kind = switch (chat.kind) {
       'pm' => 'Личный чат',
       'group' => 'Группа',

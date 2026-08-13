@@ -355,4 +355,18 @@ void main() {
       expect(controller.chats.first.id, 'c2');
     });
   });
+
+  test('8.3.2: удалённый для себя чат исчезает из ленты и из кэша',
+      () async {
+    fake.chatList = [chat('c1'), chat('c2')];
+    await controller.load();
+    expect(controller.chats.map((c) => c.id), ['c1', 'c2']);
+
+    final ids = [...SettingsService.instance.deletedChats, 'c2'];
+    await SettingsService.instance.setDeletedChats(ids);
+    await controller.loadChats();
+
+    expect(controller.chats.map((c) => c.id), ['c1'],
+        reason: 'удалённый чат не возвращается при перезагрузке ленты');
+  });
 }

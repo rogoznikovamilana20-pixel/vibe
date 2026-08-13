@@ -40,6 +40,9 @@ class ChatListController extends ChangeNotifier {
   final Set<String> read = {};
   final Set<String> pinned = {};
 
+  /// 8.3.2: чаты, удалённые для себя на этом устройстве (в ленте не видны).
+  final Set<String> deleted = {};
+
   // ─── Подписки ───
   StreamSubscription<dynamic>? _streamSub;
   StreamSubscription<dynamic>? _chatSub;
@@ -64,6 +67,7 @@ class ChatListController extends ChangeNotifier {
   /// Идентичная копия (одинаковые id, превью, онлайн-статусы) не вызывает
   /// пересборку списка.
   void _mergeChats(List<VibeChat> fresh) {
+    fresh.removeWhere((c) => deleted.contains(c.id));
     if (_sameChats(chats, fresh)) return;
     chats = fresh;
     notifyListeners();
@@ -99,10 +103,12 @@ class ChatListController extends ChangeNotifier {
       ..addAll(backend.mutedNotifier.value);
     archived.addAll(backend.archivedNotifier.value);
     hidden.addAll(SettingsService.instance.hiddenChats);
+    deleted.addAll(SettingsService.instance.deletedChats);
 
     SettingsService.instance.mutedVersion.addListener(syncMuted);
     SettingsService.instance.blockedVersion.addListener(syncBlocked);
     SettingsService.instance.hiddenVersion.addListener(syncHidden);
+    SettingsService.instance.deletedVersion.addListener(syncDeleted);
     backend.archivedNotifier.addListener(syncCloudArchive);
     backend.mutedNotifier.addListener(syncCloudMuted);
     backend.presenceVersion.addListener(onPresenceChanged);
@@ -151,6 +157,21 @@ class ChatListController extends ChangeNotifier {
         ..addAll(hiddenNow);
       notifyListeners();
     }
+  }
+
+  /// 8.3.2: чат удалён для себя из меню чата — убираем его из ленты.
+  void syncDeleted() {
+    if (_disposed) return;
+    final deletedNow = SettingsService.instance.deletedChats.toSet();
+    if (deletedNow.length == deleted.length &&
+        deletedNow.difference(deleted).isEmpty) {
+      return;
+    }
+    deleted
+      ..clear()
+      ..addAll(deletedNow);
+    chats.removeWhere((c) => deleted.contains(c.id));
+    notifyListeners();
   }
 
   /// Синхронизация архива (удалённые с сервера / изменения) для локального списка.
@@ -226,6 +247,7 @@ class ChatListController extends ChangeNotifier {
     //    чтобы не было пустого экрана при плохой сети.
     if (chats.isEmpty) {
       final cached = await backend.getOfflineChats();
+      cached.removeWhere((c) => deleted.contains(c.id));
       if (cached.isNotEmpty && !_disposed) {
         chats = cached;
         notifyListeners();
@@ -407,6 +429,7 @@ class ChatListController extends ChangeNotifier {
     SettingsService.instance.mutedVersion.removeListener(syncMuted);
     SettingsService.instance.blockedVersion.removeListener(syncBlocked);
     SettingsService.instance.hiddenVersion.removeListener(syncHidden);
+    SettingsService.instance.deletedVersion.removeListener(syncDeleted);
     backend.archivedNotifier.removeListener(syncCloudArchive);
     backend.mutedNotifier.removeListener(syncCloudMuted);
     backend.presenceVersion.removeListener(onPresenceChanged);

@@ -22,6 +22,8 @@ class ChatMenuSheet extends StatefulWidget {
     this.onTapMedia,
     this.onClearHistory,
     this.onChatInfo,
+    this.onArchive,
+    this.onDelete,
   });
 
   final VibeChat chat;
@@ -32,6 +34,10 @@ class ChatMenuSheet extends StatefulWidget {
 
   /// 2.12: открыть «Сведения о чате» (вместо заглушки «в v2.0»).
   final VoidCallback? onChatInfo;
+
+  /// 8.3.2: «Архивировать» / «Удалить чат» — рабочие действия.
+  final VoidCallback? onArchive;
+  final Future<bool> Function()? onDelete;
 
   @override
   State<ChatMenuSheet> createState() => _ChatMenuSheetState();
@@ -183,6 +189,36 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
             } else {
               widget.onSnack('Сведения о чате — в v2.0');
             }
+          },
+        ),
+        // 8.3.2: архив и удаление — как в структуре меню ТГ.
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.archive_outlined, color: context.vibePrimary),
+          title: const Text('Архивировать'),
+          onTap: () {
+            Navigator.of(context).pop();
+            final archive = widget.onArchive;
+            if (archive != null) {
+              archive();
+            } else {
+              widget.onSnack('Архив — скоро');
+            }
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.delete_outline_rounded, color: VibeColors.error),
+          title: const Text('Удалить чат', style: TextStyle(color: VibeColors.error)),
+          onTap: () async {
+            Navigator.of(context).pop();
+            final del = widget.onDelete;
+            if (del == null) {
+              widget.onSnack('Удаление — скоро');
+              return;
+            }
+            final ok = await del();
+            if (ok) widget.onSnack('Чат удалён');
           },
         ),
         ListTile(
