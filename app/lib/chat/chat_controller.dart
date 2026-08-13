@@ -495,8 +495,17 @@ class ChatController extends ChangeNotifier {
         return;
       }
     } else {
-      // «Удалить для меня» — скрываем локально.
+      // «Удалить для меня»: скрываем локально и помечаем на сервере,
+      // чтобы сообщение не вернулось при следующей загрузке/реконнекте.
       messages.removeAt(idx);
+      final serverId = msg.serverId;
+      if (serverId != null) {
+        try {
+          await backend.hideMessageForMe(serverId);
+        } catch (_) {
+          // Серверное скрытие не критично: сообщение уже убрано из ленты.
+        }
+      }
     }
     notifyListeners();
   }

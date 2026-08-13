@@ -240,6 +240,14 @@ class FakeVibeBackend implements VibeBackendApi {
     return true;
   }
 
+  final List<String> hiddenMessageIds = [];
+
+  @override
+  Future<void> hideMessageForMe(String messageId) async {
+    calls.add('hideMessageForMe($messageId)');
+    hiddenMessageIds.add(messageId);
+  }
+
   // ─── Прочее (экраны: пересылка, «Сохранить в Избранное») ───
   @override
   String? get myProfileId => 'me';

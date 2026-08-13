@@ -1432,7 +1432,20 @@ Future<void> setMyProfile(VibeProfile p) async {
       final req = limit != null ? ordered.limit(limit) : ordered;
       final res = await req.timeout(const Duration(seconds: 6));
 
-      final msgs = (res as List).map((m) {
+      final raws = res as List;
+      final msgs = raws
+          .where((m) {
+            // «Удалить для меня»: сообщение помечено author deleted_by —
+            // такие не возвращаем владельцу пометки.
+            final deletedBy = m['deleted_by'];
+            if (myProfileId != null &&
+                deletedBy is List &&
+                deletedBy.contains(myProfileId)) {
+              return false;
+            }
+            return true;
+          })
+          .map((m) {
         final sender = VibeProfile.fromJson(m['profiles']);
         return VibeMessage(
           id: m['id'],
@@ -1453,7 +1466,7 @@ Future<void> setMyProfile(VibeProfile p) async {
       // Защита от «пустой истории» после перезахода: если сервер вернул
       // пусто (кратковременный сбой/REST-нестабильность), а локально есть
       // история — показываем кэш и НЕ затираем его пустым списком.
-      if (msgs.isEmpty) {
+      if (raws.isEmpty) {
         final rows = await _readCache(_cacheMsgsName(chatId));
         if (rows is List && rows.isNotEmpty) {
           return _messagesFromCacheRows(rows);
@@ -2591,6 +2604,31 @@ unawaited(() async {
       'chat_id': chatId,
     });
     return true;
+  }
+
+  /// «Удалить для меня» (серверная часть): добавляет мой id в `deleted_by`
+  /// сообщения — оно остаётся у других, но не возвращается мне при загрузке.
+  Future<void> hideMessageForMe(String messageId) async {
+    final myId = myProfileId;
+    if (myId == null) return;
+    try {
+      final row = await _client
+          .from('messages')
+          .select('deleted_by')
+          .eq('id', messageId)
+          .maybeSingle();
+      if (row == null) return;
+      final list = List<String>.from(row['deleted_by'] ?? const []);
+      if (list.contains(myId)) return;
+      list.add(myId);
+      await _client
+          .from('messages')
+          .update({'deleted_by': list})
+          .eq('id', messageId);
+    } catch (_) {
+      // Клиент уже скрыл сообщение локально; серверная пометка
+      // повторится при следующей загрузке (не критично).
+    }
   }
 
   /// «Очистить историю»: удаляет все сообщения чата (как в Telegram).

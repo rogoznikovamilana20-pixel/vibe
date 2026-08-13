@@ -463,7 +463,7 @@ void main() {
       expect(fake.deleteCalls, ['m1']);
     });
 
-    test('deleteMessage(everyone: false): только локально', () async {
+    test('deleteMessage(everyone: false): локально + серверная пометка', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
       fake.messagesByChat['c1'] = [
         seed(id: 'm1', created: t, incoming: false),
@@ -473,6 +473,8 @@ void main() {
       await controller.deleteMessage(controller.messages.first, everyone: false);
       expect(controller.messages, isEmpty);
       expect(fake.deleteCalls, isEmpty);
+      expect(fake.hiddenMessageIds, ['m1'],
+          reason: '«удалить для меня» помечает сообщение на сервере');
     });
 
     test('setPin: сохраняет в SettingsService', () async {
