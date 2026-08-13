@@ -399,6 +399,21 @@
 ### Следующее
 - По master-списку: следующий пункт (9.12/9.13) или MASTER_PLAN 9.4 integration-тесты; далее: 9.5 CI, 9.6 PERF, 9.7 TASKS, Aurion D7
 
+## Phase 3 — Фаза C (порция 17): integration-тесты (9.4 MASTER_PLAN) 🚧 blocked-env (13.08.2026)
+
+### Сделано
+- Инфраструктура: `integration_test` (SDK-зависимость в pubspec) + `integration_test/app_boot_test.dart` — smoke-boot реального приложения: сплэш → онбординг без сети, без падений, с проверкой жизни (скролл онбординга). Запуск:
+  `flutter test integration_test/app_boot_test.dart -d windows --dart-define=SUPABASE_URL=http://127.0.0.1:9 --dart-define=SUPABASE_ANON_KEY=test-anon-key`
+
+### Блокировка окружения (не код)
+- **Windows desktop**: `flutter_secure_storage_windows` требует `atlbase.h` — в Visual Studio Build Tools 2022 не установлен компонент ATL/MFC (C1083). Фикс: установить workload «C++ ATL».
+- **Chrome**: «Web devices are not supported for integration tests yet».
+- **Android**: AVD `vibe35` не стартует («emulator exited with code 1», гипервизор/backend).
+- Как только окружение починено — прогон команды выше = проверка 9.4 (`flutter analyze`/`flutter test` при этом 104/104, без регрессий).
+
+### Следующее
+- 9.5 CI (GitHub Actions: analyze+test+apk — не зависит от эмулятора), 9.6 PERF, 9.7 TASKS, Aurion D7
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list
