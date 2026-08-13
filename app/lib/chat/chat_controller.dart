@@ -158,9 +158,16 @@ class ChatController extends ChangeNotifier {
     _sub = backend.stream.listen((msg) {
       if (msg.chatId != chatId || _disposed) return;
       if (msg.localId != null) {
-        // Подтверждение своего сообщения (замена по мгновенному ключу).
+        // Подтверждение своего сообщения (замена по мгновенному ключу):
+        // забираем статус, серверный id (для удаления/правки) и эмодзи.
         final i = messages.indexWhere((m) => m.localId == msg.localId);
-        if (i >= 0) messages[i] = messages[i].copyWith(status: msg.status);
+        if (i >= 0) {
+          messages[i] = messages[i].copyWith(
+            status: msg.status,
+            serverId: msg.id,
+            stickerEmoji: msg.stickerEmoji ?? messages[i].stickerEmoji,
+          );
+        }
       } else if (msg.incoming) {
         messages.insert(0, _toMsg(msg));
         if (!atBottom) newIncoming++;
@@ -299,6 +306,84 @@ class ChatController extends ChangeNotifier {
 
   // ─── Отправка ───
 
+  // ─── Undo-отправки (Telegram: окно 5 секунд после отправки) ───
+  static const undoWindow = Duration(seconds: 5);
+
+  /// serverId (или пока localId) последнего отправленного сообщения.
+  String? undoMessageId;
+
+  /// Текст для восстановления в композер (только у текстовых).
+  String? undoText;
+
+  /// Растёт при восстановлении черновика после «Отменить» (экран
+  /// подхватывает текст в поле ввода).
+  int draftRestoreVersion = 0;
+
+  Timer? _undoTimer;
+
+  bool get undoAvailable => undoMessageId != null;
+
+  /// Включить окно отмены для отправленного сообщения.
+  void _armUndo(String? localId) {
+    final i = localId == null
+        ? -1
+        : messages.indexWhere((m) => m.localId == localId);
+    if (i < 0) return;
+    final id = messages[i].serverId ?? messages[i].localId;
+    if (id == null) return;
+    _undoTimer?.cancel();
+    undoMessageId = id;
+    undoText = (messages[i].type == MsgType.text &&
+            messages[i].text.trim().isNotEmpty)
+        ? messages[i].text
+        : null;
+    notifyListeners();
+    _undoTimer = Timer(undoWindow, () {
+      if (_disposed) return;
+      undoMessageId = null;
+      undoText = null;
+      notifyListeners();
+    });
+  }
+
+  /// «Отменить отправку»: удаляет сообщение для всех и, если это текст,
+  /// возвращает его в поле ввода (как в Telegram).
+  Future<void> undoLastSend() async {
+    final id = undoMessageId;
+    final restoreText = undoText;
+    _undoTimer?.cancel();
+    undoMessageId = null;
+    undoText = null;
+    if (id == null) {
+      notifyListeners();
+      return;
+    }
+    notifyListeners();
+
+    final i = messages.indexWhere(
+      (m) => m.serverId == id || m.localId == id,
+    );
+    if (i < 0) return;
+    final msg = messages[i];
+    try {
+      final serverId = msg.serverId;
+      if (serverId != null) {
+        await backend.deleteMessage(serverId);
+        if (_disposed) return;
+      }
+      messages.removeAt(i);
+    } catch (_) {
+      onError('Не удалось отменить отправку');
+      return;
+    }
+    if (restoreText != null && restoreText.trim().isNotEmpty) {
+      draft = restoreText;
+      draftRestoreVersion++;
+      SettingsService.instance.setDraft(chatId, restoreText);
+    }
+    notifyListeners();
+  }
+
   Future<void> send(String text) async {
     final t = text.trim();
     if (t.isEmpty) return;
@@ -352,6 +437,7 @@ class ChatController extends ChangeNotifier {
         replyAuthor: replyAuthor,
       );
       clearDraft();
+      _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
       if (i >= 0) {
@@ -375,6 +461,7 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
     try {
       await backend.sendSticker(chatId, emoji, localId: localId);
+      _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
       if (i >= 0) {
@@ -400,6 +487,7 @@ class ChatController extends ChangeNotifier {
         date: sent.created,
       ));
       notifyListeners();
+      _armUndo(localId);
     } catch (_) {
       onError('Не удалось отправить фото');
     }
@@ -429,6 +517,7 @@ class ChatController extends ChangeNotifier {
         localPath: path,
         voiceSeconds: seconds,
       );
+      _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
       if (i >= 0) {
@@ -453,6 +542,7 @@ class ChatController extends ChangeNotifier {
     try {
       await backend
           .sendVideo(chatId, file, localId: localId, localPath: file.path);
+      _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
       if (i >= 0) {
@@ -754,6 +844,7 @@ class ChatController extends ChangeNotifier {
       SettingsService.instance.setDraft(chatId, draft);
     }
     _unreadTimer?.cancel();
+    _undoTimer?.cancel();
     _sub?.cancel();
     _msgEventsSub?.cancel();
     _pinSub?.cancel();

@@ -64,6 +64,9 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Показываем панель эмодзи/стикеров.
   bool _showEmojiPanel = false;
 
+  /// Версия восстановленного черновика (после «Отменить отправку»).
+  int _seenDraftRestore = 0;
+
   // ─── Голосовая запись (удержание микрофона, как в Telegram) ───
   bool _recording = false;
   bool _micLocked = false;
@@ -954,7 +957,15 @@ class _ChatScreenState extends State<ChatScreen> {
           : const Color(0xFFEBE9F4),
       body: ListenableBuilder(
         listenable: _chat,
-        builder: (context, _) => Stack(
+        builder: (context, _) {
+          // «Отменить отправку» вернул текст в черновик — кладём в поле ввода.
+          if (_chat.draftRestoreVersion != _seenDraftRestore) {
+            _seenDraftRestore = _chat.draftRestoreVersion;
+            _input.text = _chat.draft;
+            _input.selection =
+                TextSelection.collapsed(offset: _input.text.length);
+          }
+          return Stack(
           children: [
             Column(
               children: [
@@ -968,6 +979,55 @@ class _ChatScreenState extends State<ChatScreen> {
                         parent: AlwaysScrollableScrollPhysics(),
                       ),
                       slivers: [
+                        // «Отменить отправку»: пилюля над последним пузырём
+                        // (окно 5 секунд, как в Telegram).
+                        if (_chat.undoAvailable)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                VibeSpacing.md,
+                                0,
+                                VibeSpacing.md,
+                                VibeSpacing.sm,
+                              ),
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Material(
+                                  color: context.vibeSurfaceVariant,
+                                  borderRadius:
+                                      BorderRadius.circular(VibeRadius.pill),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(
+                                      VibeRadius.pill,
+                                    ),
+                                    onTap: () => _chat.undoLastSend(),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: VibeSpacing.md,
+                                        vertical: VibeSpacing.sm,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.undo_rounded,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(
+                                            width: VibeSpacing.xs,
+                                          ),
+                                          Text(
+                                            'Отменить отправку',
+                                            style: VibeTypography.bodyMedium,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         // Из-за reverse: true это «верх» списка (свежие).
                         const SliverToBoxAdapter(
                           child: SizedBox(height: 100), // Запас для шапки
@@ -1117,9 +1177,9 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
+        );
+      },
+    ));
   }
 
   /// Плашка «Закреплённое сообщение» под шапкой (как в Telegram).

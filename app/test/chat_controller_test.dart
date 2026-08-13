@@ -534,6 +534,48 @@ void main() {
       expect(controller.pins, isEmpty);
     });
 
+    test('отправка открывает окно отмены на 5 секунд', () {
+      fakeAsync((async) {
+        var sent = false;
+        controller.send('внезапное сообщение').then((_) => sent = true);
+        async.flushMicrotasks();
+        expect(sent, isTrue);
+        expect(controller.undoAvailable, isTrue);
+        expect(controller.undoMessageId, isNotNull);
+
+        async.elapse(ChatController.undoWindow +
+            const Duration(milliseconds: 1));
+        expect(controller.undoAvailable, isFalse,
+            reason: 'окно отмены закрылось через 5 секунд');
+      });
+    });
+
+    test('undoLastSend: удаляет для всех, возвращает текст в черновик',
+        () async {
+      await controller.load();
+      await controller.send('ошибочный текст');
+      await pump();
+      expect(controller.undoAvailable, isTrue);
+      final serverId = controller.messages.first.serverId;
+      expect(serverId, isNotNull,
+          reason: 'эхо отправки приносит серверный id');
+
+      await controller.undoLastSend();
+
+      expect(controller.messages, isEmpty);
+      expect(fake.deleteCalls, [serverId]);
+      expect(controller.draft, 'ошибочный текст',
+          reason: 'текст возвращается в поле ввода');
+      expect(controller.draftRestoreVersion, 1);
+      expect(controller.undoAvailable, isFalse);
+    });
+
+    test('undoLastSend без окна — ничего не делает', () async {
+      await controller.load();
+      await controller.undoLastSend();
+      expect(fake.deleteCalls, isEmpty);
+    });
+
     test('notifyTyping: троттлинг 2.5с и пустая строка не отправляются',
         () async {
       controller.notifyTyping('a');

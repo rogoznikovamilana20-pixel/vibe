@@ -133,6 +133,8 @@ class ChatMsg {
     MsgStatus? status,
     String? localId,
     bool? edited,
+    String? serverId,
+    String? stickerEmoji,
   }) {
     return ChatMsg(
       type: type,
@@ -153,8 +155,8 @@ class ChatMsg {
       localId: localId ?? this.localId,
       edited: edited ?? this.edited,
       forwardedFrom: forwardedFrom,
-      serverId: serverId,
-      stickerEmoji: stickerEmoji,
+      serverId: serverId ?? this.serverId,
+      stickerEmoji: stickerEmoji ?? this.stickerEmoji,
       date: date,
     );
   }

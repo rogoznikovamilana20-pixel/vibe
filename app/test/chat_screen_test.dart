@@ -265,6 +265,32 @@ void main() {
     expect(find.text('закрепи меня'), findsOneWidget);
   });
 
+  testWidgets('отмена отправки: пилюля в окне, тап удаляет и возвращает текст',
+      (tester) async {
+    await pumpChat(tester);
+
+    await tester.enterText(find.byType(TextField), 'ошибочное сообщение');
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Отменить отправку'), findsOneWidget,
+        reason: 'окно отмены открыто после отправки');
+
+    await tester.tap(find.text('Отменить отправку'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ошибочное сообщение'), findsOneWidget,
+        reason: 'пузырь удалён, текст остался только в поле ввода');
+    expect(fake.deleteCalls, isNotEmpty, reason: 'серверное удаление');
+    expect(find.text('Отменить отправку'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'ошибочное сообщение',
+      reason: 'текст вернулся в поле ввода',
+    );
+  });
+
   testWidgets('два закрепа: баннер «ещё 1», тап → список всех, откреп',
       (tester) async {
     fake.messagesByChat['c1'] = [
