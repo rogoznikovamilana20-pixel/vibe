@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/services/scheduled_service.dart';
 import 'core/env_config.dart';
 import 'core/profile_avatar.dart';
 import 'core/theme/vibe_theme.dart';
@@ -34,6 +35,7 @@ void main() async {
   await SettingsService.instance.init();
   await PasscodeService.instance.init();
   await ProfileAvatar.load();
+  await ScheduledService.instance.init();
 
   // Временный E2E-хелпер: позволяет установить PIN без UI-навигации.
   const e2ePin = String.fromEnvironment('E2E_PIN');

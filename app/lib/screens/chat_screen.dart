@@ -25,6 +25,7 @@ import '../chat/widgets/chat_composer.dart';
 import '../chat/widgets/chat_menu_sheet.dart';
 import '../chat/widgets/message_bubble.dart';
 import '../core/services/notification_service.dart';
+import '../core/services/scheduled_service.dart';
 import '../data/backend.dart';
 import '../data/backend_api.dart';
 import '../data/settings_service.dart';
@@ -151,6 +152,182 @@ class _ChatScreenState extends State<ChatScreen> {
     _input.clear();
     setState(() {});
     await _chat.send(text);
+  }
+
+  /// 3.9: отложить отправку текста (удержание кнопки отправки).
+  void _showScheduleSheet(String text) {
+    HapticFeedback.selectionClick();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            VibeSpacing.xl,
+            VibeSpacing.xs,
+            VibeSpacing.xl,
+            VibeSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Отложить отправку',
+                style: VibeTypography.subtitle.copyWith(
+                  color: context.vibeTextPrimary,
+                ),
+              ),
+              const SizedBox(height: VibeSpacing.xs),
+              Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: VibeTypography.caption.copyWith(
+                  color: context.vibeTextTertiary,
+                ),
+              ),
+              const SizedBox(height: VibeSpacing.sm),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.schedule_rounded,
+                    color: context.vibePrimary),
+                title: const Text('Через 1 час'),
+                onTap: () => _applySchedule(sheetCtx, text,
+                    DateTime.now().add(const Duration(hours: 1))),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.schedule_rounded,
+                    color: context.vibePrimary),
+                title: const Text('Завтра в 09:00'),
+                onTap: () => _applySchedule(
+                  sheetCtx,
+                  text,
+                  DateTime.now().add(const Duration(days: 1)).copyWith(
+                        hour: 9,
+                        minute: 0,
+                        second: 0,
+                        millisecond: 0,
+                        microsecond: 0,
+                      ),
+                ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.event_rounded,
+                    color: context.vibePrimary),
+                title: const Text('Выбрать дату и время…'),
+                onTap: () async {
+                  Navigator.of(sheetCtx).pop();
+                  final now = DateTime.now();
+                  final day = await showDatePicker(
+                    context: context,
+                    initialDate: now,
+                    firstDate: now,
+                    lastDate: now.add(const Duration(days: 365)),
+                  );
+                  if (day == null || !mounted) return;
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.now(),
+                  );
+                  if (time == null || !mounted) return;
+                  _applySchedule(
+                    context,
+                    text,
+                    DateTime(day.year, day.month, day.day, time.hour,
+                        time.minute),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _applySchedule(BuildContext sheetCtx, String text, DateTime when) {
+    Navigator.of(sheetCtx).pop();
+    if (!mounted) return;
+    ScheduledService.instance.schedule(widget.chat.id, text, when);
+    _input.clear();
+    _chat.saveDraft('');
+    setState(() {});
+    _snack('Запланировано на ${_scheduleLabel(when)}');
+  }
+
+  /// Список отложенных сообщений чата с отменой по строке.
+  void _showScheduledList() {
+    final pending = ScheduledService.instance.pendingFor(widget.chat.id);
+    if (pending.isEmpty) return;
+    HapticFeedback.selectionClick();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            VibeSpacing.xl,
+            VibeSpacing.xs,
+            VibeSpacing.xl,
+            VibeSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Запланированные сообщения',
+                style: VibeTypography.subtitle.copyWith(
+                  color: context.vibeTextPrimary,
+                ),
+              ),
+              const SizedBox(height: VibeSpacing.sm),
+              for (final m in pending)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.schedule_rounded,
+                      color: context.vibePrimary),
+                  title: Text(
+                    m.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: VibeTypography.body.copyWith(
+                      color: context.vibeTextPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _scheduleLabel(m.when),
+                    style: VibeTypography.caption.copyWith(
+                      color: context.vibeTextTertiary,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    onPressed: () {
+                      ScheduledService.instance
+                          .cancel(widget.chat.id, m.localId);
+                      _snack('Отправка отменена');
+                    },
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    color: VibeColors.error,
+                    tooltip: 'Отменить отправку',
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _scheduleLabel(DateTime when) {
+    final h = when.hour.toString().padLeft(2, '0');
+    final min = when.minute.toString().padLeft(2, '0');
+    final d = when.day.toString().padLeft(2, '0');
+    final mo = when.month.toString().padLeft(2, '0');
+    return '$h:$min $d.$mo';
   }
 
   Future<void> _sendSticker(String emoji) async {
@@ -1452,6 +1629,62 @@ class _ChatScreenState extends State<ChatScreen> {
                   onClose: () => _chat.setReply(null),
                 ),
               ),
+            ListenableBuilder(
+              listenable: ScheduledService.instance.version,
+              builder: (context, _) {
+                final pending =
+                    ScheduledService.instance.pendingFor(widget.chat.id);
+                if (pending.isEmpty) return const SizedBox.shrink();
+                final first = pending.first;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: VibeSpacing.sm),
+                  child: Material(
+                    color: context.vibeSurfaceVariant,
+                    borderRadius: BorderRadius.circular(VibeRadius.pill),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(VibeRadius.pill),
+                      onTap: _showScheduledList,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: VibeSpacing.md,
+                          vertical: VibeSpacing.xs,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: 18,
+                              color: context.vibePrimary,
+                            ),
+                            const SizedBox(width: VibeSpacing.xs),
+                            Flexible(
+                              child: Text(
+                                pending.length == 1
+                                    ? 'Запланировано · ${_scheduleLabel(first.when)}'
+                                    : 'Запланировано: ${pending.length} · до '
+                                        '${_scheduleLabel(first.when)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: VibeTypography.caption.copyWith(
+                                  color: context.vibeTextSecondary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: VibeSpacing.xs),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 16,
+                              color: VibeColors.borderDark,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1608,6 +1841,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   onLock: _lockMic,
                   onUnlock: _unlockMic,
                   onCancel: _cancelRecording,
+                  onSchedule: _input.text.trim().isEmpty
+                      ? null
+                      : () => _showScheduleSheet(_input.text),
                 ),
               ],
             ),

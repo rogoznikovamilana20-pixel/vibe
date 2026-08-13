@@ -25,6 +25,7 @@ class SendButton extends StatefulWidget {
     required this.onLock,
     required this.onUnlock,
     required this.onCancel,
+    this.onSchedule,
   });
 
   final bool canSend;
@@ -36,6 +37,9 @@ class SendButton extends StatefulWidget {
   final VoidCallback onLock;
   final VoidCallback onUnlock;
   final VoidCallback onCancel;
+
+  /// 3.9: удержание кнопки отправки — отложить сообщение.
+  final VoidCallback? onSchedule;
 
   @override
   State<SendButton> createState() => _SendButtonState();
@@ -55,10 +59,13 @@ class _SendButtonState extends State<SendButton>
   double _dragDy = 0;
   double _dragDx = 0;
   Timer? _holdTimer;
+  Timer? _scheduleTimer;
+  bool _scheduleTriggered = false;
 
   @override
   void dispose() {
     _holdTimer?.cancel();
+    _scheduleTimer?.cancel();
     _pulse?.dispose();
     super.dispose();
   }
@@ -93,7 +100,20 @@ class _SendButtonState extends State<SendButton>
   }
 
   void _onTapDown(TapDownDetails d) {
-    if (widget.canSend || widget.recording || widget.locked) return;
+    if (widget.canSend) {
+      // Удержание на «отправить» — отложить сообщение (3.9).
+      _scheduleTimer?.cancel();
+      _scheduleTimer = Timer(const Duration(milliseconds: 500), () {
+        final onSchedule = widget.onSchedule;
+        if (mounted && widget.canSend && onSchedule != null) {
+          _scheduleTriggered = true;
+          HapticFeedback.selectionClick();
+          onSchedule();
+        }
+      });
+      return;
+    }
+    if (widget.recording || widget.locked) return;
     _holdTimer?.cancel();
     _holdTimer = Timer(
       const Duration(milliseconds: 220),
@@ -105,15 +125,21 @@ class _SendButtonState extends State<SendButton>
 
   void _onTapUp(TapUpDetails d) {
     _holdTimer?.cancel();
+    _scheduleTimer?.cancel();
     if (widget.recording && !widget.locked) widget.onRelease();
   }
 
   void _onTapCancel() {
     _holdTimer?.cancel();
+    _scheduleTimer?.cancel();
   }
 
   void _onTap() {
     HapticFeedback.lightImpact(); // КЛИК ПО КНОПКЕ
+    if (_scheduleTriggered) {
+      _scheduleTriggered = false;
+      return;
+    }
     if (widget.canSend) {
       widget.onSend();
     } else if (widget.recording && widget.locked) {

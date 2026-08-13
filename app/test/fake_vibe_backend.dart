@@ -152,6 +152,7 @@ class FakeVibeBackend implements VibeBackendApi {
     String? replyAuthor,
   }) async {
     if (throwOnSendText) {
+      calls.add('sendText($chatId)');
       throw Exception('network');
     }
     calls.add('sendText($chatId)');

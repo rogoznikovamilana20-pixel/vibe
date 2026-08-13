@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vibe_app/chat/widgets/message_bubble.dart';
+import 'package:vibe_app/core/services/scheduled_service.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/core/widgets/vibe_avatar.dart';
 import 'package:vibe_app/data/backend.dart';
@@ -21,9 +22,12 @@ void main() {
     await SettingsService.instance.init();
     fake = FakeVibeBackend();
     VibeNetImage.resolveUrl = (_) async => null;
+    ScheduledService.instance.debugReset();
+    ScheduledService.instance.backendProvider = () => fake;
   });
 
   tearDown(() {
+    ScheduledService.instance.debugReset();
     fake.close();
   });
 
@@ -495,5 +499,60 @@ void main() {
       findsOneWidget,
       reason: 'счётчик сообщений из загруженной истории',
     );
+  });
+
+  testWidgets('отложенная отправка: удержание send → планирование, в ленте нет',
+      (tester) async {
+    await pumpChat(tester);
+
+    await tester.enterText(find.byType(TextField), 'напишу позже');
+    await tester.pump();
+    await tester.longPress(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Отложить отправку'), findsOneWidget);
+    expect(find.text('Через 1 час'), findsOneWidget);
+
+    await tester.tap(find.text('Через 1 час'));
+    await tester.pumpAndSettle();
+
+    // Сообщение НЕ отправлено и НЕ в ленте, текст ушёл из поля.
+    expect(fake.calls.where((c) => c.startsWith('sendText')), isEmpty);
+    expect(find.text('напишу позже'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      isEmpty,
+    );
+    // Чип над композером с временем планирования.
+    expect(find.textContaining('Запланировано ·'), findsOneWidget);
+    expect(
+      ScheduledService.instance.pendingFor('c1'),
+      hasLength(1),
+    );
+    ScheduledService.instance.debugReset();
+  });
+
+  testWidgets('отложенная отправка: отмена из списка снимает план',
+      (tester) async {
+    await pumpChat(tester);
+
+    await tester.enterText(find.byType(TextField), 'передумаю');
+    await tester.pump();
+    await tester.longPress(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Через 1 час'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Запланировано ·'));
+    await tester.pumpAndSettle();
+    expect(find.text('Запланированные сообщения'), findsOneWidget);
+    expect(find.text('передумаю'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(ScheduledService.instance.pendingFor('c1'), isEmpty);
+    expect(find.textContaining('Запланировано ·'), findsNothing);
+    ScheduledService.instance.debugReset();
   });
 }
