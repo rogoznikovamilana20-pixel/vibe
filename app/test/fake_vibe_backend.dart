@@ -225,6 +225,14 @@ class FakeVibeBackend implements VibeBackendApi {
     );
   }
 
+  final Map<String, List<MessageEdit>> messageEditsByMessage = {};
+
+  @override
+  Future<List<MessageEdit>> listMessageEdits(String messageId) async {
+    calls.add('listMessageEdits($messageId)');
+    return List.of(messageEditsByMessage[messageId] ?? const []);
+  }
+
   @override
   Future<bool> deleteMessage(String messageId) async {
     calls.add('deleteMessage($messageId)');

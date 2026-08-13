@@ -76,6 +76,7 @@ abstract class VibeBackendApi {
   });
 
   Future<VibeMessage?> updateMessage(String messageId, String newText);
+  Future<List<MessageEdit>> listMessageEdits(String messageId);
   Future<bool> deleteMessage(String messageId);
 
   // ─── Действия ───
@@ -218,6 +219,10 @@ class LiveVibeBackend implements VibeBackendApi {
   @override
   Future<VibeMessage?> updateMessage(String messageId, String newText) =>
       _b.updateMessage(messageId, newText);
+
+  @override
+  Future<List<MessageEdit>> listMessageEdits(String messageId) =>
+      _b.listMessageEdits(messageId);
 
   @override
   Future<bool> deleteMessage(String messageId) =>

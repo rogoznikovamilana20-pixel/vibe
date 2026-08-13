@@ -300,6 +300,20 @@
 ### Следующее
 - Фаза 9.6: расширенная модель правок; Aurion: после Фаз A/B/C (D7)
 
+## Phase 3 — Фаза C (порция 10): расширенная модель правок (9.6) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 99/99)
+- **Сервер**: `supabase/migrate_v1_8_0_message_edits.sql` — таблица `message_edits` (message_id, text, edited_at, индекс, RLS открытая как у messages)
+- **Бэкенд**: `updateMessage` пишет снимок старого текста в `message_edits` перед апдейтом (текущий текст живёт в messages, как и раньше); `listMessageEdits(messageId)` — снимки от новых к старым (лимит 50); модель `MessageEdit`; `VibeBackendApi` += `listMessageEdits`
+- **UI**: у изменённого сообщения в меню — «История правок» → шит со снимками текста (пусто → «Правок не найдено»; сбой → «Сервер недоступен»)
+- `test/chat_screen_test.dart` +1: меню у edited-сообщения → снимки в шите + вызов listMessageEdits
+
+### Проверка
+- `flutter analyze` — 0 issues; `flutter test` — 99/99 (+1)
+
+### Следующее
+- Фаза 9.7: расширенная модель удалений; Aurion: после Фаз A/B/C (D7)
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list

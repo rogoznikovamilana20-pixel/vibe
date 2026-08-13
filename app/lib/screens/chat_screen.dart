@@ -724,6 +724,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     _startEdit(i);
                   },
                 ),
+              if (_chat.messages[i].edited)
+                ActionRow(
+                  icon: Icons.history_rounded,
+                  label: 'История правок',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showEditHistory(_chat.messages[i]);
+                  },
+                ),
               ActionRow(
                 icon: Icons.delete_outline_rounded,
                 label: 'Удалить',
@@ -754,6 +763,97 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       _snack('Сервер недоступен');
     }
+  }
+
+  /// История правок сообщения: снимки текста от новых к старым
+  /// (как «изменено» в Telegram с просмотром версий).
+  Future<void> _showEditHistory(ChatMsg msg) async {
+    final serverId = msg.serverId;
+    if (serverId == null) return;
+    List<MessageEdit> edits;
+    try {
+      edits = await _backend.listMessageEdits(serverId);
+    } catch (_) {
+      _snack('Сервер недоступен');
+      return;
+    }
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            VibeSpacing.lg,
+            VibeSpacing.xs,
+            VibeSpacing.lg,
+            VibeSpacing.xxl,
+          ),
+          child: edits.isEmpty
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: VibeSpacing.lg),
+                    Text(
+                      'История правок',
+                      style: VibeTypography.subtitle,
+                    ),
+                    const SizedBox(height: VibeSpacing.md),
+                    Text(
+                      'Правок не найдено',
+                      style: VibeTypography.body.copyWith(
+                        color: context.vibeTextSecondary,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'История правок',
+                      style: VibeTypography.subtitle,
+                    ),
+                    const SizedBox(height: VibeSpacing.sm),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: edits.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final e = edits[i];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    e.text,
+                                    style: VibeTypography.body.copyWith(
+                                      color: context.vibeTextPrimary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: VibeSpacing.sm),
+                                Icon(
+                                  Icons.edit_rounded,
+                                  size: 15,
+                                  color: context.vibeTextTertiary,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openForward(ChatMsg msg) async {

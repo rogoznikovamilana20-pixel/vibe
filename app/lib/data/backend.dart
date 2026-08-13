@@ -73,6 +73,19 @@ class VibeStickerPack {
 ///  - failed — не ушло (сеть/сервер).
 enum MsgStatus { sending, sent, delivered, read, failed }
 
+/// Снимок правки сообщения (история правок): старый текст в момент правки.
+class MessageEdit {
+  const MessageEdit({
+    required this.messageId,
+    required this.text,
+    required this.editedAt,
+  });
+
+  final String messageId;
+  final String text;
+  final DateTime editedAt;
+}
+
 /// Одна модель сообщения в чате.
 class VibeMessage {
   const VibeMessage({
@@ -2487,6 +2500,25 @@ unawaited(() async {
   ) async {
     final myId = myProfileId;
     if (myId == null) return null;
+    final before = await _client
+        .from('messages')
+        .select('text,chat_id')
+        .eq('id', messageId)
+        .eq('sender_id', myId)
+        .maybeSingle();
+    if (before == null) return null;
+    // Снимок старого текста в историю правок (как в Telegram).
+    final oldText = (before['text'] as String?) ?? '';
+    if (oldText.isNotEmpty) {
+      final chatIdNow = (before['chat_id'] as String?) ?? '';
+      if (chatIdNow.isNotEmpty) {
+        await _client.from('message_edits').insert({
+          'message_id': messageId,
+          'text': oldText,
+          'edited_at': DateTime.now().toIso8601String(),
+        });
+      }
+    }
     final row = await _client
         .from('messages')
         .update({
@@ -2513,6 +2545,29 @@ unawaited(() async {
       'sender_id': myId,
     });
     return updated;
+  }
+
+  /// История правок сообщения (снимки текста, от новых к старым).
+  Future<List<MessageEdit>> listMessageEdits(String messageId) async {
+    try {
+      final res = await _client
+          .from('message_edits')
+          .select('message_id,text,edited_at')
+          .eq('message_id', messageId)
+          .order('edited_at', ascending: false)
+          .limit(50);
+      return [
+        for (final r in res)
+          MessageEdit(
+            messageId: '${r['message_id']}',
+            text: '${r['text']}',
+            editedAt: DateTime.tryParse('${r['edited_at']}') ??
+                DateTime.now(),
+          ),
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Удаление сообщения «для всех» (только своих).

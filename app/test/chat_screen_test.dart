@@ -44,6 +44,7 @@ void main() {
     DateTime? created,
     String? localId,
     MsgStatus status = MsgStatus.sent,
+    bool edited = false,
   }) {
     return VibeMessage(
       id: id,
@@ -60,6 +61,7 @@ void main() {
       status: status,
       localId: localId,
       stickerEmoji: null,
+      edited: edited,
     );
   }
 
@@ -298,5 +300,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fake.forwardCalls, [(chatId: 'c2', text: 'перешли меня')]);
+  });
+
+  testWidgets('история правок: меню у изменённого → снимки текста в шите',
+      (tester) async {
+    fake.messagesByChat['c1'] = [
+      msg(id: 'm1', text: 'текущая версия', incoming: false, edited: true),
+    ];
+    fake.messageEditsByMessage['m1'] = [
+      MessageEdit(
+        messageId: 'm1',
+        text: 'вторая версия',
+        editedAt: DateTime(2026, 8, 13, 11),
+      ),
+      MessageEdit(
+        messageId: 'm1',
+        text: 'первая версия',
+        editedAt: DateTime(2026, 8, 13, 10),
+      ),
+    ];
+
+    await pumpChat(tester);
+
+    await tester.longPress(find.text('текущая версия'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('История правок'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('История правок'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('вторая версия'), findsOneWidget);
+    expect(find.text('первая версия'), findsOneWidget);
+    expect(fake.calls, contains('listMessageEdits(m1)'));
   });
 }
