@@ -1057,6 +1057,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                     key: ValueKey(
                                       'msg_${_chat.messages[i].localId ?? i}',
                                     ),
+                                    isFirstInGroup: ChatController.isFirstInGroup(
+                                      _chat.messages,
+                                      i,
+                                    ),
+                                    isLastInGroup: ChatController.isLastInGroup(
+                                      _chat.messages,
+                                      i,
+                                    ),
                                     onHeart: () => _chat.heartReact(i),
                                     onLongPress: () => _showMessageActions(i),
                                     onReply: () => _replyToMsg(i),

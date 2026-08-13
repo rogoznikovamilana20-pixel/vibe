@@ -139,6 +139,28 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  /// Свёртка цепочек (3.10): окно группы — 7 минут.
+  static const Duration groupWindow = Duration(minutes: 7);
+
+  /// Два соседних сообщения образуют одну группу (свёртку), если они
+  /// от одного автора (incoming) и разница времени <= [groupWindow].
+  static bool inSameGroup(ChatMsg a, ChatMsg b) {
+    final da = a.date;
+    final db = b.date;
+    if (da == null || db == null) return false;
+    return a.incoming == b.incoming &&
+        db.difference(da).abs() <= groupWindow;
+  }
+
+  /// Первое (самое старое) сообщение своей группы в списке `messages`.
+  static bool isFirstInGroup(List<ChatMsg> messages, int i) =>
+      i == messages.length - 1 ||
+      !inSameGroup(messages[i], messages[i + 1]);
+
+  /// Последнее (самое новое, нижнее) сообщение своей группы.
+  static bool isLastInGroup(List<ChatMsg> messages, int i) =>
+      i == 0 || !inSameGroup(messages[i], messages[i - 1]);
+
   /// Экран сообщает о положении скролла (reverse: 0 px — низ чата).
   void onScroll({required bool atBottom}) {
     if (this.atBottom == atBottom && newIncoming == 0) return;

@@ -31,6 +31,8 @@ class MessageBubble extends StatefulWidget {
     required this.scrollController,
     this.player,
     this.highlight = false,
+    this.isFirstInGroup = true,
+    this.isLastInGroup = true,
   });
 
   final ChatMsg msg;
@@ -45,6 +47,11 @@ class MessageBubble extends StatefulWidget {
 
   /// Подсветка при прыжке к закреплённому сообщению (как в Telegram).
   final bool highlight;
+
+  /// Свёртка цепочек (3.10): первый (самый старый) в группе сообщений
+  /// одного автора — верхние углы полные; последний — направленный «хвост».
+  final bool isFirstInGroup;
+  final bool isLastInGroup;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -142,6 +149,18 @@ class _MessageBubbleState extends State<MessageBubble>
             progress
           );
 
+    // Свёртка цепочек: внутри группы отступы компактные, «сросшиеся» углы.
+    final inMiddle = !widget.isFirstInGroup && !widget.isLastInGroup;
+    final vPad = inMiddle ? 1.0 : 3.0;
+    final flat = math.min(r, 4.0);
+    final top = widget.isFirstInGroup ? r : flat;
+    final bottomLeft = widget.isLastInGroup
+        ? (isIncoming ? flat : r)
+        : flat;
+    final bottomRight = widget.isLastInGroup
+        ? (isIncoming ? r : flat)
+        : flat;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       transform: Matrix4.translationValues(_dragOffset, 0, 0),
@@ -174,7 +193,7 @@ class _MessageBubbleState extends State<MessageBubble>
               ),
             ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: EdgeInsets.symmetric(vertical: vPad),
             child: Row(
               mainAxisAlignment: isIncoming ? MainAxisAlignment.start : MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -222,10 +241,10 @@ class _MessageBubbleState extends State<MessageBubble>
                                     ),
                                   ],
                             borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(r),
-                              topRight: Radius.circular(r),
-                              bottomLeft: Radius.circular(isIncoming ? math.min(r, 4) : r),
-                              bottomRight: Radius.circular(isIncoming ? r : math.min(r, 4)),
+                              topLeft: Radius.circular(top),
+                              topRight: Radius.circular(top),
+                              bottomLeft: Radius.circular(bottomLeft),
+                              bottomRight: Radius.circular(bottomRight),
                             ),
                           ),
                           clipBehavior: Clip.antiAlias,

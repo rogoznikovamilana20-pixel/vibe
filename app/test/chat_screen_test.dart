@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:vibe_app/chat/widgets/message_bubble.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/core/widgets/vibe_avatar.dart';
 import 'package:vibe_app/data/backend.dart';
@@ -415,5 +416,50 @@ void main() {
 
     expect(fake.clearHistoryCalls, ['c1']);
     expect(find.text('старое сообщение'), findsNothing);
+  });
+
+  testWidgets('свёртка цепочек: флаги группы у пузырей', (tester) async {
+    final t0 = DateTime(2026, 8, 13, 12);
+    fake.messagesByChat['c1'] = [
+      msg(
+        id: 'm1',
+        text: 'третье',
+        created: t0.add(const Duration(minutes: 2)),
+      ),
+      msg(
+        id: 'm2',
+        text: 'второе',
+        created: t0.add(const Duration(minutes: 1)),
+      ),
+      msg(id: 'm3', text: 'первое', created: t0),
+      msg(
+        id: 'm4',
+        text: 'своё',
+        incoming: false,
+        created: t0.subtract(const Duration(minutes: 1)),
+      ),
+    ];
+
+    await pumpChat(tester);
+
+    final bubbles = tester
+        .widgetList<MessageBubble>(find.byType(MessageBubble))
+        .toList();
+    expect(bubbles, hasLength(4));
+    expect(bubbles.map((b) => b.msg.text).toList(),
+        ['третье', 'второе', 'первое', 'своё']);
+
+    expect(bubbles[0].isFirstInGroup, isFalse);
+    expect(bubbles[0].isLastInGroup, isTrue,
+        reason: 'нижнее сообщение группы входящих — последнее');
+    expect(bubbles[1].isFirstInGroup, isFalse);
+    expect(bubbles[1].isLastInGroup, isFalse,
+        reason: 'середина группы — не край');
+    expect(bubbles[2].isFirstInGroup, isTrue,
+        reason: 'верхнее сообщение группы — первое');
+    expect(bubbles[2].isLastInGroup, isFalse);
+    expect(bubbles[3].isFirstInGroup, isTrue);
+    expect(bubbles[3].isLastInGroup, isTrue,
+        reason: 'одиночное исходящее — и первое, и последнее');
   });
 }

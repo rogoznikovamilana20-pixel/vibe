@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fake_async/fake_async.dart';
 
 import 'package:vibe_app/chat/chat_controller.dart';
+import 'package:vibe_app/chat/models.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
 
@@ -584,6 +585,89 @@ void main() {
       expect(fake.sendTypingCalls, 1);
       controller.notifyTyping('   ');
       expect(fake.sendTypingCalls, 1);
+    });
+  });
+
+  group('Свёртка цепочек (3.10)', () {
+    final t0 = DateTime(2026, 8, 13, 12, 0);
+
+    ChatMsg chatMsg(
+      bool incoming, {
+      DateTime? date,
+      MsgStatus status = MsgStatus.delivered,
+    }) =>
+        ChatMsg(
+          type: MsgType.text,
+          incoming: incoming,
+          time: '12:00',
+          text: 'm',
+          date: date ?? t0,
+          status: status,
+        );
+
+    test('inSameGroup: один автор и разница до 7 минут — одна группа',
+        () {
+      expect(
+        ChatController.inSameGroup(
+          chatMsg(true, date: t0),
+          chatMsg(true, date: t0.add(const Duration(minutes: 7))),
+        ),
+        isTrue,
+      );
+      expect(
+        ChatController.inSameGroup(
+          chatMsg(true, date: t0),
+          chatMsg(false, date: t0),
+        ),
+        isFalse,
+        reason: 'разные авторы не группируются',
+      );
+      expect(
+        ChatController.inSameGroup(
+          chatMsg(true, date: t0),
+          chatMsg(true, date: t0.add(const Duration(minutes: 7, seconds: 1))),
+        ),
+        isFalse,
+        reason: 'больше 7 минут — новая группа',
+      );
+    });
+
+    test('isFirst/isLastInGroup: края и разрывы определяются верно', () {
+      // i=0 — самое новое (низ), i=3 — самое старое (верх).
+      final msgs = <ChatMsg>[
+        chatMsg(true, date: t0.add(const Duration(minutes: 2))),
+        chatMsg(true, date: t0.add(const Duration(minutes: 1))),
+        chatMsg(true, date: t0),
+        chatMsg(false, date: t0.subtract(const Duration(minutes: 1))),
+      ];
+      expect(ChatController.isFirstInGroup(msgs, 0), isFalse);
+      expect(ChatController.isLastInGroup(msgs, 0), isTrue,
+          reason: 'нижнее сообщение группы — последнее');
+      expect(ChatController.isFirstInGroup(msgs, 1), isFalse);
+      expect(ChatController.isLastInGroup(msgs, 1), isFalse,
+          reason: 'середина группы — не край');
+      expect(ChatController.isFirstInGroup(msgs, 2), isTrue,
+          reason: 'верхнее сообщение группы — первое');
+      expect(ChatController.isLastInGroup(msgs, 2), isFalse);
+      expect(ChatController.isFirstInGroup(msgs, 3), isTrue);
+      expect(ChatController.isLastInGroup(msgs, 3), isTrue,
+          reason: 'одиночное сообщение — и первое, и последнее');
+    });
+
+    test('одиночные сообщения и стык авторов дают корректные флаги', () {
+      final msgs = <ChatMsg>[
+        chatMsg(true, date: t0),
+        chatMsg(false, date: t0),
+        chatMsg(false, date: t0.add(const Duration(minutes: 1))),
+      ];
+      expect(ChatController.isFirstInGroup(msgs, 0), isTrue);
+      expect(ChatController.isLastInGroup(msgs, 0), isTrue);
+      expect(ChatController.isFirstInGroup(msgs, 1), isFalse,
+          reason: 'группа исходящих: верхнее (старое) сообщение — индекс 2');
+      expect(ChatController.isLastInGroup(msgs, 1), isTrue,
+          reason: 'нижнее (новое) исходящее — последнее в группе');
+      expect(ChatController.isFirstInGroup(msgs, 2), isTrue);
+      expect(ChatController.isLastInGroup(msgs, 2), isFalse);
     });
   });
 }
