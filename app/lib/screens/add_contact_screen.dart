@@ -14,6 +14,7 @@ import '../data/backend.dart';
 import '../data/backend_api.dart';
 import 'chat_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// 8.3.1: добавление контакта — как в Telegram: имя/@ник → поиск
 /// → «Написать» (открывает pm-чат). Если никого не нашли — приглашение
@@ -132,7 +133,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                     child: VibeInput(
                       controller: _query,
                       hint: 'Имя или @ник',
-                      prefixIcon: Icons.search_rounded,
+                      prefixIcon: VibeIcons.search,
                       onSubmitted: (_) => _search(),
                     ),
                   ),

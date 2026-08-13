@@ -8,6 +8,7 @@ import '../../core/widgets/settings_widgets.dart';
 import '../../core/widgets/vibe_chat_icon.dart';
 import '../../core/widgets/vibe_top_bar.dart';
 import '../../data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class NotificationsSettingsScreen extends StatefulWidget {
   const NotificationsSettingsScreen({super.key});
@@ -43,7 +44,7 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),
@@ -57,7 +58,7 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
             title: l.notificationsFromChats,
             children: [
               _buildSwitchTile(
-                icon: Icons.person_outline_rounded,
+                icon: VibeIcons.user,
                 color: context.vibePrimary,
                 title: l.personalChats,
                 value: _personal,

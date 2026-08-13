@@ -14,6 +14,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import '../data/settings_service.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Один медиафайл из переписки (фото или видеокружок).
 class PeerMedia {
@@ -129,7 +130,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
   Widget _mediaPlaceholder(PeerMedia m) {
     return Center(
       child: Icon(
-        m.isVideo ? Icons.videocam_rounded : Icons.photo_rounded,
+        m.isVideo ? VibeIcons.video : Icons.photo_rounded,
         size: 30,
         color: context.vibeTextTertiary,
       ),
@@ -232,7 +233,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                   const SizedBox(width: VibeSpacing.md),
                   Expanded(
                     child: _ProfileAction(
-                      icon: Icons.call_rounded,
+                      icon: VibeIcons.phone,
                       label: 'Аудио',
                       onTap: () {
                         VibeToast.show(context, 'Аудиозвонок — в v2.0');
@@ -242,7 +243,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                   const SizedBox(width: VibeSpacing.md),
                   Expanded(
                     child: _ProfileAction(
-                      icon: Icons.videocam_rounded,
+                      icon: VibeIcons.video,
                       label: 'Видео',
                       onTap: () {
                         VibeToast.show(context, 'Видеозвонок — в v2.0');

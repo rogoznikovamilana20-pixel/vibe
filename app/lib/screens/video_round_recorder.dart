@@ -11,6 +11,7 @@ import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Результат записи видеокружка.
 class VideoRoundResult {
@@ -233,7 +234,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                   children: [
                     IconButton(
                       onPressed: _recording ? null : _cancel,
-                      icon: const Icon(Icons.close_rounded),
+                      icon: const Icon(VibeIcons.close),
                       color: Colors.white,
                     ),
                     const Spacer(),
@@ -289,7 +290,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                   if (_recording && _locked)
                     IconButton(
                       onPressed: _cancel,
-                      icon: const Icon(Icons.close_rounded, size: 26),
+                      icon: const Icon(VibeIcons.close, size: 26),
                       color: context.vibeError,
                       tooltip: 'Отмена',
                     ),
@@ -317,7 +318,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                       child: Icon(
                         _recording
                             ? Icons.stop_rounded
-                            : Icons.videocam_rounded,
+                            : VibeIcons.video,
                         color: Colors.white,
                         size: 28,
                       ),
@@ -327,7 +328,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                   if (_recording && _locked)
                     IconButton(
                       onPressed: _finish,
-                      icon: const Icon(Icons.send_rounded, size: 24),
+                      icon: const Icon(VibeIcons.send, size: 24),
                       color: context.vibePrimary,
                       tooltip: 'Отправить',
                     ),

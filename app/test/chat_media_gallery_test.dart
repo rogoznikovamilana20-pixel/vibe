@@ -10,6 +10,7 @@ import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
 
 import 'fake_vibe_backend.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -80,7 +81,7 @@ void main() {
 
     await pumpGallery(tester);
     expect(find.text('Медиа · 3'), findsOneWidget);
-    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    expect(find.byIcon(VibeIcons.play), findsOneWidget);
   });
 
   testWidgets('галерея: тап по плитке открывает просмотрщик', (tester) async {

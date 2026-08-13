@@ -9,6 +9,7 @@ import '../theme/vibe_spacing.dart';
 import '../theme/vibe_theme.dart';
 import '../theme/vibe_typography.dart';
 import 'vibe_avatar.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Баннер входящего пуша в стиле Vibe: стеклянная панель, аватар,
 /// имя + текст, тап по баннеру открывает чат.
@@ -150,7 +151,7 @@ class _BannerCard extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.all(6),
                         child: Icon(
-                          Icons.close_rounded,
+                          VibeIcons.close,
                           size: 18,
                           color: VibeColors.textTertiaryDark,
                         ),

@@ -12,6 +12,7 @@ import '../data/backend.dart';
 import '../data/backend_api.dart';
 import 'aurion_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Редактирование данных аккаунта — аналог экрана
 /// «Изменить данные» в профиле Telegram.
@@ -110,7 +111,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         children: [
           VibeTopBar(
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const Icon(VibeIcons.back),
               onPressed: () => Navigator.of(context).pop(),
               color: context.vibeTextPrimary,
             ),

@@ -6,6 +6,7 @@ import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/settings_widgets.dart';
 import '../../core/widgets/vibe_top_bar.dart';
 import '../../data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class DataSettingsScreen extends StatefulWidget {
   const DataSettingsScreen({super.key});
@@ -38,7 +39,7 @@ class _DataSettingsScreenState extends State<DataSettingsScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),

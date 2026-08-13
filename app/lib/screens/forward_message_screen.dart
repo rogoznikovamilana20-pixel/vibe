@@ -8,6 +8,7 @@ import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Экран «Переслать» — как в Telegram: выбор одного или нескольких чатов
 /// галочками, внизу кнопка «Отправить» (переслать выбранным).
@@ -160,7 +161,7 @@ class _ForwardPickerScreenState extends State<ForwardPickerScreen> {
                 actions: [
                   if (_selected.isNotEmpty)
                     VibeTopBarIcon(
-                      icon: Icons.send_rounded,
+                      icon: VibeIcons.send,
                       tooltip: 'Отправить',
                       onTap: () =>
                           Navigator.of(context).pop(_selected.toList()),
@@ -227,7 +228,7 @@ class _ForwardPickerScreenState extends State<ForwardPickerScreen> {
         child: Row(
           children: [
             Icon(
-              Icons.search_rounded,
+              VibeIcons.search,
               size: 20,
               color: context.vibeTextTertiary,
             ),

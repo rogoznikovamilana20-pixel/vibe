@@ -19,6 +19,7 @@ import '../../data/settings_service.dart';
 import '../models.dart';
 import 'message_status_tick.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Пузырь сообщения: текст/медиа/стикер/голосовое/видеокружок, свайп-ответ,
 /// двойной тап — сердечко с искрами, реакции и статусные галочки.
@@ -186,7 +187,7 @@ class _MessageBubbleState extends State<MessageBubble>
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.reply_rounded,
+                      VibeIcons.reply,
                       color: _triggeredReply ? context.vibePrimary : context.vibeTextSecondary,
                       size: 20,
                     ),
@@ -580,7 +581,7 @@ class _PhotoBubble extends StatelessWidget {
             if (!incoming) ...[
               const SizedBox(width: 3),
               const Icon(
-                Icons.done_all_rounded,
+                VibeIcons.checkAll,
                 size: 13,
                 color: Colors.white70,
               ),
@@ -652,7 +653,7 @@ class _NetworkPhotoBubble extends StatelessWidget {
             if (!incoming) ...[
               const SizedBox(width: 3),
               const Icon(
-                Icons.done_all_rounded,
+                VibeIcons.checkAll,
                 size: 13,
                 color: Colors.white70,
               ),
@@ -785,8 +786,8 @@ class _VoiceBubbleState extends State<_VoiceBubble>
                 duration: VibeAnimations.fadeIn,
                 child: Icon(
                   _playing
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
+                      ? VibeIcons.pause
+                      : VibeIcons.play,
                   key: ValueKey(_playing),
                   color: isIncoming ? context.vibePrimary : Colors.white,
                   size: 22,
@@ -856,7 +857,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
             if (!isIncoming) ...[
               const SizedBox(width: 3),
               const Icon(
-                Icons.done_all_rounded,
+                VibeIcons.checkAll,
                 size: 13,
                 color: Colors.white70,
               ),
@@ -1017,7 +1018,7 @@ class _VideoRoundBubbleState extends State<_VideoRoundBubble> {
                 color: VibeColors.surfaceDark,
                 child: Center(
                   child: Icon(
-                    Icons.videocam_rounded,
+                    VibeIcons.video,
                     color: VibeColors.textTertiaryDark,
                   ),
                 ),

@@ -9,6 +9,7 @@ import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_button.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Редактор аватарки: круг как в Telegram, зум/сдвиг/поворот,
 /// сохранение круглого PNG (прозрачные углы).
@@ -108,7 +109,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    icon: const Icon(VibeIcons.close, color: Colors.white),
                     tooltip: 'Отмена',
                   ),
                   const Expanded(

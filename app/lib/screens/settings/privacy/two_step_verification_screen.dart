@@ -7,6 +7,7 @@ import '../../../core/theme/vibe_typography.dart';
 import '../../../core/widgets/vibe_button.dart';
 import '../../../core/widgets/vibe_input.dart';
 import '../../../core/widgets/vibe_top_bar.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class TwoStepVerificationScreen extends StatefulWidget {
   const TwoStepVerificationScreen({super.key});
@@ -72,7 +73,7 @@ class _TwoStepVerificationScreenState extends State<TwoStepVerificationScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),

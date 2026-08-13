@@ -10,6 +10,7 @@ import '../../../core/theme/vibe_typography.dart';
 import '../../../core/widgets/settings_widgets.dart';
 import '../../../core/widgets/vibe_top_bar.dart';
 import '../../../data/passcode_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class PasscodeSettingsScreen extends StatefulWidget {
   const PasscodeSettingsScreen({super.key});
@@ -118,7 +119,7 @@ class _PasscodeSettingsScreenState extends State<PasscodeSettingsScreen> {
                   ),
                 ),
                 trailing: _autoLockSec == sec
-                    ? Icon(Icons.check_rounded, color: sheetCtx.vibePrimary)
+                    ? Icon(VibeIcons.check, color: sheetCtx.vibePrimary)
                     : null,
                 onTap: () => Navigator.pop(sheetCtx, sec),
               ),
@@ -144,7 +145,7 @@ class _PasscodeSettingsScreenState extends State<PasscodeSettingsScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),
@@ -171,7 +172,7 @@ class _PasscodeSettingsScreenState extends State<PasscodeSettingsScreen> {
               ),
               if (_hasPasscode)
                 SettingsTile(
-                  icon: Icons.edit_outlined,
+                  icon: VibeIcons.edit,
                   iconColor: context.vibePrimary,
                   title: l.changePasscode,
                   onTap: () async {

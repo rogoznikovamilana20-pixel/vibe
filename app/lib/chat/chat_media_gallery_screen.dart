@@ -9,6 +9,7 @@ import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_avatar.dart';
 import 'chat_controller.dart';
 import 'models.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Одно медиа в галерее (фото или видео-кружок).
 class ChatMediaItem {
@@ -152,7 +153,7 @@ class _MediaTile extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.play_arrow_rounded,
+                  VibeIcons.play,
                   size: 22,
                   color: Colors.white,
                 ),
@@ -240,7 +241,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 padding: const EdgeInsets.all(VibeSpacing.md),
                 child: IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  icon: const Icon(VibeIcons.close, color: Colors.white),
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.black.withValues(alpha: 0.4),
                   ),

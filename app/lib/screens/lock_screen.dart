@@ -13,6 +13,7 @@ import '../core/widgets/vibe_backdrop.dart';
 import '../core/widgets/vibe_glass_surface.dart';
 import '../core/widgets/vibe_orb.dart';
 import '../data/passcode_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Полноэкранная блокировка приложения: ввод код-пароля, биометрия,
 /// лимит попыток (5) с временной блокировкой ввода.
@@ -117,7 +118,7 @@ class _LockScreenState extends State<LockScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const VibeOrb(size: 92, icon: Icons.lock_rounded),
+                    const VibeOrb(size: 92, icon: VibeIcons.lock),
                     const SizedBox(height: VibeSpacing.xl),
                     VibeGlassSurface(
                       radius: VibeRadius.pill,

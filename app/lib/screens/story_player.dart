@@ -10,6 +10,7 @@ import '../core/theme/vibe_spacing.dart';
 import '../core/widgets/vibe_avatar.dart';
 import '../data/backend.dart';
 import '../data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Продолжительность показа фото-истории (как в Telegram).
 const kStoryPhotoDuration = Duration(seconds: 15);
@@ -301,15 +302,15 @@ class _StoryPlayerScreenState extends State<StoryPlayerScreen> {
                           },
                           icon: Icon(
                             _paused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
+                                ? VibeIcons.play
+                                : VibeIcons.pause,
                             color: Colors.white,
                           ),
                         ),
                       ],
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
+                        icon: const Icon(VibeIcons.close),
                         color: Colors.white,
                         tooltip: 'Закрыть',
                       ),
@@ -361,7 +362,7 @@ class _StoryPlayerScreenState extends State<StoryPlayerScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.done_all_rounded,
+                VibeIcons.checkAll,
                 size: 48,
                 color: Colors.white.withValues(alpha: 0.85),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   Widget host(Widget child) => MaterialApp(home: child);
@@ -110,7 +111,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Отправлено'), findsOneWidget);
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(VibeIcons.check), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 2500));
     await tester.pump(const Duration(milliseconds: 500));

@@ -9,6 +9,7 @@ import '../../core/widgets/settings_widgets.dart';
 import '../../core/widgets/vibe_top_bar.dart';
 import '../../data/settings_service.dart';
 import '../../main.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class AppearanceSettingsScreen extends StatefulWidget {
   const AppearanceSettingsScreen({super.key});
@@ -49,7 +50,7 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),
@@ -188,7 +189,7 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
       icon: icon,
       iconColor: active ? context.vibePrimary : context.vibeTextSecondary,
       title: title,
-      trailing: active ? Icon(Icons.check_rounded, color: context.vibePrimary) : const SizedBox.shrink(),
+      trailing: active ? Icon(VibeIcons.check, color: context.vibePrimary) : const SizedBox.shrink(),
     );
   }
 

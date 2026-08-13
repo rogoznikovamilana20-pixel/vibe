@@ -6,6 +6,7 @@ import 'package:vibe_app/chats/widgets/chat_list_item.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -120,7 +121,7 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.push_pin_rounded), findsWidgets);
+    expect(find.byIcon(VibeIcons.pin), findsWidgets);
     expect(find.byIcon(Icons.notifications_off_rounded), findsWidgets);
   });
 

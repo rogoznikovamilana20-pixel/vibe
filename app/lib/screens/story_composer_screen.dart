@@ -9,6 +9,7 @@ import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/widgets/vibe_button.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Результат композера: фото истории (байты PNG/JPEG).
 class StoryComposerResult {
@@ -145,7 +146,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               padding: const EdgeInsets.all(VibeSpacing.sm),
               child: IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
+                icon: const Icon(VibeIcons.close),
                 color: Colors.white,
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.black45,
@@ -215,7 +216,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               padding: const EdgeInsets.all(VibeSpacing.sm),
               child: IconButton(
                 onPressed: () => setState(() => _captured = null),
-                icon: const Icon(Icons.arrow_back_rounded),
+                icon: const Icon(VibeIcons.back),
                 color: Colors.white,
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.black45,

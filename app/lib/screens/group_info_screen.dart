@@ -10,6 +10,7 @@ import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Результат закрытия инфо-группы.
 class GroupInfoResult {
@@ -191,7 +192,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           borderRadius: BorderRadius.circular(VibeRadius.avatar),
         ),
         child: Icon(
-          Icons.groups_rounded,
+          VibeIcons.group,
           size: 36,
           color: context.vibePrimary,
         ),
@@ -284,7 +285,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 children: [
                   Expanded(
                     child: _GroupAction(
-                      icon: Icons.edit_rounded,
+                      icon: VibeIcons.edit,
                       label: 'Переименовать',
                       onTap: _busy ? null : _rename,
                     ),

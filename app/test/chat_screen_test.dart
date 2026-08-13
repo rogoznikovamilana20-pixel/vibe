@@ -13,6 +13,7 @@ import 'package:vibe_app/screens/chat_screen.dart';
 import 'package:vibe_app/screens/peer_profile_screen.dart';
 
 import 'fake_vibe_backend.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -98,15 +99,15 @@ void main() {
     expect(find.text('Позже всех'), findsOneWidget);
     expect(find.text('Раньше'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+    expect(find.byIcon(VibeIcons.mic), findsOneWidget);
   });
 
   testWidgets('пустой ввод: кнопка — микрофон, отправка недоступна',
       (tester) async {
     await pumpChat(tester);
 
-    expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.send_rounded), findsNothing);
+    expect(find.byIcon(VibeIcons.mic), findsOneWidget);
+    expect(find.byIcon(VibeIcons.send), findsNothing);
   });
 
   testWidgets('отправка текста: sendText + сообщение в ленте', (tester) async {
@@ -114,7 +115,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'привет');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.tap(find.byIcon(VibeIcons.send));
     await tester.pumpAndSettle();
 
     expect(fake.lastTextSent, 'привет');
@@ -144,7 +145,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'в пути');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.tap(find.byIcon(VibeIcons.send));
     await tester.pump();
 
     expect(find.text('в пути'), findsOneWidget);
@@ -157,7 +158,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'упасть');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.tap(find.byIcon(VibeIcons.send));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -269,7 +270,7 @@ void main() {
       reason: 'текст в пузыре + плашка закреплённого под шапкой',
     );
 
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.tap(find.byIcon(VibeIcons.close));
     await tester.pumpAndSettle();
 
     expect(find.text('закрепи меня'), findsOneWidget);
@@ -281,7 +282,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'ошибочное сообщение');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.tap(find.byIcon(VibeIcons.send));
     await tester.pumpAndSettle();
 
     expect(find.text('Отменить отправку'), findsOneWidget,
@@ -314,7 +315,7 @@ void main() {
     expect(find.text('ещё 1'), findsOneWidget,
         reason: 'баннер: верхний закреп + счётчик остальных');
 
-    await tester.tap(find.byIcon(Icons.push_pin_rounded).first);
+    await tester.tap(find.byIcon(VibeIcons.pin).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Закреплённые сообщения'), findsOneWidget);
@@ -326,7 +327,7 @@ void main() {
 
     await tester.tap(find.descendant(
       of: find.widgetWithText(ListTile, 'первый закреп'),
-      matching: find.byIcon(Icons.close_rounded),
+      matching: find.byIcon(VibeIcons.close),
     ));
     await tester.pumpAndSettle();
 
@@ -413,7 +414,7 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(VibeIcons.moreVertical));
     await tester.pumpAndSettle();
 
     expect(find.text('Очистить историю'), findsOneWidget);
@@ -483,7 +484,7 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(VibeIcons.moreVertical));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Сведения о чате'));
     await tester.pumpAndSettle();
@@ -514,7 +515,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'напишу позже');
     await tester.pump();
-    await tester.longPress(find.byIcon(Icons.send_rounded));
+    await tester.longPress(find.byIcon(VibeIcons.send));
     await tester.pumpAndSettle();
 
     expect(find.text('Отложить отправку'), findsOneWidget);
@@ -547,7 +548,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'передумаю');
     await tester.pump();
-    await tester.longPress(find.byIcon(Icons.send_rounded));
+    await tester.longPress(find.byIcon(VibeIcons.send));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Через 1 час'));
     await tester.pumpAndSettle();
@@ -557,7 +558,7 @@ void main() {
     expect(find.text('Запланированные сообщения'), findsOneWidget);
     expect(find.text('передумаю'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.tap(find.byIcon(VibeIcons.close));
     await tester.pumpAndSettle();
 
     expect(ScheduledService.instance.pendingFor('c1'), isEmpty);

@@ -7,6 +7,7 @@ import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_avatar.dart';
 import '../../core/widgets/vibe_island.dart';
 import '../../data/backend.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Плитка чата в ленте: аватар, имя, превью, время-пилюля, pin, DND,
 /// unread-бейдж, свайпы (архив / не беспокоить) и мультивыбор.
@@ -96,7 +97,7 @@ class ChatListItem extends StatelessWidget {
       background: _swipeBackground(
         context: context,
         color: VibeColors.surfaceElevatedDark,
-        icon: isArchived ? Icons.unarchive_rounded : Icons.archive_rounded,
+        icon: isArchived ? Icons.unarchive_rounded : VibeIcons.archive,
         label: isArchived ? 'Из архива' : 'Архив',
       ),
       child: Padding(
@@ -129,7 +130,7 @@ class ChatListItem extends StatelessWidget {
               if (pinned) ...[
                 const SizedBox(width: VibeSpacing.xs),
                 const Icon(
-                  Icons.push_pin_rounded,
+                  VibeIcons.pin,
                   size: 16,
                   color: VibeColors.vivid,
                 ),
@@ -187,7 +188,7 @@ class ChatListItem extends StatelessWidget {
                 children: [
                   if (pinned) ...[
                     const Icon(
-                      Icons.push_pin_rounded,
+                      VibeIcons.pin,
                       size: 12,
                       color: VibeColors.vivid,
                     ),
@@ -303,7 +304,7 @@ class ChatListItem extends StatelessWidget {
       case 'biz':
         return Icons.business_outlined;
       default:
-        return Icons.person_outline_rounded;
+        return VibeIcons.user;
     }
   }
 }

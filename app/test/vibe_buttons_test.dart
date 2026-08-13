@@ -6,6 +6,7 @@ import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/core/widgets/vibe_button.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_button.dart';
 import 'package:vibe_app/data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   setUp(() async {
@@ -43,7 +44,7 @@ void main() {
       (tester) async {
     var taps = 0;
     await tester.pumpWidget(
-      wrap(VibeIconButton(icon: Icons.search_rounded, onPressed: () => taps++)),
+      wrap(VibeIconButton(icon: VibeIcons.search, onPressed: () => taps++)),
     );
     final size = tester.getSize(find.byType(VibeIconButton));
     expect(size.width, 48, reason: 'hit-target не меньше 48');
@@ -55,7 +56,7 @@ void main() {
 
   testWidgets('8.2.2: pressed scale 0.86 и возврат 1.0', (tester) async {
     await tester.pumpWidget(
-      wrap(VibeIconButton(icon: Icons.edit_rounded, onPressed: () {})),
+      wrap(VibeIconButton(icon: VibeIcons.edit, onPressed: () {})),
     );
     final gesture =
         await tester.startGesture(tester.getCenter(find.byType(VibeIconButton)));

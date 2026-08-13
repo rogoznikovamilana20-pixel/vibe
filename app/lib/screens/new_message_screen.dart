@@ -12,6 +12,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'chat_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Экран «Новое сообщение» — как в Telegram: поле поиска контакта сверху
 /// и список контактов; тап открывает переписку.
@@ -256,7 +257,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         child: Row(
           children: [
             Icon(
-              Icons.search_rounded,
+              VibeIcons.search,
               size: 20,
               color: context.vibeTextTertiary,
             ),

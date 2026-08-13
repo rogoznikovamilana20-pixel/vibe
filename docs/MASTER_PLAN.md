@@ -96,8 +96,8 @@
 
 ## ФАЗА 8 — UX/UI: иконки, кнопки, виджеты, подразделы
 ### 8.1 Система иконок
-- [ ] 8.1.1 Свой иконочный шрифт VibeIcons (~120 иконок, фирменные: искра ✦, щит, Вайбик)
-- [ ] 8.1.2 Заменить «материальные» иконки (more_vert, person_outline…) на фирменные
+- [x] 8.1.1 Свой иконочный шрифт VibeIcons (~120 иконок, фирменные: искра ✦, щит, Вайбик) ✅ (13.08.2026) — `VibeIcons` (lib/core/widgets/vibe_icon_font.dart) + `assets/fonts/vibe_icons.ttf`: 40 глифов (send, back, check, checkAll, edit, trash, pin, star, heart, bolt, home, phone, video, camera, more, plus, close, search, mic, lock, folder, archive, user, group, copy, reply, download, volume, play, pause, eye, info, file, clock, bubble, smile, settings, attach), статические константы `IconData`, ttf подключён в pubspec (family: VibeIcons)
+- [x] 8.1.2 Заменить «материальные» иконки (more_vert, person_outline…) на фирменные ✅ (13.08.2026) — карта из 56 Material-имён → VibeIcons в `lib/` (43 файла) и `test/`: композер, шапка чата, табы (чаты/контакты/центра), лента, меню чата, шары/сетки/профиль/настройки/сторис и др.; вне карты остались Material-иконки без глифов (edit_note, checklist, check_box_outline_blank, group_alt, eye_off и др.) — в точках доработки; `flutter analyze` — 0 issues, `flutter test` — 184/184 ✅
 - [x] 8.1.3 Новая иконка приложения (лаунчер + adaptive, ночной клуб: фиолетовый орб + искра) ✅ (13.08.2026) — фирменная иконка Vibe: фиолетовый орб (градиент #A66BFF→#6E38D8) с белой искрой ✦ на ночном фоне #0D0A1E; Android: adaptive-вектор (v26+) + legacy PNG 48–192px (10 шт), round-версии; iOS: AppIcon 15 размеров до 1024; web: 192/512 + maskable; сборка assembleDebug успешна
 ### 8.2 Кнопки и контролы
 - [x] 8.2.1 Единая кнопочная система по DESIGN_SYSTEM (высоты 56/44/36, радиус 14, ripple) ✅ (13.08.2026) — VibeButton: пресеты VibeButtonSize (l 56 / m 44 / s 36), радиус кнопок 14; ripple/свечение/градиент уже были

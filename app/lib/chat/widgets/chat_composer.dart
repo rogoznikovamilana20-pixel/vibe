@@ -10,6 +10,7 @@ import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
 import 'message_bubble.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Кнопка отправки / микрофона: держишь — запись, свайп вверх — замочек,
 /// свайп влево — отмена (как в TG).
@@ -189,20 +190,20 @@ class _SendButtonState extends State<SendButton>
           duration: VibeAnimations.fadeIn,
           child: widget.canSend
               ? const Icon(
-                  Icons.send_rounded,
+                  VibeIcons.send,
                   key: ValueKey('send'),
                   color: Colors.white,
                   size: 22,
                 )
               : widget.locked
                   ? const Icon(
-                      Icons.lock_rounded,
+                      VibeIcons.lock,
                       key: ValueKey('lock'),
                       color: Colors.white,
                       size: 22,
                     )
                   : Icon(
-                      Icons.mic_rounded,
+                      VibeIcons.mic,
                       key: const ValueKey('mic'),
                       color: widget.recording ? VibeColors.warning : context.vibePrimary,
                       size: 22,
@@ -269,7 +270,7 @@ class ReplyPanel extends StatelessWidget {
           ),
           IconButton(
             onPressed: onClose,
-            icon: const Icon(Icons.close_rounded, size: 20),
+            icon: const Icon(VibeIcons.close, size: 20),
             color: context.vibeTextSecondary,
             tooltip: 'Отменить ответ',
           ),
@@ -369,14 +370,14 @@ class _RollingPillState extends State<RollingPill> {
           ),
           IconButton(
             onPressed: widget.onCancel,
-            icon: const Icon(Icons.close_rounded, size: 22),
+            icon: const Icon(VibeIcons.close, size: 22),
             color: context.vibeError,
             tooltip: 'Отмена',
           ),
           if (locked)
             IconButton(
               onPressed: widget.onSend,
-              icon: const Icon(Icons.send_rounded, size: 20),
+              icon: const Icon(VibeIcons.send, size: 20),
               color: context.vibePrimary,
               tooltip: 'Отправить',
             ),
@@ -488,14 +489,14 @@ class _VideoRollPillState extends State<VideoRollPill> {
           ),
           IconButton(
             onPressed: widget.onCancel,
-            icon: const Icon(Icons.close_rounded, size: 22),
+            icon: const Icon(VibeIcons.close, size: 22),
             color: context.vibeError,
             tooltip: 'Отмена',
           ),
           if (locked)
             IconButton(
               onPressed: widget.onSend,
-              icon: const Icon(Icons.send_rounded, size: 20),
+              icon: const Icon(VibeIcons.send, size: 20),
               color: context.vibePrimary,
               tooltip: 'Отправить',
             ),

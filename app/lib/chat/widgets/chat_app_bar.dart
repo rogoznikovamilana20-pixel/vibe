@@ -9,6 +9,7 @@ import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_avatar.dart';
 import '../../core/widgets/vibe_icon_button.dart';
 import '../../data/backend.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Стеклянная пилюля шапки чата — как в Telegram: одна плавающая капсула.
 /// Использует стекло темы, поэтому дружит и со светлой, и с тёмной темой.
@@ -165,7 +166,7 @@ class ChatAppBar extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       VibeIconButton(
-                        icon: Icons.search_rounded,
+                        icon: VibeIcons.search,
                         onPressed: onOpenSearch,
                         tooltip: 'Поиск',
                         color: context.vibeTextPrimary,
@@ -193,7 +194,7 @@ class ChatAppBar extends StatelessWidget {
                             : const Color(0x1F1C1B22),
                       ),
                       VibeIconButton(
-                        icon: Icons.more_vert_rounded,
+                        icon: VibeIcons.moreVertical,
                         onPressed: onShowMenu,
                         tooltip: 'Ещё',
                         color: context.vibeTextPrimary,

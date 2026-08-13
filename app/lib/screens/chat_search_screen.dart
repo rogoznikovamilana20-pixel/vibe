@@ -8,6 +8,7 @@ import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Одна находка поиска по сообщениям чата.
 class ChatSearchItem {
@@ -148,7 +149,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.search_rounded,
+                      VibeIcons.search,
                       size: 20,
                       color: context.vibeTextTertiary,
                     ),
@@ -231,7 +232,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                     onTap: () => _pick(i),
                     leading: Icon(
                       r.incoming
-                          ? Icons.arrow_back_rounded
+                          ? VibeIcons.back
                           : Icons.arrow_forward_rounded,
                       size: 18,
                       color: context.vibeTextTertiary,

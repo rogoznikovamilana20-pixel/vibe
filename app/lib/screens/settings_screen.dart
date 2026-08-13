@@ -23,6 +23,7 @@ import 'settings/privacy_settings.dart';
 import 'settings/data_settings.dart';
 import 'settings/language_settings.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Настройки в стиле Telegram (вкладка «Настройки»).
 class SettingsScreen extends StatefulWidget {
@@ -49,7 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SliverToBoxAdapter(
             child: VibeTopBar(
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
+                icon: const Icon(VibeIcons.back),
                 onPressed: () {}, // Заглушка, т.к. это вкладка
                 color: context.vibeTextPrimary,
               ),
@@ -147,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         collapsedBarBuilder: (_, progress) => VibeCollapsedTopBar(
           progress: progress,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () {},
             color: context.vibeTextPrimary,
           ),

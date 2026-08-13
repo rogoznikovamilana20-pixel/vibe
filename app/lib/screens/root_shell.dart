@@ -21,6 +21,7 @@ import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Оболочка приложения: стеклянная нижняя навигация
 /// Чаты / Контакты / Настройки / Профиль — как в Telegram.
@@ -227,10 +228,10 @@ class _VibeBottomNav extends StatelessWidget {
   final int chatsUnread;
 
   static const _destinations = [
-    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Чаты'),
-    (Icons.people_outline_rounded, Icons.people_rounded, 'Контакты'),
-    (Icons.settings_outlined, Icons.settings_rounded, 'Настройки'),
-    (Icons.person_outline_rounded, Icons.person_rounded, 'Профиль'),
+    (Icons.chat_bubble_outline_rounded, VibeIcons.bubble, 'Чаты'),
+    (Icons.people_outline_rounded, VibeIcons.group, 'Контакты'),
+    (Icons.settings_outlined, VibeIcons.settings, 'Настройки'),
+    (VibeIcons.user, VibeIcons.user, 'Профиль'),
   ];
 
   @override
@@ -416,7 +417,7 @@ class _NavAvatar extends StatelessWidget {
           size: 26,
           emoji: profile?.emoji,
           photo: photo,
-          fallbackIcon: Icons.person_rounded,
+          fallbackIcon: VibeIcons.user,
         ),
       ),
     );

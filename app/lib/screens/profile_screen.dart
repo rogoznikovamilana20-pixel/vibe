@@ -21,6 +21,7 @@ import 'edit_profile_screen.dart';
 import 'my_links_screen.dart';
 import 'settings_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Вкладка «Профиль» — как раздел профиля в Telegram:
 /// QR-код, аватарка, имя, кнопки «Выбрать фото / Изменить данные /
@@ -65,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: VibeTopBarTitle(_displayName()),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.more_vert_rounded),
+                  icon: const Icon(VibeIcons.moreVertical),
                   onPressed: () => _showProfileMenu(context),
                   color: context.vibeTextPrimary,
                   tooltip: 'Ещё',
@@ -274,7 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onTap: () => _changeAvatar(context),
         ),
         _ProfileActionTile(
-          icon: Icons.edit_outlined,
+          icon: VibeIcons.edit,
           title: 'Изменить данные',
           onTap: () => _openEditProfile(context),
         ),
@@ -333,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.edit_outlined),
+              leading: const Icon(VibeIcons.edit),
               title: const Text('Изменить имя'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -341,7 +342,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.copy_rounded),
+              leading: const Icon(VibeIcons.copy),
               title: const Text('Копировать ссылку'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -388,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           : null,
                     ),
                     child: _profileGradientIndex == i
-                        ? const Icon(Icons.check_rounded, color: Colors.white)
+                        ? const Icon(VibeIcons.check, color: Colors.white)
                         : null,
                   ),
                 ),

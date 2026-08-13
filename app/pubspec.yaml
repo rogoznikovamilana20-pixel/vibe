@@ -48,3 +48,6 @@ flutter:
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter.ttf
+    - family: VibeIcons
+      fonts:
+        - asset: assets/fonts/vibe_icons.ttf

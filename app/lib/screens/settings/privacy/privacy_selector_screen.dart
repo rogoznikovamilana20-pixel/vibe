@@ -6,6 +6,7 @@ import '../../../core/theme/vibe_theme.dart';
 import '../../../core/theme/vibe_typography.dart';
 import '../../../core/widgets/settings_widgets.dart';
 import '../../../core/widgets/vibe_top_bar.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class PrivacySelectorScreen extends StatefulWidget {
   const PrivacySelectorScreen({
@@ -50,7 +51,7 @@ class _PrivacySelectorScreenState extends State<PrivacySelectorScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),
@@ -88,7 +89,7 @@ class _PrivacySelectorScreenState extends State<PrivacySelectorScreen> {
       icon: active ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
       iconColor: active ? context.vibePrimary : context.vibeTextSecondary,
       title: title,
-      trailing: active ? Icon(Icons.check_rounded, color: context.vibePrimary) : const SizedBox.shrink(),
+      trailing: active ? Icon(VibeIcons.check, color: context.vibePrimary) : const SizedBox.shrink(),
     );
   }
 }

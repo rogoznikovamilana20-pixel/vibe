@@ -12,6 +12,7 @@ import '../data/backend.dart';
 import '../data/chat_folder.dart';
 import '../data/settings_service.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// 8.3.7: экран «Папки» — список пользовательских папок чатов.
 /// Каждая папка — название + эмодзи; состав чатов назначается вручную.
@@ -35,7 +36,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: VibeIconButton(
-            icon: Icons.arrow_back_rounded,
+            icon: VibeIcons.back,
             onPressed: () => Navigator.of(context).maybePop(),
             tooltip: 'Назад',
           ),
@@ -290,7 +291,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: VibeIconButton(
-            icon: Icons.arrow_back_rounded,
+            icon: VibeIcons.back,
             onPressed: () => Navigator.of(context).maybePop(),
             tooltip: 'Назад',
           ),

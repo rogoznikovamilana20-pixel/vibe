@@ -11,6 +11,7 @@ import 'privacy/privacy_selector_screen.dart';
 import 'privacy/passcode_screen.dart';
 import 'privacy/devices_screen.dart';
 import 'privacy/two_step_verification_screen.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
   const PrivacySettingsScreen({super.key});
@@ -60,7 +61,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(VibeIcons.back),
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),
@@ -178,7 +179,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                 ),
               ),
               SettingsTile(
-                icon: Icons.call_rounded,
+                icon: VibeIcons.phone,
                 iconColor: Colors.green,
                 title: l.callsAndGroups,
                 subtitleWidget: Row(

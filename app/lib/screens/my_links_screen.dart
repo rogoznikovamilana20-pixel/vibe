@@ -8,6 +8,7 @@ import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// «Мои ссылки» — список ссылок на профиль (как в Telegram
 /// «Расширенные права» → ссылки): vibe.me-ссылка, @ник, телефон, QR-код.
@@ -75,7 +76,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
                   Navigator.pop(ctx);
                   _copy(context, link, 'Ссылка скопирована: $link');
                 },
-                icon: const Icon(Icons.copy_rounded, size: 18),
+                icon: const Icon(VibeIcons.copy, size: 18),
                 label: const Text('Копировать ссылку'),
               ),
             ],
@@ -92,7 +93,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
         children: [
           VibeTopBar(
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const Icon(VibeIcons.back),
               onPressed: () => Navigator.of(context).pop(),
               color: context.vibeTextPrimary,
             ),

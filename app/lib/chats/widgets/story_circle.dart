@@ -5,6 +5,7 @@ import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_avatar.dart';
 import '../../screens/story_player.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Кружок истории в карусели (как в Telegram):
 /// непросмотренная — градиентное кольцо, просмотренная — тонкое серое;
@@ -53,7 +54,7 @@ class StoryCircle extends StatelessWidget {
             child: ClipOval(
               child: placeholder
                   ? Icon(
-                      Icons.add_rounded,
+                      VibeIcons.plus,
                       color: context.vibePrimary,
                       size: 26,
                     )

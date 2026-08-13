@@ -9,6 +9,7 @@ import '../../core/widgets/vibe_avatar.dart';
 import '../../data/backend.dart';
 import '../../data/settings_service.dart';
 import '../../screens/settings/notifications_settings.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Меню чата как в Telegram: столбец «Уведомления» открывает подраздел,
 /// из него — «Выключить на время» со списком длительностей. А кнопка
@@ -169,7 +170,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.search_rounded, color: context.vibePrimary),
+          leading: Icon(VibeIcons.search, color: context.vibePrimary),
           title: const Text('Поиск в чате'),
           onTap: () {
             Navigator.of(context).pop();
@@ -178,7 +179,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.info_outline_rounded,
+          leading: Icon(VibeIcons.info,
               color: context.vibePrimary),
           title: const Text('Сведения о чате'),
           onTap: () {
@@ -247,7 +248,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.arrow_back_rounded, size: 20),
+          leading: const Icon(VibeIcons.back, size: 20),
           title: const Text('Уведомления'),
           onTap: () => setState(() => _level = 0),
         ),
@@ -307,7 +308,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.arrow_back_rounded, size: 20),
+          leading: const Icon(VibeIcons.back, size: 20),
           title: const Text('Выключить на время'),
           onTap: () => setState(() => _level = 1),
         ),
@@ -322,7 +323,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         }.entries)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.schedule_rounded, color: context.vibePrimary),
+            leading: Icon(VibeIcons.clock, color: context.vibePrimary),
             title: Text(entry.key),
             onTap: () {
               _setMuted(true);

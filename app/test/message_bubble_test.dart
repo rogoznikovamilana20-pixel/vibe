@@ -7,6 +7,7 @@ import 'package:vibe_app/chat/widgets/message_bubble.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -61,19 +62,19 @@ void main() {
 
     expect(find.text('Привет'), findsOneWidget);
     expect(find.text('12:30'), findsOneWidget);
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(VibeIcons.check), findsOneWidget);
   });
 
   testWidgets('MessageBubble: квитанции delivered/read/failed',
       (tester) async {
     await tester.pumpWidget(wrap(textMsg(status: MsgStatus.delivered)));
-    expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
+    expect(find.byIcon(VibeIcons.checkAll), findsOneWidget);
 
     await tester.pumpWidget(wrap(textMsg(status: MsgStatus.read)));
-    expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
+    expect(find.byIcon(VibeIcons.checkAll), findsOneWidget);
     expect(
       tester
-          .widget<Icon>(find.byIcon(Icons.done_all_rounded))
+          .widget<Icon>(find.byIcon(VibeIcons.checkAll))
           .color
           ?.toARGB32(),
       const Color(0xFF8AB4F8).toARGB32(),
@@ -87,8 +88,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(wrap(textMsg(incoming: true, status: MsgStatus.read)));
 
-    expect(find.byIcon(Icons.done_all_rounded), findsNothing);
-    expect(find.byIcon(Icons.check_rounded), findsNothing);
+    expect(find.byIcon(VibeIcons.checkAll), findsNothing);
+    expect(find.byIcon(VibeIcons.check), findsNothing);
   });
 
   testWidgets('MessageBubble: превью ответа (replyText)', (tester) async {

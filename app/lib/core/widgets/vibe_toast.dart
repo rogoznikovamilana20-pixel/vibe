@@ -7,6 +7,7 @@ import '../theme/vibe_animations.dart';
 import '../theme/vibe_colors.dart';
 import '../theme/vibe_spacing.dart';
 import '../theme/vibe_typography.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// 8.4.6: фирменный тост Vibe — всплывающая капсула как у Telegram.
 /// Единая тёмная капсула над всем (root overlay), авто-исчезание,
@@ -173,9 +174,9 @@ class _VibeToastHostState extends State<_VibeToastHost>
 
 /// Пре-сет иконок тоста (как в ТГ: галочка успеха, ошибка).
 abstract final class VibeToastIcons {
-  static const success = Icons.check_rounded;
+  static const success = VibeIcons.check;
   static const error = Icons.error_outline_rounded;
-  static const info = Icons.info_outline_rounded;
+  static const info = VibeIcons.info;
 
   static const successColor = VibeColors.success;
   static const errorColor = VibeColors.errorLight;

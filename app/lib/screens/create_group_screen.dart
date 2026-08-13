@@ -15,6 +15,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'chat_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// «Создать группу» как в Telegram: выбираем участников из контактов,
 /// создаём групповой чат и сразу открываем его.
@@ -154,7 +155,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   child: VibeInput(
                     controller: _searchController,
                     hint: 'Поиск по имени или @нику',
-                    prefixIcon: Icons.search_rounded,
+                    prefixIcon: VibeIcons.search,
                     onChanged: _onSearchChanged,
                   ),
                 ),
@@ -330,7 +331,7 @@ class _MemberTile extends StatelessWidget {
                 ),
                 child: selected
                     ? const Icon(
-                        Icons.check_rounded,
+                        VibeIcons.check,
                         size: 17,
                         color: Colors.white,
                       )

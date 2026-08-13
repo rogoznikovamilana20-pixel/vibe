@@ -16,6 +16,7 @@ import '../data/backend.dart';
 import 'avatar_editor_screen.dart';
 import 'root_shell.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Создание профиля: имя + эмодзи-аватарка.
 class ProfileSetupScreen extends StatefulWidget {
@@ -176,7 +177,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               VibeInput(
                 controller: _nameController,
                 hint: 'Как тебя зовут?',
-                prefixIcon: Icons.person_outline_rounded,
+                prefixIcon: VibeIcons.user,
               ),
               const SizedBox(height: 16),
               VibeInput(

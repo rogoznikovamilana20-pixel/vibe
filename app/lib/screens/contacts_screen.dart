@@ -14,6 +14,7 @@ import '../data/backend.dart';
 import 'add_contact_screen.dart';
 import 'chat_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Вкладка «Контакты» — как в Telegram: поиск и список людей.
 /// Тап по контакту открывает чат с ним.
@@ -158,7 +159,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
               child: VibeInput(
                 controller: _searchController,
                 hint: 'Поиск по имени или @нику',
-                prefixIcon: Icons.search_rounded,
+                prefixIcon: VibeIcons.search,
                 onChanged: (_) => _applyFilter(),
               ),
             ),
