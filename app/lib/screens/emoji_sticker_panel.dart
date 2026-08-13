@@ -5,14 +5,17 @@ import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../data/backend.dart';
+import '../data/backend_api.dart';
 
-/// Панель ввода: вкладки «Эмодзи» (вставка в поле) и «Стикеры»
-/// (мгновенная отправка) — как в Telegram.
+/// Панель ввода: вкладки «Эмодзи» (вставка в поле), «Стикеры»
+/// и «Гифки» (мгновенная отправка анимированным медиа) — как в Telegram.
 class EmojiStickerPanel extends StatefulWidget {
   const EmojiStickerPanel({
     super.key,
     required this.onEmoji,
     required this.onSticker,
+    required this.onGif,
+    this.backend,
   });
 
   /// Эмодзи выбран — дописать к тексту сообщения.
@@ -21,9 +24,29 @@ class EmojiStickerPanel extends StatefulWidget {
   /// Стикер выбран — отправить сразу.
   final ValueChanged<String> onSticker;
 
+  /// Гифка выбрана — отправить сразу (аргумент — имя файла в assets).
+  final ValueChanged<String> onGif;
+
+  /// Источник стикер-паков (в тестах — фейк; по умолчанию — живой бэкенд).
+  final VibeBackendApi? backend;
+
   @override
   State<EmojiStickerPanel> createState() => _EmojiStickerPanelState();
 }
+
+/// Встроенные анимированные гифки (локальный набор, без серверной схемы).
+const kGifAssets = [
+  'assets/gifs/gif1.gif',
+  'assets/gifs/gif2.gif',
+  'assets/gifs/gif3.gif',
+  'assets/gifs/gif4.gif',
+  'assets/gifs/gif5.gif',
+  'assets/gifs/gif6.gif',
+  'assets/gifs/gif7.gif',
+  'assets/gifs/gif8.gif',
+  'assets/gifs/gif9.gif',
+  'assets/gifs/gif10.gif',
+];
 
 class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
   Future<List<VibeStickerPack>>? _packsFuture;
@@ -32,7 +55,9 @@ class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
   @override
   void initState() {
     super.initState();
-    _packsFuture = VibeBackend.instance.listStickerPacks();
+    final VibeBackendApi backend =
+        widget.backend ?? LiveVibeBackend(VibeBackend.instance);
+    _packsFuture = backend.listStickerPacks();
   }
 
   @override
@@ -50,7 +75,7 @@ class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
         border: Border.all(color: context.vibeDivider),
       ),
       child: DefaultTabController(
-        length: 2,
+        length: 3,
         child: Column(
           children: [
             TabBar(
@@ -61,6 +86,7 @@ class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
               tabs: const [
                 Tab(text: 'Эмодзи'),
                 Tab(text: 'Стикеры'),
+                Tab(text: 'Гифки'),
               ],
             ),
             const SizedBox(height: VibeSpacing.sm),
@@ -78,6 +104,8 @@ class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
                       ),
                       categoryViewConfig: const CategoryViewConfig(
                         backgroundColor: Colors.transparent,
+                        initCategory: Category.SMILEYS,
+                        recentTabBehavior: RecentTabBehavior.NONE,
                       ),
                       bottomActionBarConfig: const BottomActionBarConfig(
                         showBackspaceButton: true,
@@ -87,6 +115,7 @@ class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
                     ),
                   ),
                   _buildStickers(context),
+                  _buildGifs(context),
                 ],
               ),
             ),
@@ -170,6 +199,34 @@ class _EmojiStickerPanelState extends State<EmojiStickerPanel> {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildGifs(BuildContext context) {
+    return GridView.builder(
+      padding: EdgeInsets.zero,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: VibeSpacing.sm,
+        crossAxisSpacing: VibeSpacing.sm,
+      ),
+      itemCount: kGifAssets.length,
+      itemBuilder: (context, i) {
+        final asset = kGifAssets[i];
+        final name = asset.split('/').last;
+        return InkWell(
+          borderRadius: BorderRadius.circular(VibeRadius.md),
+          onTap: () => widget.onGif(name),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(VibeRadius.md),
+            child: Image.asset(
+              asset,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+            ),
+          ),
         );
       },
     );

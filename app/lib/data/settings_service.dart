@@ -90,7 +90,7 @@ class SettingsService {
   }
 
   // Акцентный цвет
-  int get accentColorValue => _prefs.getInt(_keyAccentColor) ?? 0xFF8B5CF6;
+  int get accentColorValue => _prefs.getInt(_keyAccentColor) ?? 0xFF3390EC;
 
   /// Сигнал об изменении акцентного цвета — тема пересобирается на лету.
   final ValueNotifier<int> accentVersion = ValueNotifier<int>(0);

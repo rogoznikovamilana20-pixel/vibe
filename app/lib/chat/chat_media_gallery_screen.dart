@@ -169,8 +169,8 @@ class _MediaTile extends StatelessWidget {
     if (item.kind == 'photo' && url != null && url.isNotEmpty) {
       return VibeNetImage(source: url, fit: BoxFit.cover);
     }
-    const palette = [
-      Color(0xFF8B5CF6),
+    const palette = <Color>[
+      Color(0xFF3390EC),
       Color(0xFF3B82F6),
       Color(0xFFEC4899),
       Color(0xFF10B981),
@@ -353,8 +353,8 @@ class _PhotoViewer extends StatelessWidget {
   }
 
   Widget _gradient(ChatMediaItem item) {
-    const palette = [
-      Color(0xFF8B5CF6),
+    const palette = <Color>[
+      Color(0xFF3390EC),
       Color(0xFF3B82F6),
       Color(0xFFEC4899),
       Color(0xFF10B981),

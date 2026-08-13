@@ -2,9 +2,64 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../data/backend.dart';
+import 'attachments.dart';
+
+export 'attachments.dart';
 
 /// Тип содержимого сообщения.
-enum MsgType { text, photo, voice, video }
+enum MsgType {
+  text,
+  photo,
+  voice,
+  video,
+
+  /// Вложение «файл» (JSON-контент в text).
+  file,
+
+  /// Вложение «локация» (JSON-контент в text).
+  location,
+
+  /// Вложение «контакт» (JSON-контент в text).
+  contact,
+
+  /// Вложение «опрос» (JSON-контент в text).
+  poll,
+
+  /// Служебное сообщение «голос в опросе» — в ленте не показывается.
+  pollVote,
+}
+
+/// Счётчик голосов опроса: [votes][i] — сколько голосов за вариант i.
+List<int> computePollVotes(List<ChatMsg> messages, String pollId) {
+  final counts = <int>[];
+  for (final m in messages) {
+    final attach = m.attachment;
+    if (m.type != MsgType.pollVote ||
+        attach == null ||
+        attach.pollId != pollId) {
+      continue;
+    }
+    while (counts.length <= attach.opt) {
+      counts.add(0);
+    }
+    counts[attach.opt]++;
+  }
+  return counts;
+}
+
+/// Вариант, за который проголосовал текущий пользователь (или null).
+int? myPollVote(List<ChatMsg> messages, String pollId) {
+  for (final m in messages) {
+    final attach = m.attachment;
+    if (m.type == MsgType.pollVote &&
+        !m.incoming &&
+        attach != null &&
+        attach.pollId == pollId) {
+      return attach.opt;
+    }
+  }
+  return null;
+}
 
 /// Разбивает текст на спаны, делая URL-ссылки кликабельными (как в TG).
 final _urlPattern = RegExp(
@@ -73,12 +128,16 @@ class ChatMsg {
     this.serverId,
     this.stickerEmoji,
     this.date,
+    this.attachment,
   });
 
   final MsgType type;
   final bool incoming;
   final String time;
   final String text;
+
+  /// Разобранное JSON-вложение (файл/локация/контакт/опрос/голос).
+  final AttachmentData? attachment;
 
   /// Полная дата сообщения — для разделителей дат (как в Telegram).
   final DateTime? date;
@@ -135,6 +194,7 @@ class ChatMsg {
     bool? edited,
     String? serverId,
     String? stickerEmoji,
+    AttachmentData? attachment,
   }) {
     return ChatMsg(
       type: type,
@@ -158,6 +218,7 @@ class ChatMsg {
       serverId: serverId ?? this.serverId,
       stickerEmoji: stickerEmoji ?? this.stickerEmoji,
       date: date,
+      attachment: attachment ?? this.attachment,
     );
   }
 }

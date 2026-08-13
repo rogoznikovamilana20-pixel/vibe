@@ -113,31 +113,31 @@ void main() {
     await SettingsService.instance.init();
   });
 
-  test('golden dark: контраст пар темы (эталон 13.08.2026)', () {
+  test('golden dark: контраст пар темы (эталон 14.08.2026)', () {
     _runAudit('ТЁМНАЯ ТЕМА', _pairsFor(VibeTheme.dark(), true, const [
-      17.91, // onSurface / фон
-      7.05, // onSurfaceVariant / фон
-      3.77, // tertiary / фон
-      16.49, // onSurface / surface
-      15.53, // onSurface / surfaceHigh
-      14.63, // onInverseSurface / inverseSurface
-      4.65, // accent / фон
-      4.23, // onPrimary / primary
-      6.47, // error / фон
+      16.29, // onSurface / фон
+      7.64, // onSurfaceVariant / фон
+      3.70, // tertiary / фон
+      14.25, // onSurface / surface
+      13.56, // onSurface / surfaceHigh
+      11.57, // onInverseSurface / inverseSurface
+      4.92, // accent / фон
+      3.31, // onPrimary / primary
+      5.06, // error / фон
     ]));
   });
 
-  test('golden light: контраст пар темы (эталон 13.08.2026)', () {
+  test('golden light: контраст пар темы (эталон 14.08.2026)', () {
     _runAudit('СВЕТЛАЯ ТЕМА', _pairsFor(VibeTheme.light(), false, const [
-      15.89, // onSurface / фон
-      7.34, // onSurfaceVariant / фон
-      4.16, // tertiary / фон
-      14.00, // onSurface / surface
-      12.64, // onSurface / surfaceHigh
-      11.14, // onInverseSurface / inverseSurface
-      3.94, // accent / фон
-      4.23, // onPrimary / primary
-      6.08, // error / фон (errorLight с 13.08.2026, AA)
+      21.00, // onSurface / фон
+      4.66, // onSurfaceVariant / фон
+      3.25, // tertiary / фон
+      19.11, // onSurface / surface
+      17.95, // onSurface / surfaceHigh
+      16.66, // onInverseSurface / inverseSurface
+      3.31, // accent / фон
+      3.31, // onPrimary / primary
+      6.54, // error / фон (errorLight, AA)
     ]));
   });
 }

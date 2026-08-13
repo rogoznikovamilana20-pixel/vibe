@@ -54,11 +54,22 @@ abstract class VibeBackendApi {
     String? localId,
   });
 
+  /// Стикер-паки для панели эмодзи/стикеров.
+  Future<List<VibeStickerPack>> listStickerPacks();
+
   Future<VibeMessage> sendPhoto(
     String chatId,
     Uint8List bytes, {
     String? localId,
     String? localPath,
+  });
+
+  Future<VibeMessage> sendFile(
+    String chatId,
+    File file, {
+    String? localId,
+    String? localPath,
+    String? mime,
   });
 
   Future<VibeMessage> sendVoice(
@@ -114,6 +125,7 @@ abstract class VibeBackendApi {
   });
 
   // ─── Контакты (8.3.1) ───
+  Future<List<VibeProfile>> listContacts();
   Future<List<VibeProfile>> searchUsers(String query);
   Future<String> ensurePmChat(String peerId);
   Future<VibeChat?> chatById(String chatId);
@@ -204,6 +216,9 @@ class LiveVibeBackend implements VibeBackendApi {
       _b.sendSticker(chatId, emoji, localId: localId);
 
   @override
+  Future<List<VibeStickerPack>> listStickerPacks() => _b.listStickerPacks();
+
+  @override
   Future<VibeMessage> sendPhoto(
     String chatId,
     Uint8List bytes, {
@@ -211,6 +226,17 @@ class LiveVibeBackend implements VibeBackendApi {
     String? localPath,
   }) =>
       _b.sendPhoto(chatId, bytes, localId: localId, localPath: localPath);
+
+  @override
+  Future<VibeMessage> sendFile(
+    String chatId,
+    File file, {
+    String? localId,
+    String? localPath,
+    String? mime,
+  }) =>
+      _b.sendFile(chatId, file,
+          localId: localId, localPath: localPath, mime: mime);
 
   @override
   Future<VibeMessage> sendVoice(
@@ -330,6 +356,9 @@ class LiveVibeBackend implements VibeBackendApi {
 
   @override
   String formatTime(dynamic raw) => VibeBackend.formatTime(raw);
+
+  @override
+  Future<List<VibeProfile>> listContacts() => _b.listContacts();
 
   @override
   Future<List<VibeProfile>> searchUsers(String query) =>

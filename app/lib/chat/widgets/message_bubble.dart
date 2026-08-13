@@ -1,10 +1,13 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/vibe_animations.dart';
@@ -21,8 +24,8 @@ import 'message_status_tick.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
-/// Пузырь сообщения: текст/медиа/стикер/голосовое/видеокружок, свайп-ответ,
-/// двойной тап — сердечко с искрами, реакции и статусные галочки.
+/// ?????? ?????????: ?????/?????/??????/?????????/???????????, ?????-?????,
+/// ??????? ??? ? ???????? ? ???????, ??????? ? ????????? ???????.
 class MessageBubble extends StatefulWidget {
   const MessageBubble({
     super.key,
@@ -36,6 +39,11 @@ class MessageBubble extends StatefulWidget {
     this.highlight = false,
     this.isFirstInGroup = true,
     this.isLastInGroup = true,
+    this.chatId,
+    this.pollVotes = const [],
+    this.myVote,
+    this.onOpenContact,
+    this.onVote,
   });
 
   final ChatMsg msg;
@@ -43,18 +51,33 @@ class MessageBubble extends StatefulWidget {
   final VoidCallback onLongPress;
   final VoidCallback onReply;
 
-  /// Открытие URL из текста сообщения (в браузере).
+  /// ???????? URL ?? ?????? ????????? (? ????????).
   final ValueChanged<String> onOpenUrl;
   final ScrollController scrollController;
   final AudioPlayer? player;
 
-  /// Подсветка при прыжке к закреплённому сообщению (как в Telegram).
+  /// ????????? ??? ?????? ? ???????????? ????????? (??? ? Telegram).
   final bool highlight;
 
-  /// Свёртка цепочек (3.10): первый (самый старый) в группе сообщений
-  /// одного автора — верхние углы полные; последний — направленный «хвост».
+  /// ?????? ??????? (3.10): ?????? (????? ??????) ? ?????? ?????????
+  /// ?????? ?????? ? ??????? ???? ??????; ????????? ? ???????????? ??????.
   final bool isFirstInGroup;
   final bool isLastInGroup;
+
+  /// Id ???? ? ??? ??????????? ? ?????? ? ?????????? ?????.
+  final String? chatId;
+
+  /// ???????? ??????? ?????? (?????? ???????? > ????? ???????).
+  final List<int> pollVotes;
+
+  /// ???????, ?? ??????? ??? ????????? ??????? ????????????.
+  final int? myVote;
+
+  /// ?????????? ?? ???????? ?? ????????.
+  final ValueChanged<String>? onOpenContact;
+
+  /// ??????????? ? ?????? (????? ????????).
+  final ValueChanged<int>? onVote;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -65,11 +88,11 @@ class _MessageBubbleState extends State<MessageBubble>
   late final AnimationController _spark;
   bool _sparkVisible = false;
 
-  // Для динамического градиента
+  // ??? ????????????? ?????????
   final GlobalKey _bubbleKey = GlobalKey();
   double _yPos = 0;
 
-  // Для свайпа ответа
+  // ??? ?????? ??????
   double _dragOffset = 0;
   bool _triggeredReply = false;
 
@@ -102,7 +125,7 @@ class _MessageBubbleState extends State<MessageBubble>
   }
 
   void _onDoubleTap() {
-    HapticFeedback.vibrate(); // ИСПРАВЛЕНО: Стандартный мощный отклик
+    HapticFeedback.vibrate(); // ??????????: ??????????? ?????? ??????
     widget.onHeart();
     setState(() => _sparkVisible = true);
     _spark.forward(from: 0);
@@ -114,7 +137,7 @@ class _MessageBubbleState extends State<MessageBubble>
   void _onHorizontalDragUpdate(DragUpdateDetails d) {
     if (d.delta.dx < 0) {
       setState(() {
-        _dragOffset += d.delta.dx * 0.4; // Сопротивление свайпу
+        _dragOffset += d.delta.dx * 0.4; // ????????????? ??????
         if (_dragOffset < -60 && !_triggeredReply) {
           _triggeredReply = true;
           HapticFeedback.mediumImpact();
@@ -139,20 +162,17 @@ class _MessageBubbleState extends State<MessageBubble>
     final isIncoming = msg.incoming;
     final r = SettingsService.instance.bubbleRadius.clamp(4.0, 24.0);
 
-    // Расчет динамического цвета для исходящих
-    final screenHeight = MediaQuery.of(context).size.height;
-    final progress = (_yPos / screenHeight).clamp(0.0, 1.0);
-    
-    // Плавный перелив от основного фиолетового к более насыщенному
+    // Telegram-??????: ???????? ? ?????? ???? (??? ????? ? ???????? ??
+    // ???????), ????????? ? ????? (??? ?????? ?? ???????). ?????? ????????.
     final bubbleColor = isIncoming
-        ? (context.isDarkMode ? const Color(0xFF19172C) : Colors.white)
-        : Color.lerp(
-            const Color(0xFF8B4DFF), 
-            const Color(0xFF5B21B6), 
-            progress
-          );
+        ? (context.isDarkMode
+            ? VibeColors.bubbleInDark
+            : VibeColors.bubbleInLight)
+        : (context.isDarkMode
+            ? VibeColors.bubbleOutDark
+            : VibeColors.bubbleOutLight);
 
-    // Свёртка цепочек: внутри группы отступы компактные, «сросшиеся» углы.
+    // ?????? ???????: ?????? ?????? ??????? ??????????, ??????????? ????.
     final inMiddle = !widget.isFirstInGroup && !widget.isLastInGroup;
     final vPad = inMiddle ? 1.0 : 3.0;
     final flat = math.min(r, 4.0);
@@ -171,7 +191,7 @@ class _MessageBubbleState extends State<MessageBubble>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Иконка ответа, которая появляется при свайпе
+          // ?????? ??????, ??????? ?????????? ??? ??????
           if (_dragOffset < 0)
             Positioned(
               right: -40,
@@ -253,6 +273,23 @@ class _MessageBubbleState extends State<MessageBubble>
                           clipBehavior: Clip.antiAlias,
                           child: _bubbleContent(context, msg, isIncoming),
                         ),
+                        // Telegram-?????: ?????? ????? ? ?????????? ? ??????.
+                        if (widget.isLastInGroup)
+                          Positioned(
+                            right: isIncoming ? null : 0,
+                            left: isIncoming ? 0 : null,
+                            bottom: -6,
+                            child: CustomPaint(
+                              size: const Size(11, 7),
+                              painter: _TailPainter(
+                                color: widget.highlight
+                                    ? VibeColors.workBlue
+                                        .withValues(alpha: 0.35)
+                                    : bubbleColor,
+                                mirror: !isIncoming,
+                              ),
+                            ),
+                          ),
                         if (msg.reactions.isNotEmpty)
                           Positioned(
                             right: isIncoming ? 8 : null,
@@ -302,6 +339,43 @@ class _MessageBubbleState extends State<MessageBubble>
     if (msg.type == MsgType.video) {
       return _VideoRoundBubble(msg: msg, incoming: isIncoming);
     }
+    // 8.3.3: ???????? ? ????/???????/???????/?????; ????? ? ?????? ?????.
+    final attach = msg.attachment;
+    if (attach != null) {
+      switch (attach.kind) {
+        case AttachmentKind.file:
+          return _FileBubble(
+            attach: attach,
+            chatId: widget.chatId,
+            incoming: isIncoming,
+          );
+        case AttachmentKind.gif:
+          return _GifBubble(
+            attach: attach,
+            time: msg.time,
+            incoming: isIncoming,
+          );
+        case AttachmentKind.location:
+          return _LocationBubble(attach: attach, incoming: isIncoming);
+        case AttachmentKind.contact:
+          return _ContactBubble(
+            attach: attach,
+            incoming: isIncoming,
+            onOpenContact: widget.onOpenContact,
+          );
+        case AttachmentKind.poll:
+          return _PollBubble(
+            attach: attach,
+            pollId: msg.serverId ?? '',
+            incoming: isIncoming,
+            votes: widget.pollVotes,
+            myVote: widget.myVote,
+            onVote: widget.onVote,
+          );
+        case AttachmentKind.pollVote:
+          return const SizedBox.shrink();
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -317,7 +391,7 @@ class _MessageBubbleState extends State<MessageBubble>
                   size: 13,
                   color: isIncoming
                       ? context.vibePrimary
-                      : const Color(0xFFB7A7FF),
+                      : const Color(0xFF8FC8FF),
                 ),
                 const SizedBox(width: 4),
                 Flexible(
@@ -327,7 +401,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     style: VibeTypography.caption.copyWith(
                       color: isIncoming
                           ? context.vibePrimary
-                          : const Color(0xFFB7A7FF),
+                          : const Color(0xFF8FC8FF),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -342,7 +416,7 @@ class _MessageBubbleState extends State<MessageBubble>
               msg.text,
               isIncoming
                   ? context.vibePrimary
-                  : const Color(0xFFC9B4FF),
+                  : const Color(0xFF8FC8FF),
               widget.onOpenUrl,
             ),
             style: VibeTypography.body.copyWith(
@@ -351,7 +425,7 @@ class _MessageBubbleState extends State<MessageBubble>
             ),
           ),
         ),
-        // 8.4.4: превью ссылки под текстом (OpenGraph-карточка).
+        // 8.4.4: ?????? ?????? ??? ??????? (OpenGraph-????????).
         if (VibeLinkPreview.instance.firstUrl(msg.text) != null)
           _LinkPreviewCard(
             text: msg.text,
@@ -366,7 +440,7 @@ class _MessageBubbleState extends State<MessageBubble>
             const Spacer(),
             if (msg.edited)
               Text(
-                'изменено',
+'изменено',
                 style: VibeTypography.caption.copyWith(
                   color: isIncoming
                       ? (context.isDarkMode
@@ -494,7 +568,7 @@ class _PhotoBubble extends StatelessWidget {
       return _NetworkPhotoBubble(url: url, time: msg.time, incoming: incoming);
     }
     const palette = [
-      Color(0xFF8B5CF6),
+      VibeColors.primary,
       Color(0xFF3B82F6),
       Color(0xFFEC4899),
       Color(0xFF10B981),
@@ -541,7 +615,7 @@ class _PhotoBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Фото · демо',
+                    'Фото к чату',
                     style: const TextStyle(
                       fontSize: 10,
                       color: Colors.white,
@@ -616,7 +690,7 @@ class _NetworkPhotoBubble extends StatelessWidget {
             height: 150,
             child: VibeNetImage(
               source: url,
-              // 5.4: декодируем в целевом размере пузыря.
+              // 5.4: ?????????? ? ??????? ??????? ??????.
               cacheWidth: (220 * MediaQuery.of(context).devicePixelRatio)
                   .round(),
               errorBuilder: (_, _, _) => Container(
@@ -725,7 +799,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     var url = widget.msg.voiceUrl;
     if ((localPath == null || localPath.isEmpty) &&
         (url == null || url.isEmpty)) {
-      VibeToast.show(context, 'Нет аудиофайла');
+      VibeToast.show(context, 'Нет голосового');
       return;
     }
     setState(() => _playing = !_playing);
@@ -933,7 +1007,7 @@ class _SparkBurst extends StatelessWidget {
                   child: Opacity(
                     opacity: fade,
                     child: Text(
-                      '✦',
+                      '?',
                       style: TextStyle(
                         fontSize: 15,
                         color: Color.lerp(
@@ -947,7 +1021,7 @@ class _SparkBurst extends StatelessWidget {
                 ),
               Transform.scale(
                 scale: 1 + 0.35 * Curves.easeOutBack.transform(t),
-                child: const Text('❤️', style: TextStyle(fontSize: 26)),
+                child: const Text('??', style: TextStyle(fontSize: 26)),
               ),
             ],
           ),
@@ -957,7 +1031,7 @@ class _SparkBurst extends StatelessWidget {
   }
 }
 
-/// Видеокружок — круглое видео с автовоспроизведением по кругу (как в ТГ).
+/// ??????????? ? ??????? ????? ? ???????????????????? ?? ????? (??? ? ??).
 class _VideoRoundBubble extends StatefulWidget {
   const _VideoRoundBubble({required this.msg, required this.incoming});
 
@@ -1036,7 +1110,7 @@ class _VideoRoundBubbleState extends State<_VideoRoundBubble> {
   }
 }
 
-/// Анимированная волна эквалайзера (запись голосового).
+/// ????????????? ????? ??????????? (?????? ??????????).
 class EqualizerWave extends StatefulWidget {
   const EqualizerWave({super.key, required this.color});
 
@@ -1085,9 +1159,9 @@ class _EqualizerWaveState extends State<EqualizerWave>
   }
 }
 
-/// 8.4.4: карточка превью ссылки (OpenGraph) под текстом сообщения.
-/// Показывается когда первая ссылка в тексте дала данные; пустой ответ
-/// (нет меты / сеть недоступна) — честная деградация без карточки.
+/// 8.4.4: ???????? ?????? ?????? (OpenGraph) ??? ??????? ?????????.
+/// ???????????? ????? ?????? ?????? ? ?????? ???? ??????; ?????? ?????
+/// (??? ???? / ???? ??????????) ? ??????? ?????????? ??? ????????.
 class _LinkPreviewCard extends StatelessWidget {
   const _LinkPreviewCard({
     required this.text,
@@ -1190,4 +1264,624 @@ class _LinkPreviewCard extends StatelessWidget {
       },
     );
   }
+}
+
+/// 8.3.3: ???????? ????? ? ???????? ? ??????/????????; ??? ? ??????????
+/// ? ????????? ?????????? (??????????? URL ????? media-sign).
+/// ?????: ?????????????? ????????????? ?????? (??? ? ??), ?? ????-????????.
+class _GifBubble extends StatelessWidget {
+  const _GifBubble({
+    required this.attach,
+    required this.time,
+    required this.incoming,
+  });
+
+  final AttachmentData attach;
+  final String time;
+  final bool incoming;
+
+  @override
+  Widget build(BuildContext context) {
+    final sending = attach.url == null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 220,
+            height: 150,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (!sending)
+                  // ??? cacheWidth: GIF ???????????? ????????? ? ???????????.
+                  VibeNetImage(source: attach.url, fit: BoxFit.cover)
+                else
+                  Container(
+                    color: incoming
+                        ? context.vibePrimary.withValues(alpha: 0.10)
+                        : Colors.white.withValues(alpha: 0.10),
+                    alignment: Alignment.center,
+                    child: const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Text(
+                      'GIF',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      time,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FileBubble extends StatelessWidget {
+  const _FileBubble({
+    required this.attach,
+    required this.incoming,
+    this.chatId,
+  });
+
+  final AttachmentData attach;
+  final bool incoming;
+  final String? chatId;
+
+  static const _extIcons = {
+    'pdf': Icons.picture_as_pdf_rounded,
+    'doc': Icons.description_rounded,
+    'docx': Icons.description_rounded,
+    'xls': Icons.table_chart_rounded,
+    'xlsx': Icons.table_chart_rounded,
+    'zip': Icons.folder_zip_rounded,
+    'rar': Icons.folder_zip_rounded,
+    'txt': Icons.notes_rounded,
+    'mp3': Icons.music_note_rounded,
+    'mp4': Icons.movie_rounded,
+  };
+
+  String get _ext =>
+      (attach.name ?? '').split('.').last.toLowerCase();
+
+  IconData get _icon => _extIcons[_ext] ?? Icons.insert_drive_file_rounded;
+
+  String get _sizeText {
+    final s = attach.size;
+    if (s < 1024) return '$s Б';
+    if (s < 1024 * 1024) return '${(s / 1024).toStringAsFixed(1)} КБ';
+    return '${(s / (1024 * 1024)).toStringAsFixed(1)} МБ';
+  }
+
+  Future<void> _download(BuildContext context) async {
+    if (attach.url == null) return;
+    VibeToast.show(context, 'Отправка…');
+    try {
+      final signed = await VibeBackend.instance.mediaUrl(attach.url);
+      if (signed == null) throw Exception('no url');
+      final res = await http.get(Uri.parse(signed)).timeout(
+        const Duration(seconds: 30),
+      );
+      if (res.statusCode != 200) throw Exception('http ${res.statusCode}');
+      final dir = await getApplicationDocumentsDirectory();
+      final name = attach.name ?? 'file';
+      final file = File('${dir.path}${Platform.pathSeparator}$name');
+      await file.writeAsBytes(res.bodyBytes);
+      if (!context.mounted) return;
+      VibeToast.show(context, 'Сохранено: $name');
+    } catch (_) {
+      if (!context.mounted) return;
+      VibeToast.show(context, 'Не удалось скачать файл');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(VibeRadius.card),
+        onTap: () => _download(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_ext == 'gif' && attach.url != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: VibeNetImage(
+                      source: attach.url,
+                      fit: BoxFit.cover,
+                      placeholder: Container(
+                        color: primary.withValues(alpha: 0.14),
+                        child: Icon(_icon, color: primary, size: 22),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(_icon, color: primary, size: 22),
+                ),
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      attach.name ?? 'файл',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: incoming
+                            ? context.vibeTextPrimary
+                            : Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      attach.url == null ? 'Неизвестно' : _sizeText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: incoming
+                            ? context.vibeTextSecondary
+                            : Colors.white60,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (attach.url != null) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.download_rounded,
+                  size: 18,
+                  color: incoming
+                      ? context.vibeTextSecondary
+                      : Colors.white60,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 8.3.3: ???????? ????????? ? ?????????? + ???????? ? ???????.
+class _LocationBubble extends StatelessWidget {
+  const _LocationBubble({required this.attach, required this.incoming});
+
+  final AttachmentData attach;
+  final bool incoming;
+
+  Future<void> _openMaps() async {
+    final uri = Uri.parse(
+      'https://maps.google.com/?q=${attach.lat.toStringAsFixed(6)},${attach.lng.toStringAsFixed(6)}',
+    );
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final lat = attach.lat.toStringAsFixed(6);
+    final lng = attach.lng.toStringAsFixed(6);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(VibeIcons.pin, color: primary, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              attach.label?.isNotEmpty == true
+                  ? attach.label!
+                  : 'Локация',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: incoming ? context.vibeTextPrimary : Colors.white,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$lat, $lng',
+          style: TextStyle(
+            fontSize: 12,
+            color: incoming ? context.vibeTextSecondary : Colors.white70,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          borderRadius: BorderRadius.circular(VibeRadius.md),
+          onTap: _openMaps,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(VibeRadius.md),
+            ),
+            child: Text(
+              'Открыть в картах',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: primary,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 8.3.3: ???????? ???????? ? ??????? ????????, ?????? ??????????.
+class _ContactBubble extends StatelessWidget {
+  const _ContactBubble({
+    required this.attach,
+    required this.incoming,
+    this.onOpenContact,
+  });
+
+  final AttachmentData attach;
+  final bool incoming;
+  final ValueChanged<String>? onOpenContact;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final name = attach.contactName ?? 'Собеседник';
+    final initial = name.isEmpty ? '?' : name.characters.first;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: primary.withValues(alpha: 0.16),
+          child: Text(
+            initial,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: incoming ? context.vibeTextPrimary : Colors.white,
+                ),
+              ),
+              if (attach.nick?.isNotEmpty == true)
+                Text(
+                  '@${attach.nick}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: incoming
+                        ? context.vibeTextSecondary
+                        : Colors.white60,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        InkWell(
+          borderRadius: BorderRadius.circular(VibeRadius.md),
+          onTap: () {
+            if (attach.uid != null) onOpenContact?.call(attach.uid!);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(VibeRadius.md),
+            ),
+            child: Text(
+              'Написать',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: primary,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 8.3.3: ???????? ?????? ? ????????, ???????????, ???????? ???????.
+class _PollBubble extends StatelessWidget {
+  const _PollBubble({
+    required this.attach,
+    required this.pollId,
+    required this.incoming,
+    required this.votes,
+    required this.myVote,
+    required this.onVote,
+  });
+
+  final AttachmentData attach;
+  final String pollId;
+  final bool incoming;
+  final List<int> votes;
+  final int? myVote;
+  final ValueChanged<int>? onVote;
+
+  int get _total => votes.fold(0, (a, b) => a + b);
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final options = attach.options;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(VibeIcons.bubble, color: primary, size: 16),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                attach.question ?? 'Вопрос',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: incoming ? context.vibeTextPrimary : Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        for (var i = 0; i < options.length; i++) ...[
+          _PollOption(
+            index: i,
+            label: options[i],
+            count: i < votes.length ? votes[i] : 0,
+            total: _total,
+            selected: myVote == i,
+            canVote: myVote == null && onVote != null,
+            incoming: incoming,
+            onTap: () => onVote?.call(i),
+          ),
+          if (i < options.length - 1) const SizedBox(height: 6),
+        ],
+        const SizedBox(height: 6),
+        Text(
+          _total == 0 ? '0 голосов' : '$_total ${_plural(_total)}',
+          style: TextStyle(
+            fontSize: 11,
+            color: incoming ? context.vibeTextSecondary : Colors.white60,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _plural(int n) {
+    final m = n % 10;
+    final h = n % 100;
+    if (h >= 11 && h <= 14) return 'голосов';
+    if (m == 1) return 'голос';
+    if (m >= 2 && m <= 4) return 'голоса';
+    return 'голосов';
+  }
+}
+
+class _PollOption extends StatelessWidget {
+  const _PollOption({
+    required this.index,
+    required this.label,
+    required this.count,
+    required this.total,
+    required this.selected,
+    required this.canVote,
+    required this.incoming,
+    required this.onTap,
+  });
+
+  final int index;
+  final String label;
+  final int count;
+  final int total;
+  final bool selected;
+  final bool canVote;
+  final bool incoming;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final textColor = incoming ? context.vibeTextPrimary : Colors.white;
+    final pct = total == 0
+        ? 0.0
+        : (count / total * 100).clamp(0, 100).toDouble();
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: canVote ? onTap : null,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: (canVote || selected)
+              ? primary.withValues(alpha: selected ? 0.16 : 0.07)
+              : primary.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? primary.withValues(alpha: 0.7)
+                : primary.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${index + 1}.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: primary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (total > 0) ...[
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct / 100,
+                  minHeight: 4,
+                  backgroundColor: primary.withValues(alpha: 0.12),
+                  valueColor: AlwaysStoppedAnimation(primary),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Telegram-хвост пузыря: маленький уголок снизу со стороны отправителя.
+class _TailPainter extends CustomPainter {
+  const _TailPainter({required this.color, required this.mirror});
+
+  final Color color;
+
+  /// true — хвост у правого края (исходящее), false — у левого.
+  final bool mirror;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    if (mirror) {
+      path.moveTo(size.width, 0);
+      path.lineTo(size.width, size.height);
+      path.lineTo(0, 0);
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(0, size.height);
+      path.lineTo(size.width, 0);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TailPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.mirror != mirror;
 }

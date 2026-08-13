@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:vibe_app/chat/models.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/backend_api.dart';
 
@@ -30,6 +31,9 @@ class FakeVibeBackend implements VibeBackendApi {
 
   /// Заготовка для ленты сториз (экран списка читает для кружков).
   List<VibeStory> stories = [];
+
+  /// Контакты для вложения «Контакт» (8.3.3).
+  List<VibeProfile> contacts = [];
 
   @override
   Future<List<VibeStory>> listStories() async {
@@ -63,6 +67,24 @@ class FakeVibeBackend implements VibeBackendApi {
 
   /// Если true — `sendText` бросает исключение (эмуляция сетевой ошибки).
   bool throwOnSendText = false;
+
+  /// Стикер-паки для панели (8.3.4).
+  List<VibeStickerPack> stickerPacks = [
+    VibeStickerPack(
+      id: 'p1',
+      title: 'Классика',
+      stickers: [
+        for (final e in ['👍', '❤️', '😂', '😍', '😎', '🤝', '🎉', '🔥', '👏', '😢', '🙏', '💪'])
+          VibeSticker(id: e, emoji: e),
+      ],
+    ),
+  ];
+
+  @override
+  Future<List<VibeStickerPack>> listStickerPacks() async {
+    calls.add('listStickerPacks()');
+    return stickerPacks;
+  }
 
   // ─── Приватность (3.7) ───
   PrivacySettings? privacySettings;
@@ -228,6 +250,43 @@ class FakeVibeBackend implements VibeBackendApi {
   }
 
   @override
+  Future<VibeMessage> sendFile(
+    String chatId,
+    File file, {
+    String? localId,
+    String? localPath,
+    String? mime,
+  }) async {
+    // Гифки — анимированное медиа (как в реальном backend.dart).
+    if (mime == 'image/gif') {
+      calls.add('sendGif($chatId)');
+    } else {
+      calls.add('sendFile($chatId)');
+    }
+    final name = file.uri.pathSegments.isEmpty
+        ? 'file'
+        : file.uri.pathSegments.last;
+    final json = AttachmentData.encode(
+      kind: mime == 'image/gif'
+          ? AttachmentKind.gif
+          : AttachmentKind.file,
+      name: name,
+      size: file.lengthSync(),
+      mime: mime,
+      url: 'media/$chatId/$name',
+    );
+    final sent = _sent(
+      chatId,
+      text: json,
+      localId: localId,
+      status: MsgStatus.sent,
+      created: DateTime.now(),
+    );
+    streamCtrl.add(sent);
+    return sent;
+  }
+
+  @override
   Future<VibeMessage> sendVoice(
     String chatId,
     File voiceFile, {
@@ -358,6 +417,12 @@ class FakeVibeBackend implements VibeBackendApi {
             p.displayName.toLowerCase().contains(q) ||
             p.username.toLowerCase().contains(q))
         .toList();
+  }
+
+  @override
+  Future<List<VibeProfile>> listContacts() async {
+    calls.add('listContacts()');
+    return contacts;
   }
 
   @override

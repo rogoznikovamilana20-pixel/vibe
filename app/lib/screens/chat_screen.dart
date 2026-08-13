@@ -1,9 +1,10 @@
-﻿
+
 import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'dart:async';
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:camera/camera.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -49,6 +50,20 @@ class ChatScreen extends StatefulWidget {
 
   /// Тестовая подмена данных (widget-тесты); null — живой бэкенд.
   final VibeBackendApi? backend;
+
+  /// Запись гифки во временный файл для отправки (инжектируемо для тестов —
+  /// в widget-тестах реальный файловый I/O не завершается в FakeAsync).
+  static Future<File> Function(String assetName) writeGifTemp =
+      _writeGifTempDefault;
+
+  static Future<File> _writeGifTempDefault(String assetName) async {
+    final bytes = await rootBundle.load('assets/gifs/$assetName');
+    final dir = await getTemporaryDirectory();
+    final tmp = File('${dir.path}/vibe_gifs/$assetName');
+    await tmp.parent.create(recursive: true);
+    await tmp.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+    return tmp;
+  }
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -425,6 +440,18 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendSticker(String emoji) async {
     HapticFeedback.lightImpact();
     await _chat.sendSticker(emoji);
+  }
+
+  Future<void> _sendGif(String assetName) async {
+    HapticFeedback.lightImpact();
+    try {
+      // Ассет не файл: копируем во временный каталог и шлём как анимированное
+      // медиа (как в ТГ): в пузыре анимированный GIF, не карточка-файл.
+      final tmp = await ChatScreen.writeGifTemp(assetName);
+      await _chat.sendGif(tmp, assetName);
+    } catch (e) {
+      _snack('Не удалось отправить гифку: $e');
+    }
   }
 
   Future<void> _sendPhoto() async {
@@ -878,6 +905,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openAttachmentMenu(BuildContext context) {
     HapticFeedback.lightImpact();
+    Widget row(List<Widget> items) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: items,
+      );
+    }
+
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -899,43 +933,348 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(height: VibeSpacing.lg),
-            Row(
-              children: [
-                AttachmentItem(
-                  icon: Icons.photo_library_rounded,
-                  color: VibeColors.vivid,
-                  label: 'Фото',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _sendPhoto();
-                  },
-                ),
-                const SizedBox(width: VibeSpacing.lg),
-                AttachmentItem(
-                  icon: VibeIcons.mic,
-                  color: const Color(0xFFEC4899),
-                  label: 'Голос',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _startRecording();
-                  },
-                ),
-                const SizedBox(width: VibeSpacing.lg),
-                AttachmentItem(
-                  icon: Icons.insert_drive_file_rounded,
-                  color: const Color(0xFFF59E0B),
-                  label: 'Файл',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showAttachments();
-                  },
-                ),
-              ],
-            ),
+            row([
+              AttachmentItem(
+                icon: VibeIcons.camera,
+                color: VibeColors.vivid,
+                label: 'Фото',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _sendPhoto();
+                },
+              ),
+              AttachmentItem(
+                icon: VibeIcons.mic,
+                color: const Color(0xFFEC4899),
+                label: 'Голос',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _startRecording();
+                },
+              ),
+              AttachmentItem(
+                icon: Icons.photo_library_rounded,
+                color: VibeColors.primary,
+                label: 'Медиа',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showAttachments();
+                },
+              ),
+            ]),
+            const SizedBox(height: VibeSpacing.lg),
+            row([
+              AttachmentItem(
+                icon: VibeIcons.file,
+                color: const Color(0xFFF59E0B),
+                label: 'Файл',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _sendFile();
+                },
+              ),
+              AttachmentItem(
+                icon: VibeIcons.pin,
+                color: const Color(0xFF10B981),
+                label: 'Локация',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _sendLocation(context);
+                },
+              ),
+              AttachmentItem(
+                icon: VibeIcons.user,
+                color: const Color(0xFF3B82F6),
+                label: 'Контакт',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _sendContact(context);
+                },
+              ),
+            ]),
+            const SizedBox(height: VibeSpacing.lg),
+            row([
+              AttachmentItem(
+                icon: VibeIcons.bubble,
+                color: context.vibePrimary,
+                label: 'Опрос',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _sendPoll(context);
+                },
+              ),
+            ]),
           ],
         ),
       ),
     );
+  }
+
+  /// Файл-вложение: системный выбор файла → отправка.
+  void _sendFile() {
+    unawaited(() async {
+      final result = await FilePicker.pickFiles(
+        dialogTitle: 'Выберите файл',
+      );
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.first.path;
+      if (path == null) return;
+      await _chat.sendFile(File(path));
+    }());
+  }
+
+  /// Локация: честное ручное задание координат (диалог) → карточка в чате.
+  void _sendLocation(BuildContext context) {
+    final latCtrl = TextEditingController();
+    final lngCtrl = TextEditingController();
+    final labelCtrl = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Локация'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: latCtrl,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Широта (например 55.7558)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: lngCtrl,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Долгота (например 37.6173)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: labelCtrl,
+              decoration: const InputDecoration(labelText: 'Подпись (необяз.)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final lat = double.tryParse(
+                latCtrl.text.trim().replaceAll(',', '.'),
+              );
+              final lng = double.tryParse(
+                lngCtrl.text.trim().replaceAll(',', '.'),
+              );
+              if (lat == null ||
+                  lng == null ||
+                  lat < -90 ||
+                  lat > 90 ||
+                  lng < -180 ||
+                  lng > 180) {
+                VibeToast.show(ctx, 'Введите валидные координаты');
+                return;
+              }
+              Navigator.of(ctx).pop();
+              final label = labelCtrl.text.trim();
+              final attach = AttachmentData(
+                kind: AttachmentKind.location,
+                lat: lat,
+                lng: lng,
+                label: label.isEmpty ? null : label,
+              );
+              _chat.sendAttachmentJson(
+                AttachmentData.encode(
+                  kind: AttachmentKind.location,
+                  lat: lat,
+                  lng: lng,
+                  label: label.isEmpty ? null : label,
+                ),
+                MsgType.location,
+                attach,
+              );
+            },
+            child: const Text('Отправить'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Контакт: выбор из списка контактов → визитка в чате.
+  void _sendContact(BuildContext context) {
+    unawaited(() async {
+      final contacts = await _backend.listContacts();
+      if (!context.mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: VibeSpacing.md),
+          children: [
+            for (final p in contacts)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: VibeColors.primary.withValues(alpha: 0.15),
+                  child: Text(
+                    (p.displayName.isEmpty
+                            ? '?'
+                            : p.displayName.characters.first)
+                        .toUpperCase(),
+                    style: TextStyle(
+                      color: context.vibePrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                title: Text(p.displayName),
+                subtitle: Text('@${p.username}'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  final attach = AttachmentData(
+                    kind: AttachmentKind.contact,
+                    uid: p.id,
+                    contactName: p.displayName,
+                    nick: p.username,
+                  );
+                  _chat.sendAttachmentJson(
+                    AttachmentData.encode(
+                      kind: AttachmentKind.contact,
+                      uid: p.id,
+                      contactName: p.displayName,
+                      nick: p.username,
+                    ),
+                    MsgType.contact,
+                    attach,
+                  );
+                },
+              ),
+            if (contacts.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(VibeSpacing.lg),
+                child: Text(
+                  'Контактов пока нет — добавьте их на вкладке «Контакты»',
+                  style: VibeTypography.bodyMedium.copyWith(
+                    color: context.vibeTextSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+          ],
+        ),
+      );
+    }());
+  }
+
+  /// Опрос: вопрос + 2–4 варианта → опрос в чате.
+  void _sendPoll(BuildContext context) {
+    final questionCtrl = TextEditingController();
+    final optionCtrls = [TextEditingController(), TextEditingController()];
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) => AlertDialog(
+            title: const Text('Опрос'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: questionCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Вопрос',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (var i = 0; i < optionCtrls.length; i++) ...[
+                      TextField(
+                        controller: optionCtrls[i],
+                        decoration: InputDecoration(
+                          labelText: 'Вариант ${i + 1}',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (optionCtrls.length < 4)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setSheetState(() {
+                              optionCtrls.add(TextEditingController());
+                            });
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Добавить вариант'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final q = questionCtrl.text.trim();
+                  final options = optionCtrls
+                      .map((c) => c.text.trim())
+                      .where((o) => o.isNotEmpty)
+                      .toList();
+                  if (q.isEmpty || options.length < 2) {
+                    VibeToast.show(ctx, 'Нужны вопрос и минимум 2 варианта');
+                    return;
+                  }
+                  Navigator.of(ctx).pop();
+                  final attach = AttachmentData(
+                    kind: AttachmentKind.poll,
+                    question: q,
+                    options: options,
+                  );
+                  _chat.sendAttachmentJson(
+                    AttachmentData.encode(
+                      kind: AttachmentKind.poll,
+                      question: q,
+                      options: options,
+                    ),
+                    MsgType.poll,
+                    attach,
+                  );
+                },
+                child: const Text('Опубликовать'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// «Написать» по контакту-вложению: открыть pm-чат с человеком.
+  Future<void> _openContactChat(String uid) async {
+    try {
+      final chatId = await VibeBackend.instance.ensurePmChat(uid);
+      final chat = await VibeBackend.instance.chatById(chatId);
+      if (chat == null || !mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatScreen(chat: chat),
+        ),
+      );
+    } catch (_) {
+      if (mounted) VibeToast.show(context, 'Не удалось открыть чат');
+    }
   }
 
   void _showAttachments() {
@@ -1461,6 +1800,34 @@ class _ChatScreenState extends State<ChatScreen> {
                                             _chat.pinFlashId != null &&
                                             _chat.messages[i].serverId ==
                                                 _chat.pinFlashId,
+                                        chatId: _chat.chatId,
+                                        pollVotes: _chat.messages[i].type ==
+                                                    MsgType.poll &&
+                                                _chat.messages[i].serverId !=
+                                                    null
+                                            ? computePollVotes(
+                                                _chat.messages,
+                                                _chat.messages[i].serverId!,
+                                              )
+                                            : const [],
+                                        myVote: _chat.messages[i].type ==
+                                                    MsgType.poll &&
+                                                _chat.messages[i].serverId !=
+                                                    null
+                                            ? myPollVote(
+                                                _chat.messages,
+                                                _chat.messages[i].serverId!,
+                                              )
+                                            : null,
+                                        onOpenContact: _openContactChat,
+                                        onVote: _chat.messages[i]
+                                                    .serverId !=
+                                                null
+                                            ? (opt) => _chat.sendPollVote(
+                                                _chat.messages[i].serverId!,
+                                                opt,
+                                              )
+                                            : null,
                                       ),
                                     ],
                                   );
@@ -1989,8 +2356,10 @@ Expanded(
             ),
             if (_showEmojiPanel)
               EmojiStickerPanel(
+                backend: _backend,
                 onEmoji: (e) => setState(() => _input.text += e),
                 onSticker: _sendSticker,
+                onGif: _sendGif,
               ),
           ],
         ),

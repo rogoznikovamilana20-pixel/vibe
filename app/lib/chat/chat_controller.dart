@@ -184,10 +184,12 @@ class ChatController extends ChangeNotifier {
         // забираем статус, серверный id (для удаления/правки) и эмодзи.
         final i = messages.indexWhere((m) => m.localId == msg.localId);
         if (i >= 0) {
+          final sentAttach = AttachmentData.tryParse(msg.text);
           messages[i] = messages[i].copyWith(
             status: msg.status,
             serverId: msg.id,
             stickerEmoji: msg.stickerEmoji ?? messages[i].stickerEmoji,
+            attachment: sentAttach ?? messages[i].attachment,
           );
         }
       } else if (msg.incoming) {
@@ -574,6 +576,110 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  /// Вложение «файл»: мгновенный пузырь без URL, после загрузки
+  /// подстановка URL приходит подтверждением сервера.
+  Future<void> sendFile(File file) async {
+    final name = file.uri.pathSegments.isEmpty
+        ? 'file'
+        : file.uri.pathSegments.last;
+    final localId = 'f${DateTime.now().microsecondsSinceEpoch}';
+    messages.insert(0, ChatMsg(
+      type: MsgType.file,
+      incoming: false,
+      time: _now(),
+      status: MsgStatus.sending,
+      localId: localId,
+      date: DateTime.now(),
+      attachment: AttachmentData(
+        kind: AttachmentKind.file,
+        name: name,
+        size: file.lengthSync(),
+      ),
+    ));
+    notifyListeners();
+    try {
+      await backend.sendFile(chatId, file, localId: localId, localPath: file.path);
+      _armUndo(localId);
+    } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
+      onError('Не удалось отправить файл');
+    }
+  }
+
+  /// Гифка: анимированное медиа (kind=gif), в пузыре крупный GIF.
+  Future<void> sendGif(File file, String name) async {
+    final localId = 'g${DateTime.now().microsecondsSinceEpoch}';
+    messages.insert(0, ChatMsg(
+      type: MsgType.file,
+      incoming: false,
+      time: _now(),
+      status: MsgStatus.sending,
+      localId: localId,
+      date: DateTime.now(),
+      attachment: AttachmentData(
+        kind: AttachmentKind.gif,
+        name: name,
+        size: file.lengthSync(),
+      ),
+    ));
+    notifyListeners();
+    try {
+      await backend.sendFile(chatId, file,
+          localId: localId, localPath: file.path, mime: 'image/gif');
+      _armUndo(localId);
+    } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
+      onError('Не удалось отправить гифку');
+    }
+  }
+
+  /// Вложение, отправляемое JSON-строкой в text (локация/контакт/опрос/голос).
+  Future<void> sendAttachmentJson(
+    String json,
+    MsgType type,
+    AttachmentData attach,
+  ) async {
+    final localId = 'a${DateTime.now().microsecondsSinceEpoch}';
+    messages.insert(0, ChatMsg(
+      type: type,
+      incoming: false,
+      time: _now(),
+      status: MsgStatus.sending,
+      localId: localId,
+      date: DateTime.now(),
+      attachment: attach,
+    ));
+    notifyListeners();
+    try {
+      await backend.sendText(chatId, json, localId: localId);
+    } catch (_) {
+      final i = messages.indexWhere((m) => m.localId == localId);
+      if (i >= 0) {
+        messages[i] = messages[i].copyWith(status: MsgStatus.failed);
+      }
+      onError('Не удалось отправить вложение');
+    }
+  }
+
+  /// Голос в опросе: служебное сообщение poll_vote (в ленте не видно).
+  Future<void> sendPollVote(String pollId, int opt) {
+    return sendAttachmentJson(
+      AttachmentData.encode(
+        kind: AttachmentKind.pollVote,
+        pollId: pollId,
+        opt: opt,
+      ),
+      MsgType.pollVote,
+      AttachmentData(kind: AttachmentKind.pollVote, pollId: pollId, opt: opt),
+    );
+  }
+
   // ─── Действия над сообщениями ───
 
   void addReaction(int i, String emoji) {
@@ -762,8 +868,30 @@ class ChatController extends ChangeNotifier {
   // ─── Маппинг ───
 
   ChatMsg _toMsg(VibeMessage m) {
+    final attach = AttachmentData.tryParse(m.text);
     MsgType type;
-    if (m.stickerEmoji != null) {
+    if (attach != null) {
+      switch (attach.kind) {
+        case AttachmentKind.file:
+          type = MsgType.file;
+          break;
+        case AttachmentKind.gif:
+          type = MsgType.file;
+          break;
+        case AttachmentKind.location:
+          type = MsgType.location;
+          break;
+        case AttachmentKind.contact:
+          type = MsgType.contact;
+          break;
+        case AttachmentKind.poll:
+          type = MsgType.poll;
+          break;
+        case AttachmentKind.pollVote:
+          type = MsgType.pollVote;
+          break;
+      }
+    } else if (m.stickerEmoji != null) {
       type = MsgType.text; // Стикер — тип text, рендерим по stickerEmoji.
     } else if (m.photoPath != null) {
       type = MsgType.photo;
@@ -778,7 +906,7 @@ class ChatController extends ChangeNotifier {
       type: type,
       incoming: m.incoming,
       time: _fmtTime(m.created),
-      text: m.text ?? '',
+      text: attach == null ? (m.text ?? '') : '',
       photoSeed: 0,
       voiceSeconds: 10,
       voiceUrl: m.voicePath,
@@ -791,6 +919,7 @@ class ChatController extends ChangeNotifier {
       serverId: m.id,
       stickerEmoji: m.stickerEmoji,
       date: m.created,
+      attachment: attach,
       reactions: [
         for (final e in m.reactions.entries) ChatReaction(e.key, e.value),
       ],
@@ -820,6 +949,7 @@ class ChatController extends ChangeNotifier {
       serverId: m.serverId,
       stickerEmoji: m.stickerEmoji,
       date: m.date,
+      attachment: m.attachment,
     );
   }
 
@@ -846,6 +976,7 @@ class ChatController extends ChangeNotifier {
       serverId: m.serverId,
       stickerEmoji: m.stickerEmoji,
       date: m.date,
+      attachment: m.attachment,
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/services/notification_service.dart';
+import '../chat/attachments.dart';
 
 /// Одна модель «чата» из списка.
 class VibeChat {
@@ -1762,6 +1763,100 @@ peerName: peer?.displayName,
       streamController.add(local.copyWith(status: MsgStatus.failed));
       rethrow;
     }
+  }
+
+  /// Отправить файл-вложение: загрузка в storage + JSON-метаданные в text.
+  /// Один бакет (`avatars`), путь `media/<chatId>/file_*` — media-sign уже
+  /// разрешает префикс участникам чата.
+  Future<VibeMessage> sendFile(
+    String chatId,
+    File file, {
+    String? localId,
+    String? localPath,
+    String? mime,
+  }) async {
+    final lId = localId ?? _nextLocalId();
+    final name = file.uri.pathSegments.isEmpty
+        ? 'file'
+        : file.uri.pathSegments.last;
+    final mimeType = mime ?? _mimeByExtension(file.path);
+    // Гифки — анимированное медиа (kind=gif), не карточка-файл.
+    final kind = mimeType == 'image/gif'
+        ? AttachmentKind.gif
+        : AttachmentKind.file;
+    final json = AttachmentData.encode(
+      kind: kind,
+      name: name,
+      size: file.lengthSync(),
+      mime: mimeType,
+    );
+    final local = _ownLocal(
+      chatId: chatId,
+      localId: lId,
+      text: json,
+      status: MsgStatus.sending,
+    );
+    streamController.add(local);
+    try {
+      final safeName = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final path =
+          'media/$chatId/file_$myProfileId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+      await _client.storage.from('avatars').upload(
+            path,
+            file,
+            fileOptions: FileOptions(
+              upsert: false,
+              contentType: mime ?? _mimeByExtension(file.path),
+            ),
+          );
+      final jsonWithUrl = AttachmentData.encode(
+        kind: kind,
+        name: name,
+        size: file.lengthSync(),
+        mime: mimeType,
+        url: path,
+      );
+      final row = await _client.from('messages').insert({
+        'chat_id': chatId,
+        'sender_id': myProfileId,
+        'text': jsonWithUrl,
+      }).select().single();
+      _broadcastMessageRow(row);
+      _chatsController.add(null);
+      final sent = _ownMessage(row).copyWith(
+        localId: lId,
+        status: MsgStatus.sent,
+      );
+      _sentById['${row['id']}'] = sent;
+      streamController.add(sent);
+      return sent;
+    } catch (_) {
+      streamController.add(local.copyWith(status: MsgStatus.failed));
+      rethrow;
+    }
+  }
+
+  static String _mimeByExtension(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    const map = {
+      'pdf': 'application/pdf',
+      'doc': 'application/msword',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'txt': 'text/plain',
+      'zip': 'application/zip',
+      'rar': 'application/vnd.rar',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif': 'image/gif',
+      'mp3': 'audio/mpeg',
+      'mp4': 'video/mp4',
+    };
+    return map[ext] ?? 'application/octet-stream';
   }
 
   /// Отправить голосовое сообщение (файл m4a).

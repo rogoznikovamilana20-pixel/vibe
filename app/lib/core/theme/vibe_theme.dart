@@ -106,9 +106,8 @@ class VibeTheme {
         labelLarge: VibeTypography.button.copyWith(color: textPrimary),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark
-            ? VibeColors.bgAltDark.withValues(alpha: 0.85)
-            : VibeColors.surface0Light.withValues(alpha: 0.9),
+        // Telegram: строгая сплошная шапка.
+        backgroundColor: isDark ? VibeColors.toolbarDark : VibeColors.surface0Light,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
