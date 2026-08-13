@@ -12,7 +12,9 @@ import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/passcode_service.dart';
 import 'package:vibe_app/data/settings_service.dart';
+import 'package:vibe_app/core/widgets/vibe_avatar.dart';
 import 'package:vibe_app/screens/chat_list_screen.dart';
+import 'package:vibe_app/screens/new_message_screen.dart';
 
 import 'fake_vibe_backend.dart';
 
@@ -76,6 +78,51 @@ void main() {
     expect(find.text('Мария'), findsOneWidget);
     expect(find.text('Привет!'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('пустое состояние (8.4.7): CTA открывает композер',
+      (tester) async {
+    fake.chatList = [];
+
+    await pumpList(tester);
+
+    expect(find.text('Нет чатов'), findsOneWidget);
+    final cta = find.widgetWithText(FilledButton, 'Новое сообщение');
+    expect(cta, findsOneWidget);
+
+    await tester.tap(cta);
+    await tester.pumpAndSettle();
+    expect(find.byType(NewMessageScreen), findsOneWidget);
+  });
+
+  testWidgets('шторка (8.3.5): аватар открывает меню, навигация по вкладкам',
+      (tester) async {
+    final opened = <int>[];
+    fake.chatList = [chatX(id: 'c1', title: 'Иван')];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: VibeTheme.light(),
+        localizationsDelegates: const [VibeLocalizationsDelegate()],
+        supportedLocales: const [Locale('ru'), Locale('en')],
+        home: ChatListScreen(
+          userName: 'Андрей',
+          backend: fake,
+          onOpenTab: opened.add,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(VibeAvatar).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Контакты'), findsOneWidget);
+    expect(find.text('Настройки'), findsOneWidget);
+    expect(find.text('Профиль'), findsOneWidget);
+
+    await tester.tap(find.text('Настройки'));
+    await tester.pumpAndSettle();
+    expect(opened, [2]);
   });
 
   testWidgets('плитка «Сохранённые» — первый элемент основного списка',
