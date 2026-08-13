@@ -1782,12 +1782,12 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     try {
-      final bytes = await voiceFile.readAsBytes();
+      // 5.5: стриминг файла в storage — без readAsBytes всего файла.
       final path =
           'media/$chatId/voice_$myProfileId/${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await _client.storage.from('avatars').uploadBinary(
+      await _client.storage.from('avatars').upload(
             path,
-            bytes,
+            voiceFile,
             fileOptions: const FileOptions(
               upsert: false,
               contentType: 'audio/mp4',
@@ -1830,12 +1830,12 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     try {
-      final bytes = await videoFile.readAsBytes();
+      // 5.5: стриминг файла в storage — без readAsBytes всего файла.
       final path =
           'media/$chatId/video_$myProfileId/${DateTime.now().millisecondsSinceEpoch}.mp4';
-      await _client.storage.from('avatars').uploadBinary(
+      await _client.storage.from('avatars').upload(
             path,
-            bytes,
+            videoFile,
             fileOptions: const FileOptions(
               upsert: false,
               contentType: 'video/mp4',

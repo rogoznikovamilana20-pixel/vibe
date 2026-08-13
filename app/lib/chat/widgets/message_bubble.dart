@@ -606,6 +606,9 @@ class _NetworkPhotoBubble extends StatelessWidget {
             height: 150,
             child: VibeNetImage(
               source: url,
+              // 5.4: декодируем в целевом размере пузыря.
+              cacheWidth: (220 * MediaQuery.of(context).devicePixelRatio)
+                  .round(),
               errorBuilder: (_, _, _) => Container(
                 color: Colors.black26,
                 alignment: Alignment.center,

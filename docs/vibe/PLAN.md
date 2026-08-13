@@ -568,7 +568,24 @@
 - analyze 0; verify.ps1 passed; 146/146 (+5)
 
 ### Следующее
-- 4.x Cloud Pinning рефактор; 5.x скорость; 1.7/1.8 крипто; 2.x закрыто, Фаза 3 закрыта
+- 4.x Cloud Pinning рефактор; 1.7/1.8 крипто; 5.7-5.9; 8.x UI
+
+## Phase 3 — Фаза C (порция 29): 5.x скорость (5.1–5.6) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 154/154, CI-гейт EXIT=0)
+- **5.1 Тикер-пульс**: `ChatListController` — 20s-перезагрузка ленты только при молчащем realtime дольше 20 c (`_lastRealtimeEvent`, `_pulse`); постоянный polling исключён.
+- **5.2 Presence-троттлинг**: при шквале presence-событий полный `listChats` не чаще раза в 2 c (`_presenceInterval`), хвост — одна отложенная перезагрузка; тесты +2 (шквал, пауза > интервала).
+- **5.3 setState-оптимизации**: ввод текста больше не пересобирает экран — listener `_input` + кэш-флаг `_canSend` (setState только на границе пусто/не-пусто; автостоп при восстановлении черновика через снятие listener в build); лента сообщений в `RepaintBoundary`.
+- **5.4 Disk-кэш медиа**: `MediaCache` (ключ sha1 URL, файлы `vibe_cache/media`, fetcher/dirOverride подменяемы — тесты +5); `VibeNetImage` грузится из кэша (первый показ качает+пишет, далее с диска, плейсхолдер при сбое); `cacheWidth` для аватаров и фото-пузырей.
+- **5.5 Стриминг-загрузка**: голос (`sendVoice`) и видеокружок (`sendVideo`) — `storage.upload(File)` напрямую, `readAsBytes` убраны.
+- **5.6 Таймеры записи**: `RollingPill`/`VideoRollPill` — Stateful с собственным `Timer.periodic(1s)` (`onTick` наружу, автостоп 60 c на стороне экрана); setState в ChatScreen во время записи отсутствует; тест +1 (тик 0:00→0:03, onTick, отмена таймера при размонтировании).
+- Бонус к 5.2: в фейке `FakeVibeBackend.sendText` фиксирует вызов даже при сбое.
+
+### Проверка
+- analyze 0; verify.ps1 passed; 154/154 (+8)
+
+### Следующее
+- 5.7 Realtime один broadcast-канал; 5.8 дельта-обновление ленты; 5.9 ленивая инициализация; 4.x Cloud Pinning; 1.7/1.8 крипто; 8.x UI
 
 ## Следующие фазы (из master-промпта)
 

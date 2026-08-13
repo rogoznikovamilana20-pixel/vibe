@@ -1,14 +1,18 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../../data/backend.dart';
+import '../services/media_cache.dart';
 import '../theme/vibe_colors.dart';
 import '../theme/vibe_spacing.dart';
 import '../theme/vibe_typography.dart';
 
 /// Сетевой виджет приватных медиа: резолвит [source] через
-/// edge-функцию media-sign в подписанный URL и грузит картинку.
+/// edge-функцию media-sign в подписанный URL и грузит картинку
+/// через диск-кэш (5.4), с опциональным декодированием в целевом
+/// размере [cacheWidth]/[cacheHeight].
 class VibeNetImage extends StatefulWidget {
   const VibeNetImage({
     super.key,
@@ -16,6 +20,8 @@ class VibeNetImage extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.placeholder,
     this.errorBuilder,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   /// Резолвер пути в подписанный URL (по умолчанию — живой бэкенд;
@@ -29,6 +35,10 @@ class VibeNetImage extends StatefulWidget {
   final Widget? placeholder;
   final ImageErrorWidgetBuilder? errorBuilder;
 
+  /// Декодирование в целевом разрешении (экономия памяти).
+  final int? cacheWidth;
+  final int? cacheHeight;
+
   @override
   State<VibeNetImage> createState() => _VibeNetImageState();
 }
@@ -36,6 +46,8 @@ class VibeNetImage extends StatefulWidget {
 class _VibeNetImageState extends State<VibeNetImage> {
   Future<String?>? _future;
   String? _lastSource;
+  Future<File?>? _fileFuture;
+  String? _lastUrl;
 
   // Мемоизируем future, чтобы FutureBuilder не сбрасывался в «загрузку»
   // на каждом rebuild (это давало мультяшность при обновлении списка).
@@ -47,11 +59,21 @@ class _VibeNetImageState extends State<VibeNetImage> {
     return _future!;
   }
 
+  // Мемоизация загрузки файла по URL (без повторных обращений к диску).
+  Future<File?> _fileFor(String url) {
+    if (url != _lastUrl || _fileFuture == null) {
+      _lastUrl = url;
+      _fileFuture = MediaCache.instance.cachedFile(url);
+    }
+    return _fileFuture!;
+  }
+
   @override
   void didUpdateWidget(covariant VibeNetImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.source != widget.source) {
       _future = null;
+      _fileFuture = null;
     }
   }
 
@@ -72,16 +94,32 @@ class _VibeNetImageState extends State<VibeNetImage> {
                 color: VibeColors.textTertiaryDark.withValues(alpha: 0.15),
               );
         }
-        return Image.network(
-          url,
-          fit: widget.fit,
-          gaplessPlayback: true,
-          errorBuilder: (context, error, stack) =>
-              widget.errorBuilder?.call(context, error, stack) ??
-              (widget.placeholder ??
+        return FutureBuilder<File?>(
+          future: _fileFor(url),
+          builder: (context, fs) {
+            final file = fs.data;
+            if (fs.connectionState != ConnectionState.done || file == null) {
+              return widget.placeholder ??
                   ColoredBox(
                     color: VibeColors.textTertiaryDark.withValues(alpha: 0.15),
-                  )),
+                  );
+            }
+            return Image.file(
+              file,
+              fit: widget.fit,
+              cacheWidth: widget.cacheWidth,
+              cacheHeight: widget.cacheHeight,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stack) =>
+                  widget.errorBuilder?.call(context, error, stack) ??
+                  (widget.placeholder ??
+                      ColoredBox(
+                        color: VibeColors.textTertiaryDark.withValues(
+                          alpha: 0.15,
+                        ),
+                      )),
+            );
+          },
         );
       },
     );
@@ -150,6 +188,9 @@ class VibeAvatar extends StatelessWidget {
               child: VibeNetImage(
                 source: photoUrl,
                 fit: BoxFit.cover,
+                // 5.4: декодируем в целевом размере аватара.
+                cacheWidth: (size * MediaQuery.of(context).devicePixelRatio)
+                    .round(),
                 errorBuilder: (_, _, _) => _fallback(gradient),
               ),
             ),

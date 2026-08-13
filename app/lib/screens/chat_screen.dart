@@ -65,6 +65,10 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Показываем панель эмодзи/стикеров.
   bool _showEmojiPanel = false;
 
+  /// 5.3: кэшированный «текст есть» — setState только при смене границы
+  /// пусто/не-пусто, а не на каждую клавишу.
+  bool _canSend = false;
+
   /// Версия восстановленного черновика (после «Отменить отправку»).
   int _seenDraftRestore = 0;
 
@@ -72,7 +76,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _recording = false;
   bool _micLocked = false;
   int _recordSeconds = 0;
-  Timer? _recordTimer;
   final _recorder = AudioRecorder();
   String? _recordPath;
 
@@ -82,7 +85,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _videoRolling = false;
   bool _videoLocked = false;
   int _videoSeconds = 0;
-  Timer? _videoTimer;
   bool _justHeld = false;
   double _videoDragDy = 0;
   Timer? _holdTimer;
@@ -106,15 +108,26 @@ class _ChatScreenState extends State<ChatScreen> {
     _chat.load();
     // Восстановление черновика (draft читается синхронно в load()).
     _input.text = _chat.draft;
+    _canSend = _input.text.trim().isNotEmpty;
+    // 5.3: подписка на поле ввода вместо setState в onChanged —
+    // пересборка только при смене canSend, typing/draft идут без неё.
+    _input.addListener(_onInputChanged);
     _scroll.addListener(_onChatScroll);
+  }
+
+  void _onInputChanged() {
+    _chat.notifyTyping(_input.text);
+    _chat.saveDraft(_input.text);
+    final canSend = _input.text.trim().isNotEmpty;
+    if (canSend != _canSend) {
+      setState(() => _canSend = canSend);
+    }
   }
 
   @override
   void dispose() {
     NotificationService.instance.exitChat(_chatId);
     _chat.dispose();
-    _recordTimer?.cancel();
-    _videoTimer?.cancel();
     _holdTimer?.cancel();
     _camCtrl?.dispose();
     _recorder.dispose();
@@ -190,21 +203,30 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: VibeSpacing.sm),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.schedule_rounded,
-                    color: context.vibePrimary),
+                leading: Icon(
+                  Icons.schedule_rounded,
+                  color: context.vibePrimary,
+                ),
                 title: const Text('Через 1 час'),
-                onTap: () => _applySchedule(sheetCtx, text,
-                    DateTime.now().add(const Duration(hours: 1))),
+                onTap: () => _applySchedule(
+                  sheetCtx,
+                  text,
+                  DateTime.now().add(const Duration(hours: 1)),
+                ),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.schedule_rounded,
-                    color: context.vibePrimary),
+                leading: Icon(
+                  Icons.schedule_rounded,
+                  color: context.vibePrimary,
+                ),
                 title: const Text('Завтра в 09:00'),
                 onTap: () => _applySchedule(
                   sheetCtx,
                   text,
-                  DateTime.now().add(const Duration(days: 1)).copyWith(
+                  DateTime.now()
+                      .add(const Duration(days: 1))
+                      .copyWith(
                         hour: 9,
                         minute: 0,
                         second: 0,
@@ -215,8 +237,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.event_rounded,
-                    color: context.vibePrimary),
+                leading: Icon(Icons.event_rounded, color: context.vibePrimary),
                 title: const Text('Выбрать дату и время…'),
                 onTap: () async {
                   Navigator.of(sheetCtx).pop();
@@ -236,8 +257,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   _applySchedule(
                     context,
                     text,
-                    DateTime(day.year, day.month, day.day, time.hour,
-                        time.minute),
+                    DateTime(
+                      day.year,
+                      day.month,
+                      day.day,
+                      time.hour,
+                      time.minute,
+                    ),
                   );
                 },
               ),
@@ -288,8 +314,10 @@ class _ChatScreenState extends State<ChatScreen> {
               for (final m in pending)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.schedule_rounded,
-                      color: context.vibePrimary),
+                  leading: Icon(
+                    Icons.schedule_rounded,
+                    color: context.vibePrimary,
+                  ),
                   title: Text(
                     m.text,
                     maxLines: 1,
@@ -306,8 +334,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   trailing: IconButton(
                     onPressed: () {
-                      ScheduledService.instance
-                          .cancel(widget.chat.id, m.localId);
+                      ScheduledService.instance.cancel(
+                        widget.chat.id,
+                        m.localId,
+                      );
                       _snack('Отправка отменена');
                     },
                     icon: const Icon(Icons.close_rounded, size: 20),
@@ -374,17 +404,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _recordSeconds = 0;
       _recordPath = path;
     });
-    _recordTimer?.cancel();
-    _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      setState(() {
-        _recordSeconds++;
-        if (_recordSeconds >= 60) {
-          t.cancel();
-          _stopRecording();
-        }
-      });
-    });
   }
 
   /// Зафиксировать запись (при поднятии пальца) — режим «удержание».
@@ -401,7 +420,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _cancelRecording() {
-    _recordTimer?.cancel();
     final path = _recordPath;
     HapticFeedback.selectionClick();
     setState(() {
@@ -416,7 +434,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _stopRecording() async {
-    _recordTimer?.cancel();
     if (!_recording) return;
     final stopped = await _recorder.stop();
     final seconds = _recordSeconds;
@@ -699,18 +716,16 @@ class _ChatScreenState extends State<ChatScreen> {
             if (chat.kind == 'pm')
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.person_outline_rounded,
-                    color: context.vibePrimary),
-                title: const Text('Участник'),
-                trailing: Text(
-                  peer,
-                  style: VibeTypography.bodyMedium,
+                leading: Icon(
+                  Icons.person_outline_rounded,
+                  color: context.vibePrimary,
                 ),
+                title: const Text('Участник'),
+                trailing: Text(peer, style: VibeTypography.bodyMedium),
               ),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.forum_outlined,
-                  color: context.vibePrimary),
+              leading: Icon(Icons.forum_outlined, color: context.vibePrimary),
               title: const Text('Сообщений'),
               trailing: Text(
                 '${_chat.messages.length}',
@@ -1087,10 +1102,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: VibeSpacing.lg),
-                    Text(
-                      'История правок',
-                      style: VibeTypography.subtitle,
-                    ),
+                    Text('История правок', style: VibeTypography.subtitle),
                     const SizedBox(height: VibeSpacing.md),
                     Text(
                       'Правок не найдено',
@@ -1104,17 +1116,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'История правок',
-                      style: VibeTypography.subtitle,
-                    ),
+                    Text('История правок', style: VibeTypography.subtitle),
                     const SizedBox(height: VibeSpacing.sm),
                     Flexible(
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: edits.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (_, i) {
                           final e = edits[i];
                           return Padding(
@@ -1222,236 +1230,253 @@ class _ChatScreenState extends State<ChatScreen> {
       body: ListenableBuilder(
         listenable: _chat,
         builder: (context, _) {
-          // «Отменить отправку» вернул текст в черновик — кладём в поле ввода.
+// «Отменить отправку» вернул текст в черновик — кладём в поле ввода.
           if (_chat.draftRestoreVersion != _seenDraftRestore) {
             _seenDraftRestore = _chat.draftRestoreVersion;
+            // Без listener: восстановление не должно шлáть «печатает»
+            // и делать setState посреди build.
+            _input.removeListener(_onInputChanged);
             _input.text = _chat.draft;
+            _canSend = _input.text.trim().isNotEmpty;
+            _input.addListener(_onInputChanged);
             _input.selection =
                 TextSelection.collapsed(offset: _input.text.length);
           }
           return Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: SettingsService.instance.appearanceVersion,
-                    builder: (context, _) => CustomScrollView(
-                      controller: _scroll,
-                      reverse: true, // Инвертированный список сообщений
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      slivers: [
-                        // «Отменить отправку»: пилюля над последним пузырём
-                        // (окно 5 секунд, как в Telegram).
-                        if (_chat.undoAvailable)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                VibeSpacing.md,
-                                0,
-                                VibeSpacing.md,
-                                VibeSpacing.sm,
-                              ),
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: Material(
-                                  color: context.vibeSurfaceVariant,
-                                  borderRadius:
-                                      BorderRadius.circular(VibeRadius.pill),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(
-                                      VibeRadius.pill,
-                                    ),
-                                    onTap: () => _chat.undoLastSend(),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: VibeSpacing.md,
-                                        vertical: VibeSpacing.sm,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.undo_rounded,
-                                            size: 18,
-                                          ),
-                                          const SizedBox(
-                                            width: VibeSpacing.xs,
-                                          ),
-                                          Text(
-                                            'Отменить отправку',
-                                            style: VibeTypography.bodyMedium,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: ListenableBuilder(
+                      listenable: SettingsService.instance.appearanceVersion,
+                      builder: (context, _) => RepaintBoundary(
+                        child: CustomScrollView(
+                          controller: _scroll,
+                          reverse: true, // Инвертированный список сообщений
+                          physics: const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                          slivers: [
+                            // «Отменить отправку»: пилюля над последним пузырём
+                            // (окно 5 секунд, как в Telegram).
+                            if (_chat.undoAvailable)
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    VibeSpacing.md,
+                                    0,
+                                    VibeSpacing.md,
+                                    VibeSpacing.sm,
                                   ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        // Из-за reverse: true это «верх» списка (свежие).
-                        const SliverToBoxAdapter(
-                          child: SizedBox(height: 100), // Запас для шапки
-                        ),
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: VibeSpacing.md,
-                            vertical: VibeSpacing.md,
-                          ),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate((context, i) {
-                              final showDate =
-                                  i == 0 ||
-                                  !_sameDay(
-                                    _chat.messages[i].date,
-                                    _chat.messages[i - 1].date,
-                                  );
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (showDate)
-                                    MessageDateDivider(
-                                      date: _chat.messages[i].date,
-                                    ),
-                                  MessageBubble(
-                                    msg: _chat.messages[i],
-                                    key: ValueKey(
-                                      'msg_${_chat.messages[i].localId ?? i}',
-                                    ),
-                                    isFirstInGroup: ChatController.isFirstInGroup(
-                                      _chat.messages,
-                                      i,
-                                    ),
-                                    isLastInGroup: ChatController.isLastInGroup(
-                                      _chat.messages,
-                                      i,
-                                    ),
-                                    onHeart: () => _chat.heartReact(i),
-                                    onLongPress: () => _showMessageActions(i),
-                                    onReply: () => _replyToMsg(i),
-                                    onOpenUrl: _openUrl,
-                                    scrollController: _scroll,
-                                    player: _player,
-                                    highlight:
-                                        _chat.pinFlashId != null &&
-                                        _chat.messages[i].serverId ==
-                                            _chat.pinFlashId,
-                                  ),
-                                ],
-                              );
-                            }, childCount: _chat.messages.length),
-                          ),
-                        ),
-                        ListenableBuilder(
-                          listenable: _backend.connectivityVersion,
-                          builder: (context, _) => _backend.isOffline
-                              ? const SliverToBoxAdapter(
                                   child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: VibeOfflineBanner(),
+                                    alignment: Alignment.centerRight,
+                                    child: Material(
+                                      color: context.vibeSurfaceVariant,
+                                      borderRadius: BorderRadius.circular(
+                                        VibeRadius.pill,
+                                      ),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(
+                                          VibeRadius.pill,
+                                        ),
+                                        onTap: () => _chat.undoLastSend(),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: VibeSpacing.md,
+                                            vertical: VibeSpacing.sm,
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.undo_rounded,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(
+                                                width: VibeSpacing.xs,
+                                              ),
+                                              Text(
+                                                'Отменить отправку',
+                                                style:
+                                                    VibeTypography.bodyMedium,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                )
-                              : const SliverToBoxAdapter(
-                                  child: SizedBox.shrink(),
                                 ),
-                        ),
-                        // Индикатор подгрузки старых сообщений.
-                        if (_chat.hasMoreOlder)
-                          SliverToBoxAdapter(
-                            child: Padding(
+                              ),
+                            // Из-за reverse: true это «верх» списка (свежие).
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 100), // Запас для шапки
+                            ),
+                            SliverPadding(
                               padding: const EdgeInsets.symmetric(
+                                horizontal: VibeSpacing.md,
                                 vertical: VibeSpacing.md,
                               ),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    value: _chat.loadingOlder ? null : 0,
+                              sliver: SliverList(
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  i,
+                                ) {
+                                  final showDate =
+                                      i == 0 ||
+                                      !_sameDay(
+                                        _chat.messages[i].date,
+                                        _chat.messages[i - 1].date,
+                                      );
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (showDate)
+                                        MessageDateDivider(
+                                          date: _chat.messages[i].date,
+                                        ),
+                                      MessageBubble(
+                                        msg: _chat.messages[i],
+                                        key: ValueKey(
+                                          'msg_${_chat.messages[i].localId ?? i}',
+                                        ),
+                                        isFirstInGroup:
+                                            ChatController.isFirstInGroup(
+                                              _chat.messages,
+                                              i,
+                                            ),
+                                        isLastInGroup:
+                                            ChatController.isLastInGroup(
+                                              _chat.messages,
+                                              i,
+                                            ),
+                                        onHeart: () => _chat.heartReact(i),
+                                        onLongPress: () =>
+                                            _showMessageActions(i),
+                                        onReply: () => _replyToMsg(i),
+                                        onOpenUrl: _openUrl,
+                                        scrollController: _scroll,
+                                        player: _player,
+                                        highlight:
+                                            _chat.pinFlashId != null &&
+                                            _chat.messages[i].serverId ==
+                                                _chat.pinFlashId,
+                                      ),
+                                    ],
+                                  );
+                                }, childCount: _chat.messages.length),
+                              ),
+                            ),
+                            ListenableBuilder(
+                              listenable: _backend.connectivityVersion,
+                              builder: (context, _) => _backend.isOffline
+                                  ? const SliverToBoxAdapter(
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: VibeOfflineBanner(),
+                                      ),
+                                    )
+                                  : const SliverToBoxAdapter(
+                                      child: SizedBox.shrink(),
+                                    ),
+                            ),
+                            // Индикатор подгрузки старых сообщений.
+                            if (_chat.hasMoreOlder)
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: VibeSpacing.md,
+                                  ),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        value: _chat.loadingOlder ? null : 0,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
+                            // Нижний отступ списка (под плавающей шапкой).
+                            SliverToBoxAdapter(
+                              child: SizedBox(
+                                height: MediaQuery.of(context).padding.top + 72,
+                              ),
                             ),
-                          ),
-                        // Нижний отступ списка (под плавающей шапкой).
-                        SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: MediaQuery.of(context).padding.top + 72,
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                _buildInputBar(context),
-              ],
-            ),
-            // Плавающая шапка чата.
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ChatAppBar(
-                      chat: widget.chat,
-                      groupTitle: _chat.groupTitle,
-                      peerTyping: _chat.peerTyping,
-                      onBack: () => Navigator.of(context).pop(),
-                      onOpenProfile: _openProfile,
-                      onOpenGroupInfo: _openGroupInfo,
-                      onOpenSearch: _openSearch,
-                      onChooseCall: () => _chooseCall(context),
-                      onShowMenu: () => _showChatMenu(context),
-                    ),
-                    if (_chat.pinMsgId != null) _buildPinnedBanner(context),
-                  ],
-                ),
+                  _buildInputBar(context),
+                ],
               ),
-            ),
-            // Плашка «N непрочитанных» (прыжок к первому непрочитанному).
-            if (_chat.unreadJumpIndex != null)
+              // Плавающая шапка чата.
               Positioned(
+                top: 0,
                 left: 0,
                 right: 0,
-                bottom:
-                    VibeSpacing.md + MediaQuery.of(context).viewPadding.bottom,
-                child: Center(
-                  child: _UnreadPlank(
-                    count: _chat.unreadJumpIndex! + 1,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _chat.jumpToUnread();
-                      _scrollToEnd();
-                    },
+                child: SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ChatAppBar(
+                        chat: widget.chat,
+                        groupTitle: _chat.groupTitle,
+                        peerTyping: _chat.peerTyping,
+                        onBack: () => Navigator.of(context).pop(),
+                        onOpenProfile: _openProfile,
+                        onOpenGroupInfo: _openGroupInfo,
+                        onOpenSearch: _openSearch,
+                        onChooseCall: () => _chooseCall(context),
+                        onShowMenu: () => _showChatMenu(context),
+                      ),
+                      if (_chat.pinMsgId != null) _buildPinnedBanner(context),
+                    ],
                   ),
                 ),
               ),
-            // Кнопка «новые сообщения» (прыжок вниз, как в Telegram).
-            Positioned(
-              right: VibeSpacing.md,
-              bottom:
-                  VibeSpacing.md + MediaQuery.of(context).viewPadding.bottom,
-              child: JumpDownButton(
-                visible: !_chat.atBottom || _chat.newIncoming > 0,
-                badge: _chat.newIncoming,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  _chat.jumpToBottom();
-                  _scrollToEnd();
-                },
+              // Плашка «N непрочитанных» (прыжок к первому непрочитанному).
+              if (_chat.unreadJumpIndex != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom:
+                      VibeSpacing.md +
+                      MediaQuery.of(context).viewPadding.bottom,
+                  child: Center(
+                    child: _UnreadPlank(
+                      count: _chat.unreadJumpIndex! + 1,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _chat.jumpToUnread();
+                        _scrollToEnd();
+                      },
+                    ),
+                  ),
+                ),
+              // Кнопка «новые сообщения» (прыжок вниз, как в Telegram).
+              Positioned(
+                right: VibeSpacing.md,
+                bottom:
+                    VibeSpacing.md + MediaQuery.of(context).viewPadding.bottom,
+                child: JumpDownButton(
+                  visible: !_chat.atBottom || _chat.newIncoming > 0,
+                  badge: _chat.newIncoming,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _chat.jumpToBottom();
+                    _scrollToEnd();
+                  },
+                ),
               ),
-            ),
-          ],
-        );
-      },
-    ));
+            ],
+          );
+        },
+      ),
+    );
   }
 
   /// Плашка «Закреплённое сообщение» под шапкой (как в Telegram).
@@ -1632,8 +1657,9 @@ class _ChatScreenState extends State<ChatScreen> {
             ListenableBuilder(
               listenable: ScheduledService.instance.version,
               builder: (context, _) {
-                final pending =
-                    ScheduledService.instance.pendingFor(widget.chat.id);
+                final pending = ScheduledService.instance.pendingFor(
+                  widget.chat.id,
+                );
                 if (pending.isEmpty) return const SizedBox.shrink();
                 final first = pending.first;
                 return Padding(
@@ -1663,7 +1689,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 pending.length == 1
                                     ? 'Запланировано · ${_scheduleLabel(first.when)}'
                                     : 'Запланировано: ${pending.length} · до '
-                                        '${_scheduleLabel(first.when)}',
+                                          '${_scheduleLabel(first.when)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: VibeTypography.caption.copyWith(
@@ -1744,19 +1770,25 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: context.vibePrimary,
                   tooltip: 'Вложение',
                 ),
-                Expanded(
+Expanded(
                   child: _videoRolling
                       ? VideoRollPill(
                           cam: _camCtrl,
-                          seconds: _videoSeconds,
                           locked: _videoLocked,
+                          onTick: (s) {
+                            _videoSeconds = s;
+                            if (s >= 60) _finalizeVideo(send: true);
+                          },
                           onCancel: _cancelVideoRoll,
                           onSend: () => _finalizeVideo(send: true),
                         )
                       : _recording
                       ? RollingPill(
-                          seconds: _recordSeconds,
                           locked: _micLocked,
+                          onTick: (s) {
+                            _recordSeconds = s;
+                            if (s >= 60) _stopRecording();
+                          },
                           onCancel: _cancelRecording,
                           onSend: _stopRecording,
                         )
@@ -1793,11 +1825,6 @@ class _ChatScreenState extends State<ChatScreen> {
                             controller: _input,
                             maxLines: 5,
                             minLines: 1,
-                            onChanged: (_) {
-                              setState(() {});
-                              _chat.notifyTyping(_input.text);
-                              _chat.saveDraft(_input.text);
-                            },
                             style: VibeTypography.body.copyWith(
                               color: context.vibeTextPrimary,
                             ),
@@ -1832,7 +1859,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   tooltip: 'Эмодзи и стикеры',
                 ),
                 SendButton(
-                  canSend: _input.text.trim().isNotEmpty,
+                  canSend: _canSend,
                   recording: _recording,
                   locked: _micLocked,
                   onMicTap: _startRecording,
@@ -1841,9 +1868,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   onLock: _lockMic,
                   onUnlock: _unlockMic,
                   onCancel: _cancelRecording,
-                  onSchedule: _input.text.trim().isEmpty
-                      ? null
-                      : () => _showScheduleSheet(_input.text),
+                  onSchedule: _canSend
+                      ? () => _showScheduleSheet(_input.text)
+                      : null,
                 ),
               ],
             ),
@@ -1933,18 +1960,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _videoLocked = false;
       _videoSeconds = 0;
     });
-    _videoTimer?.cancel();
-    _videoTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() => _videoSeconds++);
-      if (_videoSeconds >= 60) {
-        t.cancel();
-        _finalizeVideo(send: true);
-      }
-    });
   }
 
   void _onCamDragUpdate(DragUpdateDetails d) {
@@ -1966,7 +1981,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _finalizeVideo({required bool send}) async {
-    _videoTimer?.cancel();
     final cam = _camCtrl;
     if (cam == null || !_videoRolling) return;
     XFile? xf;
@@ -1998,7 +2012,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _cancelVideoRoll() async {
-    _videoTimer?.cancel();
     final cam = _camCtrl;
     if (cam != null && _videoRolling) {
       try {

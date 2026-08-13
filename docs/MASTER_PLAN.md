@@ -65,12 +65,12 @@
 - [ ] 4.12 Синхронизация настроек (акцент и др.) на сервер
 
 ## ФАЗА 5 — Скорость (быстрее ТГ)
-- [ ] 5.1 Убрать `Timer.periodic(20s)` → обновление по realtime-событиям
-- [ ] 5.2 `_onPresenceChanged`: спот-обновление карточки вместо `listChats`
-- [ ] 5.3 Убрать `setState` на скролл; RepaintBoundary + const
-- [ ] 5.4 Кэш изображений: `cacheWidth` + disk-кэш `vibe_cache/media`
-- [ ] 5.5 Медиа: стриминг вместо `readAsBytes` всего файла
-- [ ] 5.6 Таймеры 1с в записи — изолированный виджет (без пересборки)
+- [x] 5.1 Убрать `Timer.periodic(20s)` → обновление по realtime-событиям ✅ (13.08.2026) — тикер-пульс: 20s-перезагрузка ленты только когда realtime молчит дольше 20 c (`_lastRealtimeEvent` + `_pulse` в ChatListController); постоянный polling при живом websocket исключён
+- [x] 5.2 `_onPresenceChanged`: спот-обновление карточки вместо `listChats` ✅ (13.08.2026) — троттлинг: при шквале presence-событий полный `listChats` не чаще раза в 2 c (`_presenceInterval`), хвостовые события сливаются в одну отложенную перезагрузку; тесты 2
+- [x] 5.3 Убрать `setState` на скролл; RepaintBoundary + const ✅ (13.08.2026) — `setState` при вводе только на смену границы пусто/не-пусто (listener на `_input` + кэш-флаг `_canSend`); лента сообщений в `RepaintBoundary`; onScroll уже не нотифицировал впустую
+- [x] 5.4 Кэш изображений: `cacheWidth` + disk-кэш `vibe_cache/media` ✅ (13.08.2026) — `MediaCache` (ключ sha1 URL, fetcher/dirOverride подменяемы, тесты 5); VibeNetImage читает из диск-кэша с плейсхолдером при сбое; `cacheWidth` для аватаров и фото-пузырей (декодирование в целевом размере)
+- [x] 5.5 Медиа: стриминг вместо `readAsBytes` всего файла ✅ (13.08.2026) — голосовое и видеокружок: `storage.upload(File)` напрямую (API стримит с диска), `readAsBytes` убраны из sendVoice/sendVideo
+- [x] 5.6 Таймеры 1с в записи — изолированный виджет (без пересборки) ✅ (13.08.2026) — RollingPill/VideoRollPill тикают сами (Timer внутри State, `onTick` наружу для автостопа 60 c), `setState` в ChatScreen во время записи отсутствует; тест 1
 - [ ] 5.7 Realtime: один канал broadcast (убрать дубль postgres_changes)
 - [ ] 5.8 Дельта-обновление ленты (по id, без removeAt+insert всего списка)
 - [ ] 5.9 Ленивая инициализация, сплэш не ждёт лишнего

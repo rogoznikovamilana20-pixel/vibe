@@ -280,22 +280,55 @@ class ReplyPanel extends StatelessWidget {
 }
 
 /// Пилюля записи голосового: таймер, эквалайзер, отмена/отправка.
-class RollingPill extends StatelessWidget {
+/// Пилюля записи голосового: таймер живёт внутри (5.6) — тик не
+/// пересобирает весь экран чата, только саму пилюлю.
+class RollingPill extends StatefulWidget {
   const RollingPill({
     super.key,
-    required this.seconds,
     required this.locked,
     required this.onCancel,
     required this.onSend,
+    this.onTick,
+    this.maxSeconds = 60,
   });
 
-  final int seconds;
   final bool locked;
   final VoidCallback onCancel;
   final VoidCallback onSend;
 
+  /// Секунды записи (для автостопа на стороне экрана).
+  final ValueChanged<int>? onTick;
+  final int maxSeconds;
+
+  @override
+  State<RollingPill> createState() => _RollingPillState();
+}
+
+class _RollingPillState extends State<RollingPill> {
+  int _seconds = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() => _seconds++);
+      widget.onTick?.call(_seconds);
+      if (_seconds >= widget.maxSeconds) t.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final seconds = _seconds;
+    final locked = widget.locked;
     return Container(
       constraints: const BoxConstraints(minHeight: 48),
       padding: const EdgeInsets.symmetric(
@@ -335,14 +368,14 @@ class RollingPill extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: onCancel,
+            onPressed: widget.onCancel,
             icon: const Icon(Icons.close_rounded, size: 22),
             color: VibeColors.error,
             tooltip: 'Отмена',
           ),
           if (locked)
             IconButton(
-              onPressed: onSend,
+              onPressed: widget.onSend,
               icon: const Icon(Icons.send_rounded, size: 20),
               color: context.vibePrimary,
               tooltip: 'Отправить',
@@ -354,24 +387,57 @@ class RollingPill extends StatelessWidget {
 }
 
 /// Пилюля записи видеокружка: круглый предпросмотр камеры, таймер.
-class VideoRollPill extends StatelessWidget {
+/// Таймер живёт внутри (5.6) — тик не пересобирает экран чата.
+class VideoRollPill extends StatefulWidget {
   const VideoRollPill({
     super.key,
     required this.cam,
-    required this.seconds,
     required this.locked,
     required this.onCancel,
     required this.onSend,
+    this.onTick,
+    this.maxSeconds = 60,
   });
 
   final CameraController? cam;
-  final int seconds;
   final bool locked;
   final VoidCallback onCancel;
   final VoidCallback onSend;
 
+  /// Секунды записи (для автостопа на стороне экрана).
+  final ValueChanged<int>? onTick;
+  final int maxSeconds;
+
+  @override
+  State<VideoRollPill> createState() => _VideoRollPillState();
+}
+
+class _VideoRollPillState extends State<VideoRollPill> {
+  int _seconds = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() => _seconds++);
+      widget.onTick?.call(_seconds);
+      if (_seconds >= widget.maxSeconds) t.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final seconds = _seconds;
+    final locked = widget.locked;
+    final cam = widget.cam;
     return Container(
       constraints: const BoxConstraints(minHeight: 48),
       padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.md),
@@ -387,13 +453,13 @@ class VideoRollPill extends StatelessWidget {
       child: Row(
         children: [
           // Круглый предпросмотр камеры во время записи (как в TG).
-          if (cam != null && cam!.value.isInitialized)
+          if (cam != null && cam.value.isInitialized)
             SizedBox(
               width: 38,
               height: 38,
               child: ClipOval(
                 child: CameraPreview(
-                  cam!,
+                  cam,
                   child: const SizedBox.shrink(),
                 ),
               ),
@@ -421,14 +487,14 @@ class VideoRollPill extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: onCancel,
+            onPressed: widget.onCancel,
             icon: const Icon(Icons.close_rounded, size: 22),
             color: VibeColors.error,
             tooltip: 'Отмена',
           ),
           if (locked)
             IconButton(
-              onPressed: onSend,
+              onPressed: widget.onSend,
               icon: const Icon(Icons.send_rounded, size: 20),
               color: context.vibePrimary,
               tooltip: 'Отправить',

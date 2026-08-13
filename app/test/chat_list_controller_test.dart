@@ -271,4 +271,46 @@ void main() {
       expect(controller.archived, {'a1'});
     });
   });
+
+  group('presence-троттлинг (5.2)', () {
+    int listChatsCalls() =>
+        fake.calls.where((c) => c == 'listChats').length;
+
+    test('шквал presence-событий: 1 мгновенная перезагрузка + хвост через паузу',
+        () async {
+      fake.chatList = [chat('c1')];
+      await controller.load();
+      expect(listChatsCalls(), 1);
+
+      for (var i = 0; i < 5; i++) {
+        fake.presenceNotifier.value++;
+      }
+      await pump();
+      expect(listChatsCalls(), 2);
+
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      expect(listChatsCalls(), 3);
+
+      await Future<void>.delayed(const Duration(milliseconds: 3000));
+      expect(listChatsCalls(), 3);
+    });
+
+    test('событие после паузы дольше интервала — мгновенная перезагрузка',
+        () async {
+      await controller.load();
+      expect(listChatsCalls(), 1);
+
+      fake.presenceNotifier.value++;
+      await pump();
+      expect(listChatsCalls(), 2);
+
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+      fake.presenceNotifier.value++;
+      await pump();
+      expect(listChatsCalls(), 3);
+
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      expect(listChatsCalls(), 3);
+    });
+  });
 }

@@ -47,6 +47,18 @@ class ChatListController extends ChangeNotifier {
   Timer? _ticker;
   bool _disposed = false;
 
+  /// 5.1: время последнего realtime-события — тикер перезагружает ленту
+  /// только при «заснувшем» websocket (офлайн/фокус).
+  DateTime _lastRealtimeEvent = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Тикер-пульс: перезагрузка, только если realtime молчит > 20 секунд.
+  void _pulse() {
+    if (DateTime.now().difference(_lastRealtimeEvent) >=
+        const Duration(seconds: 20)) {
+      scheduleReload();
+    }
+  }
+
   /// Старт: локальные статусы + слушатели + realtime + первая загрузка.
   Future<void> load() async {
     pinned.addAll(SettingsService.instance.pinnedChats);
@@ -63,19 +75,25 @@ class ChatListController extends ChangeNotifier {
     backend.mutedNotifier.addListener(syncCloudMuted);
     backend.presenceVersion.addListener(onPresenceChanged);
 
-    // Периодическая перезагрузка, если websocket «заснул» (офлайн/фокус).
+    // 5.1: realtime-пульс. Периодическая перезагрузка — только если
+    // websocket «заснул» (нет realtime-событий дольше 20 секунд).
+    _lastRealtimeEvent = DateTime.now();
     _ticker = Timer.periodic(
       const Duration(seconds: 20),
-      (_) => scheduleReload(),
+      (_) => _pulse(),
     );
 
     _streamSub = backend.stream.listen((msg) {
       // Мгновенная подмена превью последнего сообщения (как в TG) и
       // фоновая перезагрузка списка при паузах.
+      _lastRealtimeEvent = DateTime.now();
       applyLivePreview(msg);
       scheduleReload();
     });
-    _chatSub = backend.chatEvents.listen((_) => scheduleReload());
+    _chatSub = backend.chatEvents.listen((_) {
+      _lastRealtimeEvent = DateTime.now();
+      scheduleReload();
+    });
 
     await loadChats();
   }
@@ -134,8 +152,30 @@ class ChatListController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Троттлинг presence-перезагрузок (5.2): при шквале событий онлайн-
+  /// статусов (пачкой меняется несколько контактов) полный `listChats`
+  /// выполняется не чаще раза в [_presenceInterval]; хвостовые события
+  /// сливаются в один отложенный перезапрос.
+  static const _presenceInterval = Duration(seconds: 2);
+  Timer? _presenceTimer;
+  DateTime? _lastPresenceReload;
+
   Future<void> onPresenceChanged() async {
     if (_disposed) return;
+    final last = _lastPresenceReload;
+    if (last != null &&
+        DateTime.now().difference(last) < _presenceInterval) {
+      _presenceTimer?.cancel();
+      _presenceTimer = Timer(_presenceInterval, () => _reloadFromPresence());
+      return;
+    }
+    await _reloadFromPresence();
+  }
+
+  Future<void> _reloadFromPresence() async {
+    if (_disposed) return;
+    _presenceTimer?.cancel();
+    _lastPresenceReload = DateTime.now();
     final fresh = await backend.listChats();
     if (_disposed) return;
     chats = fresh;
@@ -342,6 +382,7 @@ class ChatListController extends ChangeNotifier {
     backend.presenceVersion.removeListener(onPresenceChanged);
     _reloadTimer?.cancel();
     _ticker?.cancel();
+    _presenceTimer?.cancel();
     super.dispose();
   }
 }
