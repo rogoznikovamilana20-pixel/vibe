@@ -414,6 +414,19 @@
 ### Следующее
 - 9.5 CI (GitHub Actions: analyze+test+apk — не зависит от эмулятора), 9.6 PERF, 9.7 TASKS, Aurion D7
 
+## Phase 3 — Фаза C (порция 18): CI (9.5 MASTER_PLAN) ✅ (13.08.2026)
+
+### Сделано (flutter analyze = 0, flutter test: 104/104)
+- **Локальный гейт** `app/tool/verify.ps1` (PS 5.1, ASCII-only): analyze (0 issues) → полный flutter test → детект временных файлов тестов (test_out/test_full/integ_out/golden_tmp — за пределами build/) → опционально `-Apk` release-сборка. Прогнан: **CI gate passed (EXIT=0)**.
+- **GitHub Actions** `.github/workflows/vibe.yml` (push main / PR): checkout → flutter stable → pub get → analyze → test → build apk debug → upload-artifact. Репозиторий пока без remote — workflow готов к первому пушу.
+- Попутно: из индекса удалён случайно закоммиченный `app/test_full.txt` (повторный след 9.3).
+
+### Проверка
+- `flutter analyze` — 0 issues; `flutter test` — 104/104
+
+### Следующее
+- 9.6 PERF-аудит (рис), 9.7 TASKS
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list
