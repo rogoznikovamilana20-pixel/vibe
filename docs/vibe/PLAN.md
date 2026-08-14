@@ -782,6 +782,41 @@
 - [ ] `auth_backend.dart` (register/login/_profileAfterAuth/updateProfile + offline-кэш сессии).
 - [ ] `realtime_backend.dart` (подписки чатов/presence/typing).
 
+## Bugfix — пустые чаты: «уведомления есть, сообщений нет» (14.08.2026)
+
+> Симптом пользователя: FCM-уведомления от собеседников приходят, но в открытом
+> чате сообщения не отображаются (чат пустой).
+
+### Диагностика (без изменения кода)
+- В логе эмулятора: `Failed host lookup` — сначала эмулятор не резолвил DNS
+  (нет default route). Исправлено перезапуском AVD `vibe35` с `-dns-server 8.8.8.8`
+  и `ip route add default via 10.0.2.2`.
+- Через REST API (anon) и Management API SQL (postgres): RLS на `messages`/`chats`/
+  `profiles` настроен корректно (политики `members @> ARRAY[auth.uid()]`).
+- Воспроизвёл точный запрос `listMessages` как аутентифицированный юзер:
+  - `messages` без embed — работает;
+  - `profiles` напрямую — работает;
+  - `messages?select=*,profiles!sender_id(*)` — **падает**: `permission denied
+    for table profiles` (роль `authenticated`).
+- Корень: колонки `profiles.fcm_token` и `profiles.phone` добавлены `ALTER TABLE`
+  ПОСЛЕ исходного `GRANT`, поэтому у `authenticated` не было `SELECT` на них.
+  Любой `select=*` / `(*)`-embed (именно так делает `backend.listMessages`)
+  завершался ошибкой → `listMessages` бросал исключение → кэш пустой → чат пустой.
+  FCM шлёт service_role (обходит RLS/графты) — поэтому уведомления приходят, хотя
+  клиент сообщения не читает.
+
+### Фикс (server-side, применён через Management API)
+- `GRANT SELECT (fcm_token, phone) ON public.profiles TO authenticated;`
+  (зафиксировано в `supabase/migrate_fix_profile_grants.sql`).
+- После фикса точный запрос `listMessages` возвращает сообщения с embed-профилем.
+- Проверено: других таблиц с нехваткой колоночных грантов для `authenticated` нет.
+
+### Чек-лист
+- [x] Чаты открываются и показывают историю (listMessages не падает).
+- [x] embed `profiles!sender_id(*)` работает для authenticated.
+- [ ] (опционально) заменить `(*)` в embed-запросах на явные колонки, чтобы
+      добавление новых колонок в profiles не ломало `select=*` снова.
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list
