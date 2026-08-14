@@ -474,7 +474,6 @@ class _ChatListScreenState extends State<ChatListScreen>
 
           return Scaffold(
             backgroundColor: Colors.transparent,
-            drawer: _buildDrawer(context),
             body: Stack(
               children: [
                 Positioned.fill(
@@ -771,11 +770,11 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  /// 8.3.5: аватар в шапке открывает боковую шторку (как в Telegram).
+  /// Аватар в шапке открывает вкладку «Профиль» (как в Telegram).
   Widget _buildMeAvatar(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(28),
-      onTap: () => Scaffold.of(context).openDrawer(),
+          onTap: () => widget.onOpenTab?.call(3),
       child: Padding(
         padding: const EdgeInsets.only(right: VibeSpacing.sm),
         child: ValueListenableBuilder<Uint8List?>(
@@ -791,169 +790,7 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  /// 8.3.5: боковая шторка — профиль и быстрая навигация (вкладки условно
-  /// пробрасываются в оболочку через [ChatListScreen.onOpenTab]).
-  Widget _buildDrawer(BuildContext context) {
-    final isDark = context.isDarkMode;
-    final bg = isDark ? VibeColors.surface2Dark : VibeColors.surface2Light;
-    return Drawer(
-      backgroundColor: bg,
-      width: 300,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.horizontal(
-          right: Radius.circular(24),
-        ),
-      ),
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const SizedBox(height: VibeSpacing.md),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: VibeSpacing.lg,
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  widget.onOpenTab?.call(3);
-                  Navigator.of(context).pop();
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: VibeSpacing.md,
-                  ),
-                  child: Row(
-                    children: [
-                      ValueListenableBuilder<Uint8List?>(
-                        valueListenable: ProfileAvatar.myPhoto,
-                        builder: (context, photo, _) => VibeAvatar(
-                          name: widget.userName,
-                          emoji: widget.userEmoji,
-                          size: 56,
-                          photo: photo,
-                          online: true,
-                        ),
-                      ),
-                      const SizedBox(width: VibeSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.userName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: VibeTypography.title,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Профиль',
-                              style: VibeTypography.caption.copyWith(
-                                color: context.vibeTextSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const Divider(height: 1),
-            _drawerTile(
-              context,
-              icon: Icons.people_outline_rounded,
-              label: 'Контакты',
-              onTap: () {
-                widget.onOpenTab?.call(1);
-                Navigator.of(context).pop();
-              },
-            ),
-            _drawerTile(
-              context,
-              icon: Icons.bookmark_outline_rounded,
-              label: 'Избранное',
-              onTap: () {
-                Navigator.of(context).pop();
-                _openSaved();
-              },
-            ),
-            _drawerTile(
-              context,
-              icon: Icons.archive_outlined,
-              label: 'Архив',
-              onTap: () => setState(() {
-                _showArchive = true;
-                _showHidden = false;
-              }),
-            ),
-            _drawerTile(
-              context,
-              icon: Icons.folder_outlined,
-              label: 'Папки',
-              onTap: () {
-                Navigator.of(context).pop();
-                _openFoldersScreen(context);
-              },
-            ),
-            _drawerTile(
-              context,
-              icon: Icons.lock_outline_rounded,
-              label: 'Скрытые',
-              onTap: () => setState(() {
-                _showHidden = true;
-                _showArchive = false;
-              }),
-            ),
-            const Divider(height: 1),
-            _drawerTile(
-              context,
-              icon: Icons.settings_outlined,
-              label: 'Настройки',
-              onTap: () {
-                widget.onOpenTab?.call(2);
-                Navigator.of(context).pop();
-              },
-            ),
-            _drawerTile(
-              context,
-              icon: isDark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-              label: isDark ? 'Дневной режим' : 'Ночной режим',
-              onTap: () {
-                final next = isDark ? ThemeMode.light : ThemeMode.dark;
-                SettingsService.instance.setThemeMode(next);
-                VibeApp.themeModeNotifier.value = next;
-              },
-            ),
-            if (PasscodeService.instance.hasPasscode)
-              _drawerTile(
-                context,
-                icon: VibeIcons.lock,
-                label: 'Заблокировать',
-                onTap: () => _lockNow(context),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _drawerTile(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: context.vibePrimary),
-      title: Text(label),
-      onTap: onTap,
-    );
-  }
 
   void _lockNow(BuildContext context) {
     HapticFeedback.lightImpact();
