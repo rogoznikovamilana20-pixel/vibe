@@ -492,9 +492,18 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
           backend._myProfile = cached;
           myProfileNotifier.value = cached;
         }
-        unawaited(backend.profileById(user.id).then((p) {
+        // Профиль нужен сплэшу ДО принятия решения о маршруте — поэтому
+        // ждём серверный профиль (с таймаутом), а не уходим в unawaited.
+        // Иначе myProfile остаётся null, сплэш кидает на онбординг/логин
+        // при каждом запуске, хотя сессия уже восстановлена (баг ре-логина).
+        try {
+          final p = await backend
+              .profileById(user.id)
+              .timeout(const Duration(seconds: 5));
           if (p != null) backend.setMyProfile(p);
-        }));
+        } catch (_) {
+          // Оффлайн/таймаут: оставляем кеш (если есть), не ломаем маршрут.
+        }
       }
     }
 
@@ -1238,7 +1247,17 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
             return true;
           })
           .map((m) {
-        final sender = VibeProfile.fromJson(m['profiles']);
+        final senderJson = m['profiles'];
+        // Защита: если у сообщения нет профиля отправителя (удалён/битый FK),
+        // join profiles!sender_id(*) вернёт null — не роняем весь список, а
+        // показываем сообщение с плейсхолдером-отправителем.
+        final sender = senderJson is Map<String, dynamic>
+            ? VibeProfile.fromJson(senderJson)
+            : VibeProfile(
+                id: (m['sender_id'] as String?) ?? '',
+                username: '',
+                displayName: '',
+              );
         return VibeMessage(
           id: m['id'],
           chatId: m['chat_id'],

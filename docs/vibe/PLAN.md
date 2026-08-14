@@ -782,40 +782,49 @@
 - [ ] `auth_backend.dart` (register/login/_profileAfterAuth/updateProfile + offline-кэш сессии).
 - [ ] `realtime_backend.dart` (подписки чатов/presence/typing).
 
-## Bugfix — пустые чаты: «уведомления есть, сообщений нет» (14.08.2026)
+## Bugfix — пустые чаты + ре-логин при каждом запуске (14.08.2026)
 
-> Симптом пользователя: FCM-уведомления от собеседников приходят, но в открытом
-> чате сообщения не отображаются (чат пустой).
+> Симптомы пользователя: (1) FCM-уведомления приходят, но в открытом чате сообщения
+> не отображаются (чат пустой); (2) при каждом заходе требуется заново вводить
+> регистрационные данные / «создавать новый аккаунт», хотя подтягиваются контакты
+> из исходного.
 
-### Диагностика (без изменения кода)
-- В логе эмулятора: `Failed host lookup` — сначала эмулятор не резолвил DNS
-  (нет default route). Исправлено перезапуском AVD `vibe35` с `-dns-server 8.8.8.8`
-  и `ip route add default via 10.0.2.2`.
-- Через REST API (anon) и Management API SQL (postgres): RLS на `messages`/`chats`/
-  `profiles` настроен корректно (политики `members @> ARRAY[auth.uid()]`).
-- Воспроизвёл точный запрос `listMessages` как аутентифицированный юзер:
-  - `messages` без embed — работает;
-  - `profiles` напрямую — работает;
-  - `messages?select=*,profiles!sender_id(*)` — **падает**: `permission denied
-    for table profiles` (роль `authenticated`).
-- Корень: колонки `profiles.fcm_token` и `profiles.phone` добавлены `ALTER TABLE`
-  ПОСЛЕ исходного `GRANT`, поэтому у `authenticated` не было `SELECT` на них.
-  Любой `select=*` / `(*)`-embed (именно так делает `backend.listMessages`)
-  завершался ошибкой → `listMessages` бросал исключение → кэш пустой → чат пустой.
-  FCM шлёт service_role (обходит RLS/графты) — поэтому уведомления приходят, хотя
-  клиент сообщения не читает.
+### Диагностика
+- Эмулятор: `Failed host lookup` — AVD не резолвил DNS. Исправлено перезапуском
+  `vibe35` с `-dns-server 8.8.8.8` и `ip route add default via 10.0.2.2`.
+- **БД-слой проверен end-to-end через REST API (реальный проект
+  `rgdwfoicidnamejluxfx.supabase.co`)**: аутентифицированный запрос
+  `messages?select=*,profiles!sender_id(*)` возвращает **200 с сообщением и
+  заджоиненным профилем** (включая `phone`). То есть гипотеза «нет SELECT-графта
+  на `profiles.fcm_token/phone`» — **ложная**: профили читаются, RLS корректен
+  (политики `members @> ARRAY[auth.uid()]`). Файл `supabase/migrate_fix_profile_grants.sql`
+  из предыдущей попытки — неактуален и удалён.
+- Корень (1) «пустой чат»: `VibeBackend.listMessages` делал
+  `VibeProfile.fromJson(m['profiles'])` без проверки на null. Если у сообщения нет
+  профиля отправителя (битый/удалённый FK), join возвращает `null`, `fromJson(null)`
+  бросает `TypeError`, который глотается в `catch (_) {}` в `ChatController.loadMessages`
+  → весь список сообщений пустеет. Исправлено защитой (плейсхолдер-отправитель).
+- Корень (2) «ре-логин каждый запуск»: `SplashScreen` маршрутизирует по
+  `backend.myProfile != null`. Но `VibeBackend.init` грузил профиль через
+  `unawaited(profileById(...))` — к моменту возврата `init()` поле `myProfile`
+  ещё `null`, хотя сессия уже восстановлена (`myProfileId` задан). Сплэш кидал
+  пользователя на onboarding/auth при КАЖДОМ запуске, даже при живой сессии.
 
-### Фикс (server-side, применён через Management API)
-- `GRANT SELECT (fcm_token, phone) ON public.profiles TO authenticated;`
-  (зафиксировано в `supabase/migrate_fix_profile_grants.sql`).
-- После фикса точный запрос `listMessages` возвращает сообщения с embed-профилем.
-- Проверено: других таблиц с нехваткой колоночных грантов для `authenticated` нет.
+### Фикс (client-side, backend.dart)
+- `VibeBackend.init`: профиль грузится с `await` (+таймаут 5с, fallback на кеш),
+  чтобы `myProfile` был заполнен ДО решения о маршруте в сплэше → ре-логин ушёл.
+- `listMessages`: `senderJson is Map` → `VibeProfile.fromJson`, иначе плейсхолдер
+  `VibeProfile(id, username:'', displayName:'')`. Чат больше не пустеет из-за
+  одного сообщения с отсутствующим отправителем.
+- `flutter analyze`: 0 issues.
 
 ### Чек-лист
-- [x] Чаты открываются и показывают историю (listMessages не падает).
-- [x] embed `profiles!sender_id(*)` работает для authenticated.
-- [ ] (опционально) заменить `(*)` в embed-запросах на явные колонки, чтобы
-      добавление новых колонок в profiles не ломало `select=*` снова.
+- [x] `listMessages` (exact shape `*,profiles!sender_id(*)`) возвращает данные
+      на реальном проекте (проверено через REST от имени auth-юзера).
+- [x] Ре-логин при каждом запуске устранён (профиль догружается до маршрутизации).
+- [x] listMessages устойчив к null-профилю отправителя.
+- [ ] Проверить на устройстве/эмуляторе: холодный старт → сразу чаты, история
+      сообщений видна, живые сообщения приходят (realtime).
 
 ## Следующие фазы (из master-промпта)
 
