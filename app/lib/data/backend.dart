@@ -667,8 +667,12 @@ class VibeBackend {
     }
   }
 
-  static const _cacheChatsName = 'chats';
-  static String _cacheMsgsName(String chatId) => 'msgs_$chatId';
+  // Кеш чатов/сообщений привязан к аккаунту: иначе новый юзер на том же
+  // устройстве видит закешированные чаты/переписку предыдущего аккаунта.
+  String get _cacheChatsName =>
+      myProfileId == null ? 'chats' : 'chats_$myProfileId';
+  String _cacheMsgsName(String chatId) =>
+      myProfileId == null ? 'msgs_$chatId' : 'msgs_${myProfileId}_$chatId';
 
   /// Мгновенное чтение чатов из локальной памяти (для старта без задержек).
   Future<List<VibeChat>> getOfflineChats() async {
