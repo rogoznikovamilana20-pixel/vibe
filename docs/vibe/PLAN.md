@@ -755,6 +755,33 @@
 ### Следующее
 - По ревью на устройстве: пилюли (RollingPill/VideoRollPill), «перевёрнутые» элементы после 8.1.2, «съезжающие» блоки; 8.1.1 иконочный шрифт; 1.7/1.8 крипто
 
+## Phase A — Декомпозиция backend.dart (в работе, 14.08.2026)
+
+> Фаза А из MASTER_PLAN v2.0: монолит `lib/data/backend.dart` (было ~2968 стр.) разбивается
+> на `mixin`-модули через `part of 'backend.dart'` (library-private доступ сохраняется).
+> Паттерн: `mixin XMixin { … }` БЕЗ `on VibeBackend` (self-наследование запрещено Dart),
+> доступ к состоянию/методам хоста — через синглтон `VibeBackend.instance._xxx`;
+> публичный API класса `VibeBackend` не меняется (обратная совместимость для UI/контроллеров).
+
+### Сделано
+- [x] Удалён дублирующий боковой `Drawer` в `chat_list_screen.dart` (остался TG-нижний бар
+  Чаты/Контакты/Настройки/Профиль в `root_shell.dart`); аватар в шапке открывает вкладку Профиль.
+- [x] `profile_backend.dart` (`mixin ProfileBackendMixin`): профиль/директория/приватность/
+  присутствие/сессия (_saveLocalProfile, saveMyId вынесены как статические хелперы).
+- [x] `media_backend.dart` (`mixin MediaBackendMixin`): подпись приватных URL (media-sign),
+  лента/публикация/удаление сториз, кэш `_signedUrls`.
+- [x] `flutter analyze` — 0 issues после каждого модуля. backend.dart: 2968 → 2678 стр.
+
+### Проверка
+- analyze 0 (оба модуля); логин/реалтайм не затронуты (публичный API тот же).
+
+### Следующее
+- [ ] `chats_backend.dart` (ensurePmChat/createGroupChat/ensureSavedChat/chatMemberIds/
+  chatKindOf/groupMembers/renameGroup/leaveGroup/uploadAvatar/downloadMyAvatar/listChats + кеш чатов).
+- [ ] `messages_backend.dart` (listMessages/sendMessage/редактирование/удаление/реакции/read state).
+- [ ] `auth_backend.dart` (register/login/_profileAfterAuth/updateProfile + offline-кэш сессии).
+- [ ] `realtime_backend.dart` (подписки чатов/presence/typing).
+
 ## Следующие фазы (из master-промпта)
 
 - **Phase 3 (продолжение)** — Фаза B: контроллеры; Фаза C: фичи из gap list
