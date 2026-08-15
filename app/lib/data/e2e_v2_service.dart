@@ -279,6 +279,18 @@ class E2eV2Service {
   bool get isReady =>
       _edIdentityKeyPair != null && _xdhIdentityKeyPair != null;
 
+  /// Возвращает X25519 public key bytes текущего устройства (32 bytes).
+  Future<List<int>?> getIdentityKeyPublicBytes() async {
+    if (_xdhIdentityKeyPair == null) return null;
+    final pub = await _xdhIdentityKeyPair!.extractPublicKey();
+    return pub.bytes;
+  }
+
+  /// Возвращает device ID текущего устройства.
+  Future<String?> getDeviceId() async {
+    return _getDeviceId();
+  }
+
   // ---------------------------------------------------------------------------
   // Private server interaction
   // ---------------------------------------------------------------------------

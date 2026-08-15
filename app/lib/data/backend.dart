@@ -13,6 +13,8 @@ import 'offline_queue_service.dart';
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
 import 'e2e_service.dart';
+import 'e2e_v2_service.dart';
+import 'v2_outgoing.dart';
 part 'profile_backend.dart';
 part 'media_backend.dart';
 
@@ -1266,6 +1268,57 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     return ids.firstWhere((id) => id != myProfileId, orElse: () => '');
   }
 
+  /// Resolve recipient's V2 device ID from devices table.
+  Future<String?> _resolveRecipientDeviceId(String peerId) async {
+    try {
+      final devices = await _client
+          .from('devices')
+          .select('device_id')
+          .eq('user_id', peerId)
+          .limit(1);
+      if (devices.isNotEmpty) {
+        return devices[0]['device_id'] as String;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Find active V2 session ID for a peer.
+  ///
+  /// Checks if a V2 session exists with this peer's device.
+  /// Returns the session ID if found, null otherwise.
+  Future<String?> _findV2SessionId(
+    String peerId,
+    String recipientDeviceId,
+  ) async {
+    try {
+      final e2e = E2eV2Service.instance;
+      final myDeviceId = await e2e.getDeviceId();
+      if (myDeviceId == null) return null;
+
+      // Session ID is derived from device IDs + ephemeral key
+      // Try to load session by constructing the expected session ID pattern
+      // For now, check if any session exists for this peer
+      final sessionData = await _client
+          .from('devices')
+          .select('device_id')
+          .eq('user_id', peerId)
+          .maybeSingle();
+      if (sessionData == null) return null;
+
+      // Try common session ID patterns
+      // In production, session IDs are stored after X3DH
+      // For this phase, we check if a session was established
+      final deviceId = sessionData['device_id'] as String;
+      final sessionId = '${myDeviceId}_$deviceId';
+
+      final session = await e2e.loadSession(sessionId);
+      return session?.sessionId;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Тип чата: `pm` | `group` | '' (кеш 2 мин — для гейтинга уведомлений).
   final Map<String, ({String kind, DateTime at})> _chatKindCache = {};
   Future<String> chatKindOf(String chatId) async {
@@ -1679,27 +1732,68 @@ peerName: peer?.displayName,
     // E2E: try to encrypt if keys exist for both sides
     String? encryptedJson;
     bool isEncrypted = false;
+    int e2eeVersion = 0;
     try {
-      final e2e = E2eService.instance;
-      if (e2e.hasKeys) {
+      // --- V2 path (feature-gated) ---
+      if (V2Outgoing.instance.enabled) {
         final peerId = await _chatPeerId(chatId);
-        if (peerId != null) {
-          final peerKey = await _client
-              .from('profiles')
-              .select('e2e_public_key')
-              .eq('id', peerId)
-              .maybeSingle();
-          if (peerKey != null && peerKey['e2e_public_key'] != null) {
-            encryptedJson = await e2e.encryptToString(
-              plaintext: text,
-              peerId: peerId,
-            );
-            isEncrypted = true;
+        if (peerId == null) {
+          throw const V2OutgoingException('PM peer not found for V2');
+        }
+
+        // Resolve recipient device ID
+        final recipientDeviceId = await _resolveRecipientDeviceId(peerId);
+        if (recipientDeviceId == null) {
+          throw const V2OutgoingException('Recipient V2 device not found');
+        }
+
+        // Find active V2 session for this peer
+        final sessionId = await _findV2SessionId(peerId, recipientDeviceId);
+        if (sessionId == null) {
+          throw const V2OutgoingException('No V2 session with peer');
+        }
+
+        // Encrypt with V2 (serialized per session)
+        final v2Result = await V2Outgoing.instance.encryptSerialized(
+          sessionId: sessionId,
+          plaintext: text,
+          recipientDeviceId: recipientDeviceId,
+        );
+
+        // Build V2 storage payload
+        final payload = v2Result.payload;
+        payload['chat_id'] = chatId;
+        payload['sender_id'] = myProfileId;
+        encryptedJson = payload['encrypted_content'] as String;
+        isEncrypted = true;
+        e2eeVersion = 2;
+      } else {
+        // --- V1 path (existing) ---
+        final e2e = E2eService.instance;
+        if (e2e.hasKeys) {
+          final peerId = await _chatPeerId(chatId);
+          if (peerId != null) {
+            final peerKey = await _client
+                .from('profiles')
+                .select('e2e_public_key')
+                .eq('id', peerId)
+                .maybeSingle();
+            if (peerKey != null && peerKey['e2e_public_key'] != null) {
+              encryptedJson = await e2e.encryptToString(
+                plaintext: text,
+                peerId: peerId,
+              );
+              isEncrypted = true;
+              e2eeVersion = 1;
+            }
           }
         }
       }
+    } on V2OutgoingException {
+      // V2 enabled but failed — controlled failure, no fallback
+      rethrow;
     } catch (_) {
-      // Fallback to plaintext
+      // V1 fallback (existing behavior)
     }
 
     try {
@@ -1709,6 +1803,9 @@ peerName: peer?.displayName,
         'text': isEncrypted ? null : text,
         'is_encrypted': isEncrypted,
       };
+      if (e2eeVersion > 0) {
+        insertData['e2ee_version'] = e2eeVersion;
+      }
       if (encryptedJson != null) {
         insertData['encrypted_content'] = encryptedJson;
       }
