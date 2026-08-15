@@ -199,15 +199,35 @@ Future<void> setMyProfile(VibeProfile p) async {
     final id = VibeBackend.instance.myProfileId;
     if (id != null) unawaited(_writeOnline(id, false));
     await VibeBackend.instance._client.auth.signOut();
+
+    // Unsubscribe personal channel.
     final old = VibeBackend.instance._personal;
     if (old != null) {
       VibeBackend.instance._client.removeChannel(old);
     }
     VibeBackend.instance._personal = null;
     VibeBackend.instance._personalName = null;
+
+    // Unsubscribe DM channel.
+    final dm = VibeBackend.instance._dmChannel;
+    if (dm != null) {
+      VibeBackend.instance._client.removeChannel(dm);
+    }
+    VibeBackend.instance._dmChannel = null;
+
+    // Clear auth state.
     VibeBackend.instance._myProfile = null;
     VibeBackend.instance.myProfileId = null;
     VibeBackend.myProfileNotifier.value = null;
+
+    // Clear in-memory caches to prevent data leaking between accounts.
+    VibeBackend.instance._peers.clear();
+    VibeBackend.instance._seenIds.clear();
+    VibeBackend.instance._sentById.clear();
+    VibeBackend.instance._unreadByChat.clear();
+    VibeBackend._cachedProfile = null;
+
+    // Delete session file.
     final dir = await getApplicationDocumentsDirectory();
     final f1 = File('${dir.path}${Platform.pathSeparator}session.json');
     if (await f1.exists()) await f1.delete();
