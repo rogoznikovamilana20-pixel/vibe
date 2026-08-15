@@ -13,6 +13,7 @@ import '../data/backend.dart';
 import 'chat_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 
 /// Экран «Новое сообщение» — как в Telegram: поле поиска контакта сверху
 /// и список контактов; тап открывает переписку.
@@ -55,7 +56,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     try {
       chatId = await VibeBackend.instance.ensurePmChat(peer.id);
     } catch (_) {
-      _snack('Сервер недоступен');
+      _snack(VibeLocalizations.of(context).errorServerUnavailable);
       return;
     }
     if (!mounted) return;
@@ -106,6 +107,8 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 p.id.toLowerCase().contains(q))
             .toList();
 
+    final l = VibeLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Column(
@@ -120,7 +123,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                       leading: VibeTopBarIcon(
                         icon: Icons.arrow_back_ios_new_rounded,
                         onTap: () => Navigator.of(context).pop(),
-                        tooltip: 'Назад',
+                        tooltip: l.tooltipBack,
                       ),
                       actions: [
                         if (_query.isNotEmpty)
@@ -130,17 +133,17 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                               _controller.clear();
                               setState(() => _query = '');
                             },
-                            tooltip: 'Очистить',
+                            tooltip: l.tooltipClear,
                           ),
                       ],
                       title: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const VibeTopBarTitle('Новое сообщение'),
+                          VibeTopBarTitle(l.newMessageTitle),
                           const SizedBox(height: 2),
                           Text(
-                            'Начните переписку или позвоните',
+                            l.newMessageSubtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: VibeTypography.caption.copyWith(
@@ -161,7 +164,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                         padding: const EdgeInsets.only(top: VibeSpacing.xxl * 2),
                         child: Center(
                           child: Text(
-                            'Никого не нашли',
+                            l.searchNothingFound,
                             style: VibeTypography.body.copyWith(
                               color: context.vibeTextTertiary,
                             ),
@@ -195,7 +198,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                             ),
                           ),
                           subtitle: Text(
-                            peer.online ? 'в сети' : 'был(а) недавно',
+                            peer.online ? l.statusOnline : l.statusRecently,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: VibeTypography.caption.copyWith(
@@ -216,9 +219,9 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                   leading: VibeTopBarIcon(
                     icon: Icons.arrow_back_ios_new_rounded,
                     onTap: () => Navigator.of(context).pop(),
-                    tooltip: 'Назад',
+                    tooltip: l.tooltipBack,
                   ),
-                  title: const VibeTopBarTitle('Новое сообщение'),
+                  title: VibeTopBarTitle(l.newMessageTitle),
                   actions: [
                     if (_query.isNotEmpty)
                       VibeTopBarIcon(
@@ -227,7 +230,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                           _controller.clear();
                           setState(() => _query = '');
                         },
-                        tooltip: 'Очистить',
+                        tooltip: l.tooltipClear,
                       ),
                   ],
                 ),
@@ -240,6 +243,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   }
 
   Widget _buildSearchRow(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         VibeSpacing.lg,
@@ -275,7 +279,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   isCollapsed: true,
-                  hintText: 'Поиск',
+                  hintText: l.searchHint,
                   hintStyle: VibeTypography.body.copyWith(
                     color: context.vibeTextTertiary,
                   ),

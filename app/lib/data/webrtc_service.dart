@@ -1,0 +1,271 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'backend.dart';
+
+/// Сигнальные типы для звонков
+enum CallMessageType { offer, answer, iceCandidate, hangUp, reject }
+
+/// Простой Signaling через Supabase Realtime-каналы.
+/// Каждый звонок создаёт уникальный канал `call:<callId>`.
+class WebRtcService {
+  WebRtcService._();
+  static final instance = WebRtcService._();
+
+  final _client = Supabase.instance.client;
+  RealtimeChannel? _channel;
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
+  MediaStream? _remoteStream;
+
+  final localRenderer = RTCVideoRenderer();
+  final remoteRenderer = RTCVideoRenderer();
+
+  bool _inCall = false;
+  bool get inCall => _inCall;
+
+  String? _currentCallId;
+  String? _currentPeerId;
+
+  // ── Public API ──────────────────────────────────────────────
+
+  Future<void> initRenderers() async {
+    await localRenderer.initialize();
+    await remoteRenderer.initialize();
+  }
+
+  Future<void> dispose() async {
+    await localRenderer.dispose();
+    await remoteRenderer.dispose();
+    await _cleanup();
+  }
+
+  Future<void> startCall({
+    required String callId,
+    required String peerId,
+    required bool video,
+  }) async {
+    if (_inCall) return;
+    _currentCallId = callId;
+    _currentPeerId = peerId;
+    _inCall = true;
+
+    await _setupLocalStream(video);
+    await _createPeerConnection();
+    _subscribeToChannel(callId);
+
+    // Send push notification to peer about incoming call
+    try {
+      final callerName = VibeBackend.instance.myProfile?.displayName ?? 'Пользователь';
+      await _client.functions.invoke('send-call-invite', body: {
+        'chat_id': callId,
+        'call_id': callId,
+        'caller_id': _client.auth.currentUser!.id,
+        'caller_name': callerName,
+        'call_type': video ? 'video' : 'voice',
+      });
+    } catch (_) {
+      // Non-critical: call still works via Realtime signaling
+    }
+
+    final offer = await _peerConnection!.createOffer({
+      'offerToReceiveAudio': true,
+      'offerToReceiveVideo': video,
+    });
+    await _peerConnection!.setLocalDescription(offer);
+
+    _sendSignal(callId, {
+      'type': CallMessageType.offer.index,
+      'sdp': offer.sdp,
+      'sdpType': offer.type,
+      'callerId': _client.auth.currentUser!.id,
+      'video': video,
+    });
+  }
+
+  Future<void> answerCall({
+    required String callId,
+    required String callerId,
+    required bool video,
+  }) async {
+    if (_inCall) return;
+    _currentCallId = callId;
+    _currentPeerId = callerId;
+    _inCall = true;
+
+    await _setupLocalStream(video);
+    await _createPeerConnection();
+    _subscribeToChannel(callId);
+  }
+
+  Future<void> hangUp() async {
+    if (_currentCallId != null) {
+      _sendSignal(_currentCallId!, {
+        'type': CallMessageType.hangUp.index,
+        'userId': _client.auth.currentUser!.id,
+      });
+    }
+    await _cleanup();
+  }
+
+  Future<void> rejectCall(String callId, String callerId) async {
+    _sendSignal(callId, {
+      'type': CallMessageType.reject.index,
+      'userId': _client.auth.currentUser!.id,
+    });
+  }
+
+  // ── Private ─────────────────────────────────────────────────
+
+  Future<void> _setupLocalStream(bool video) async {
+    final constraints = <String, dynamic>{
+      'audio': true,
+      'video': video
+          ? {
+              'facingMode': 'user',
+              'width': {'ideal': 640},
+              'height': {'ideal': 480},
+            }
+          : false,
+    };
+    _localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    localRenderer.srcObject = _localStream;
+  }
+
+  Future<void> _createPeerConnection() async {
+    _peerConnection = await createPeerConnection({
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'},
+        // Free TURN server for NAT traversal (metered.ca)
+        {
+          'urls': 'turn:openrelay.metered.ca:80',
+          'username': 'openrelayproject',
+          'credential': 'openrelayproject',
+        },
+        {
+          'urls': 'turn:openrelay.metered.ca:443',
+          'username': 'openrelayproject',
+          'credential': 'openrelayproject',
+        },
+      ],
+    });
+
+    _localStream?.getTracks().forEach((track) {
+      _peerConnection!.addTrack(track, _localStream!);
+    });
+
+    _peerConnection!.onTrack = (event) {
+      if (event.streams.isNotEmpty) {
+        _remoteStream = event.streams[0];
+        remoteRenderer.srcObject = _remoteStream;
+      }
+    };
+
+    _peerConnection!.onIceCandidate = (candidate) {
+      if (_currentCallId != null) {
+        _sendSignal(_currentCallId!, {
+          'type': CallMessageType.iceCandidate.index,
+          'candidate': candidate.candidate,
+          'sdpMid': candidate.sdpMid,
+          'sdpMLineIndex': candidate.sdpMLineIndex,
+          'userId': _client.auth.currentUser!.id,
+        });
+      }
+    };
+
+    _peerConnection!.onConnectionState = (state) {
+      debugPrint('WebRTC connection: $state');
+      final s = state.name;
+      if (s.contains('failed') || s.contains('closed')) {
+        hangUp();
+      }
+    };
+  }
+
+  void _subscribeToChannel(String callId) {
+    _channel?.unsubscribe();
+    _channel = _client.channel('call:$callId');
+
+    _channel!.onBroadcast(
+      event: 'signal',
+      callback: (payload) async {
+        final data = Map<String, dynamic>.from(payload as Map);
+        final myId = _client.auth.currentUser?.id;
+        final senderId = data['userId'] ?? data['callerId'];
+
+        if (senderId == myId) return;
+
+        final type = CallMessageType.values[data['type'] as int];
+
+        switch (type) {
+          case CallMessageType.offer:
+            break;
+
+          case CallMessageType.answer:
+            if (_peerConnection != null) {
+              await _peerConnection!.setRemoteDescription(
+                RTCSessionDescription(data['sdp'] as String, data['sdpType'] as String),
+              );
+            }
+            break;
+
+          case CallMessageType.iceCandidate:
+            if (_peerConnection != null && data['candidate'] != null) {
+              await _peerConnection!.addCandidate(
+                RTCIceCandidate(
+                  data['candidate'] as String,
+                  data['sdpMid'] as String?,
+                  data['sdpMLineIndex'] as int?,
+                ),
+              );
+            }
+            break;
+
+          case CallMessageType.hangUp:
+          case CallMessageType.reject:
+            await _cleanup();
+            break;
+
+          default:
+            break;
+        }
+      },
+    );
+
+    _channel!.subscribe();
+  }
+
+  void _sendSignal(String callId, Map<String, dynamic> data) {
+    _client.channel('call:$callId').sendBroadcastMessage(
+      event: 'signal',
+      payload: data,
+    );
+  }
+
+  Future<void> _cleanup() async {
+    _inCall = false;
+    _currentCallId = null;
+    _currentPeerId = null;
+
+    try {
+      _localStream?.getTracks().forEach((t) => t.stop());
+      _remoteStream?.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+
+    await _peerConnection?.close();
+    _peerConnection = null;
+    _localStream = null;
+    _remoteStream = null;
+
+    localRenderer.srcObject = null;
+    remoteRenderer.srcObject = null;
+
+    await _channel?.unsubscribe();
+    _channel = null;
+  }
+}

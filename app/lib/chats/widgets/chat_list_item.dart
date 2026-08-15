@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../core/localization/vibe_localizations.dart';
 import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
@@ -51,33 +53,59 @@ class ChatListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return RepaintBoundary(
       child: VibeIsland(
         selected: selected,
-        child: Stack(
-          children: [
-            _tile(context),
-            if (selected)
-              Positioned(
-                left: 4,
-                top: 0,
-                bottom: 0,
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  color: context.vibePrimary,
-                  size: 22,
+        child: Dismissible(
+          key: ValueKey('chat_${chat.id}'),
+          direction: selectionMode
+              ? DismissDirection.none
+              : DismissDirection.horizontal,
+          confirmDismiss: (_) async {
+            if (selectionMode) return false;
+            HapticFeedback.mediumImpact();
+            return true;
+          },
+          onDismissed: onDismissed,
+          secondaryBackground: _swipeBackground(
+            context: context,
+            color: pinned ? context.vibeSurfaceElevated : const Color(0xFF3390EC),
+            icon: pinned ? VibeIcons.pin : VibeIcons.archive,
+            label: pinned ? l.chatSwipeUnpin : l.chatSwipeArchive,
+          ),
+          background: _swipeBackground(
+            context: context,
+            color: isArchived ? const Color(0xFF3390EC) : VibeColors.warning,
+            icon: isArchived ? VibeIcons.archive : Icons.notifications_off_rounded,
+            label: isArchived ? l.chatSwipeFromArchive : l.chatSwipeDnd,
+          ),
+          child: Stack(
+            children: [
+              _tile(context),
+              if (selected)
+                Positioned(
+                  left: 4,
+                  top: 0,
+                  bottom: 0,
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    color: context.vibePrimary,
+                    size: 22,
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _tile(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final id = chat.id;
     final name = chat.title;
-    final vPad = 2.0 + density * 5.0;
+    final vPad = 1.0 + density * 2.0;
 
     return Dismissible(
       key: ValueKey('chat_$id'),
@@ -92,24 +120,25 @@ class ChatListItem extends StatelessWidget {
         icon: isDnd
             ? Icons.notifications_active_rounded
             : Icons.notifications_off_rounded,
-        label: isDnd ? 'Включить уведомления' : 'Не беспокоить',
+        label: isDnd ? l.chatSwipeEnableNotifications : l.chatSwipeDnd,
       ),
       background: _swipeBackground(
         context: context,
         color: VibeColors.surfaceElevatedDark,
         icon: isArchived ? Icons.unarchive_rounded : VibeIcons.archive,
-        label: isArchived ? 'Из архива' : 'Архив',
+        label: isArchived ? l.chatSwipeFromArchive : l.chatSwipeArchive,
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: vPad),
         child: ListTile(
           onTap: onTap,
           onLongPress: onLongPress,
+          contentPadding: const EdgeInsets.only(left: 68, right: 8),
           leading: Hero(
             tag: 'avatar_${chat.id}',
             child: VibeAvatar(
               name: name,
-              size: VibeSizes.avatarLg,
+              size: 48,
               online: chat.peerOnline,
               photoUrl: chat.peerAvatar,
             ),
@@ -121,6 +150,8 @@ class ChatListItem extends StatelessWidget {
                   name,
                   overflow: TextOverflow.ellipsis,
                   style: VibeTypography.subtitle.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                     color: isDnd
                         ? context.vibeTextSecondary
                         : context.vibeTextPrimary,
@@ -150,7 +181,7 @@ class ChatListItem extends StatelessWidget {
                   TextSpan(
                     children: [
                       TextSpan(
-                        text: 'Черновик: ',
+                        text: l.chatDraftLabel,
                         style: VibeTypography.body.copyWith(
                           color: context.vibePrimary,
                           fontSize: 14,
@@ -171,7 +202,7 @@ class ChatListItem extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 )
               : Text(
-                  isArchived ? 'В архиве' : chat.lastMessage,
+                  isArchived ? l.chatInArchive : chat.lastMessage,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: VibeTypography.body.copyWith(
@@ -251,7 +282,7 @@ class ChatListItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        'Новый',
+                        l.chatNew,
                         style: VibeTypography.caption.copyWith(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
@@ -284,11 +315,14 @@ class ChatListItem extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white),
+          Icon(icon, color: Colors.white, size: 24),
           const SizedBox(width: VibeSpacing.sm),
           Text(
             label,
-            style: VibeTypography.bodyMedium.copyWith(color: Colors.white),
+            style: VibeTypography.bodyMedium.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

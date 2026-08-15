@@ -15,6 +15,7 @@ import '../data/backend_api.dart';
 import 'chat_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 
 /// 8.3.1: добавление контакта — как в Telegram: имя/@ник → поиск
 /// → «Написать» (открывает pm-чат). Если никого не нашли — приглашение
@@ -59,7 +60,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
     } catch (_) {
       if (mounted) {
         setState(() => _searching = false);
-        _snack('Поиск недоступен — проверьте сеть');
+        _snack(VibeLocalizations.of(context).errorSearchUnavailable);
       }
     }
   }
@@ -77,7 +78,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
             opacity: animation,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0.05, 0),
+                begin: const Offset(0.3, 0),
                 end: Offset.zero,
               ).animate(CurvedAnimation(
                 parent: animation,
@@ -93,10 +94,9 @@ class _AddContactScreenState extends State<AddContactScreen> {
   }
 
   void _invite() {
-    Clipboard.setData(
-      const ClipboardData(text: 'Заходи в Vibe — мой мессенджер. Жду тебя!'),
-    );
-    _snack('Приглашение скопировано — отправьте его другу');
+    final l = VibeLocalizations.of(context);
+    Clipboard.setData(ClipboardData(text: l.inviteText));
+    _snack(l.inviteCopied);
   }
 
   void _snack(String msg) {
@@ -105,6 +105,8 @@ class _AddContactScreenState extends State<AddContactScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: VibeCollapsibleScreen(
@@ -116,7 +118,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 onPressed: () => Navigator.of(context).pop(),
                 color: context.vibeTextPrimary,
               ),
-              title: const VibeTopBarTitle('Новый контакт'),
+              title: VibeTopBarTitle(l.newContactTitle),
             ),
           ),
           SliverPadding(
@@ -132,14 +134,14 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   Expanded(
                     child: VibeInput(
                       controller: _query,
-                      hint: 'Имя или @ник',
+                      hint: l.newContactHint,
                       prefixIcon: VibeIcons.search,
                       onSubmitted: (_) => _search(),
                     ),
                   ),
                   const SizedBox(width: VibeSpacing.sm),
                   VibeButton(
-                    label: 'Найти',
+                    label: l.newContactFind,
                     onPressed: _searching ? null : _search,
                     expand: false,
                     size: VibeButtonSize.s,
@@ -163,14 +165,14 @@ class _AddContactScreenState extends State<AddContactScreen> {
                           ),
                           const SizedBox(height: VibeSpacing.md),
                           Text(
-                            'Никого не нашли',
+                            l.searchNothingFound,
                             style: VibeTypography.body.copyWith(
                               color: context.vibeTextSecondary,
                             ),
                           ),
                           const SizedBox(height: VibeSpacing.lg),
                           VibeButton(
-                            label: 'Пригласить друга',
+                            label: l.newContactInviteFriend,
                             icon: Icons.ios_share_rounded,
                             onPressed: _invite,
                             type: VibeButtonType.secondary,
@@ -196,7 +198,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
             onPressed: () => Navigator.of(context).pop(),
             color: context.vibeTextPrimary,
           ),
-          title: const VibeTopBarTitle('Новый контакт'),
+          title: VibeTopBarTitle(l.newContactTitle),
         ),
       ),
     );
@@ -255,7 +257,7 @@ class _ResultTile extends StatelessWidget {
                 ),
               ),
               Text(
-                'Написать',
+                VibeLocalizations.of(context).actionWrite,
                 style: VibeTypography.caption.copyWith(
                   color: context.vibePrimary,
                   fontWeight: FontWeight.w600,

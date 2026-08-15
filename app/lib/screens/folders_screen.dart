@@ -13,6 +13,7 @@ import '../data/chat_folder.dart';
 import '../data/settings_service.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../core/localization/vibe_localizations.dart';
 
 /// 8.3.7: экран «Папки» — список пользовательских папок чатов.
 /// Каждая папка — название + эмодзи; состав чатов назначается вручную.
@@ -29,6 +30,7 @@ class FoldersScreen extends StatefulWidget {
 class _FoldersScreenState extends State<FoldersScreen> {
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final settings = SettingsService.instance;
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -38,9 +40,9 @@ class _FoldersScreenState extends State<FoldersScreen> {
           leading: VibeIconButton(
             icon: VibeIcons.back,
             onPressed: () => Navigator.of(context).maybePop(),
-            tooltip: 'Назад',
+            tooltip: l.tooltipBack,
           ),
-          title: const VibeTopBarTitle('Папки'),
+          title: VibeTopBarTitle(l.foldersTitle),
         ),
       ),
       body: ListenableBuilder(
@@ -61,7 +63,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
               for (final f in folders) _folderTile(context, f),
               const SizedBox(height: VibeSpacing.lg),
               VibeButton(
-                label: 'Новая папка',
+                label: l.foldersNewFolder,
                 icon: Icons.create_new_folder_outlined,
                 size: VibeButtonSize.s,
                 expand: true,
@@ -75,6 +77,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
   }
 
   Widget _buildEmpty(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.xxl),
@@ -96,14 +99,14 @@ class _FoldersScreenState extends State<FoldersScreen> {
             ),
             const SizedBox(height: VibeSpacing.lg),
             Text(
-              'Папок пока нет',
+              l.foldersEmptyTitle,
               style: VibeTypography.subtitle.copyWith(
                 color: context.vibeTextPrimary,
               ),
             ),
             const SizedBox(height: VibeSpacing.sm),
             Text(
-              'Разложите чаты по темам: работа, учёба, свои',
+              l.foldersEmptySubtitle,
               textAlign: TextAlign.center,
               style: VibeTypography.bodyMedium.copyWith(
                 color: context.vibeTextSecondary,
@@ -111,7 +114,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
             ),
             const SizedBox(height: VibeSpacing.xl),
             VibeButton(
-              label: 'Создать папку',
+              label: l.foldersCreateFolder,
               icon: Icons.create_new_folder_outlined,
               onPressed: () => _openEditor(context, null),
             ),
@@ -249,7 +252,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
     final settings = SettingsService.instance;
     final title = _title.text.trim();
     if (title.isEmpty) {
-      VibeToast.show(context, 'Назовите папку');
+      VibeToast.show(context, VibeLocalizations.of(context).foldersNameRequired);
       return;
     }
     if (_isNew) {
@@ -285,6 +288,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: VibeTopBarAppBar(
@@ -293,15 +297,15 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
           leading: VibeIconButton(
             icon: VibeIcons.back,
             onPressed: () => Navigator.of(context).maybePop(),
-            tooltip: 'Назад',
+            tooltip: l.tooltipBack,
           ),
-          title: VibeTopBarTitle(_isNew ? 'Новая папка' : 'Папка'),
+          title: VibeTopBarTitle(_isNew ? l.foldersNewFolder : l.foldersTitle),
           actions: [
             if (!_isNew)
               VibeIconButton(
                 icon: Icons.delete_outline_rounded,
                 onPressed: _delete,
-                tooltip: 'Удалить папку',
+                tooltip: l.foldersDeleteFolder,
                 color: context.vibeError,
               ),
           ],
@@ -316,13 +320,13 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
         ),
         children: [
           VibeInput(
-            hint: 'Название папки',
+            hint: l.foldersNameHint,
             controller: _title,
             autofocus: _isNew,
           ),
           const SizedBox(height: VibeSpacing.md),
           Text(
-            'Эмодзи папки',
+            l.foldersEmojiLabel,
             style: VibeTypography.caption.copyWith(
               color: context.vibeTextTertiary,
             ),
@@ -368,7 +372,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
             Padding(
               padding: const EdgeInsets.all(VibeSpacing.lg),
               child: Text(
-                'Чатов пока нет — напишите кому-нибудь',
+                l.foldersNoChats,
                 style: VibeTypography.bodyMedium.copyWith(
                   color: context.vibeTextSecondary,
                 ),
@@ -412,7 +416,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
             ),
           const SizedBox(height: VibeSpacing.xl),
           VibeButton(
-            label: _isNew ? 'Создать папку' : 'Сохранить',
+            label: _isNew ? l.foldersCreateFolder : l.dialogSave,
             onPressed: _save,
           ),
         ],

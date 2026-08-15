@@ -14,6 +14,7 @@ import '../core/widgets/vibe_button.dart';
 import '../core/widgets/vibe_input.dart';
 import '../data/backend.dart';
 import 'avatar_editor_screen.dart';
+import '../core/localization/vibe_localizations.dart';
 import 'root_shell.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
@@ -71,7 +72,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         emoji: _emoji,
       );
     } catch (e) {
-      _snack('Ошибка сохранения профиля. Проверьте БД.');
+      _snack(VibeLocalizations.of(context).errorProfileSaveFailed);
     }
     
     if (!mounted) return;
@@ -112,22 +113,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       try {
         await VibeBackend.instance.removeRemoteAvatar();
       } catch (_) {}
-      if (mounted) _snack('Аватар удалён');
+      if (mounted) _snack(VibeLocalizations.of(context).profileAvatarRemoved);
       return;
     }
     if (bytes != null) {
       await ProfileAvatar.save(bytes);
       try {
         await VibeBackend.instance.uploadAvatar(bytes);
-        if (mounted) _snack('Аватар обновлён · синхронизирован');
+        if (mounted) _snack(VibeLocalizations.of(context).profileAvatarUpdated);
       } catch (_) {
-        if (mounted) _snack('Аватар обновлён (без синхронизации)');
+        if (mounted) _snack(VibeLocalizations.of(context).profileAvatarUpdatedLocal);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -137,12 +139,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             children: [
               const SizedBox(height: 20),
               Text(
-                'Твой профиль',
+                l.profileSetupTitle,
                 style: VibeTypography.display.copyWith(color: context.vibeTextPrimary, fontSize: 32),
               ),
               const SizedBox(height: VibeSpacing.sm),
               Text(
-                'Никнейм нужен, чтобы тебя могли найти без номера телефона.',
+                l.profileSetupSubtitle,
                 style: VibeTypography.body.copyWith(color: context.vibeTextSecondary),
               ),
               const SizedBox(height: 40),
@@ -176,19 +178,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               const SizedBox(height: 40),
               VibeInput(
                 controller: _nameController,
-                hint: 'Как тебя зовут?',
+                hint: l.profileSetupNameHint,
                 prefixIcon: VibeIcons.user,
               ),
               const SizedBox(height: 16),
               VibeInput(
                 controller: _usernameController,
-                hint: 'Никнейм (например, alex_vibe)',
+                hint: l.profileSetupNickHint,
                 prefixIcon: Icons.alternate_email_rounded,
                 onChanged: _checkUsername,
-                errorText: _usernameAvailable ? null : 'Этот никнейм уже занят',
+                errorText: _usernameAvailable ? null : l.profileUsernameTaken,
               ),
               const SizedBox(height: 32),
-              Text('Выбери аватарку', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+              Text(l.profilePickAvatar, style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 12,
@@ -212,7 +214,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
               const SizedBox(height: 48),
               VibeButton(
-                label: _loading ? 'Сохранение...' : 'Начать общение',
+                label: _loading ? l.actionSaving : l.profileStartChatting,
                 onPressed: _loading || _nameController.text.isEmpty || _usernameController.text.length < 3 || _emoji == null
                     ? null 
                     : _continueToApp,

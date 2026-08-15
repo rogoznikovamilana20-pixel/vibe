@@ -7,7 +7,7 @@ class VibeAnimations {
 
   static const micro = Duration(milliseconds: 120);
   static const fast = Duration(milliseconds: 150);
-  static const fadeIn = Duration(milliseconds: 200);
+  static const fadeIn = Duration(milliseconds: 300);
   static const pulse = Duration(milliseconds: 200);
   static const scaleIn = Duration(milliseconds: 220);
   static const slideUp = Duration(milliseconds: 300);

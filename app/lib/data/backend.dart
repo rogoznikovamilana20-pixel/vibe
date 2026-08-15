@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
+import 'e2e_service.dart';
 part 'profile_backend.dart';
 part 'media_backend.dart';
 
@@ -848,6 +850,82 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     return Exception('Не удалось создать аккаунт. Попробуйте ещё раз.');
   }
 
+  // ── 2FA ──────────────────────────────────────────────────────
+
+  static String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    return sha256.convert(bytes).toString();
+  }
+
+  /// Включить / обновить 2FA для текущего пользователя.
+  Future<void> setTwoFactorPassword({
+    required String password,
+    String? hint,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Не авторизован');
+    final hash = _hashPassword(password);
+    await _client.from('user_security').upsert({
+      'user_id': user.id,
+      'password_hash': hash,
+      'hint': hint,
+      'enabled': true,
+    });
+  }
+
+  /// Проверяет, включена ли 2FA у текущего пользователя.
+  Future<bool> isTwoFactorEnabled() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return false;
+    try {
+      final result = await _client
+          .rpc('check_2fa_enabled');
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Получить подсказку для пароля 2FA (nullable).
+  Future<String?> getTwoFactorHint() async {
+    try {
+      final result = await _client.rpc('get_2fa_hint');
+      return result as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Проверить пароль 2FA для текущего пользователя. true = верный.
+  Future<bool> verifyTwoFactorPassword(String password) async {
+    final user = _client.auth.currentUser;
+    if (user == false || user == null) return false;
+    final hash = _hashPassword(password);
+    try {
+      final row = await _client
+          .from('user_security')
+          .select('password_hash')
+          .eq('user_id', user.id)
+          .eq('enabled', true)
+          .maybeSingle();
+      if (row == null) return false;
+      return row['password_hash'] == hash;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Отключить 2FA.
+  Future<void> disableTwoFactor() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    await _client
+        .from('user_security')
+        .update({'enabled': false}).eq('user_id', user.id);
+  }
+
+  // ── Profile ──────────────────────────────────────────────────
+
   Future<void> updateProfile({
     required String username,
     required String displayName,
@@ -973,6 +1051,13 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// Получить ID собеседника в личном чате (не текущий пользователь).
+  Future<String?> _chatPeerId(String chatId) async {
+    final ids = await chatMemberIds(chatId);
+    if (ids.length != 2) return null; // only PM
+    return ids.firstWhere((id) => id != myProfileId, orElse: () => '');
   }
 
   /// Тип чата: `pm` | `group` | '' (кеш 2 мин — для гейтинга уведомлений).
@@ -1246,11 +1331,8 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
             }
             return true;
           })
-          .map((m) {
+          .map((m) async {
         final senderJson = m['profiles'];
-        // Защита: если у сообщения нет профиля отправителя (удалён/битый FK),
-        // join profiles!sender_id(*) вернёт null — не роняем весь список, а
-        // показываем сообщение с плейсхолдером-отправителем.
         final sender = senderJson is Map<String, dynamic>
             ? VibeProfile.fromJson(senderJson)
             : VibeProfile(
@@ -1258,13 +1340,30 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
                 username: '',
                 displayName: '',
               );
+
+        // E2E: decrypt if encrypted
+        var text = m['text'] as String?;
+        if (m['is_encrypted'] == true && m['encrypted_content'] != null) {
+          try {
+            final e2e = E2eService.instance;
+            if (e2e.hasKeys && m['sender_id'] != myProfileId) {
+              text = await e2e.decryptFromString(
+                encryptedJson: m['encrypted_content'] as String,
+                peerId: m['sender_id'] as String,
+              );
+            }
+          } catch (_) {
+            text = '[зашифровано]';
+          }
+        }
+
         return VibeMessage(
           id: m['id'],
           chatId: m['chat_id'],
           senderId: m['sender_id'],
           senderName: sender.displayName,
           senderAvatar: sender.avatar,
-          text: m['text'],
+          text: text,
           voicePath: m['voice_url'],
           photoPath: m['photo_url'],
           videoPath: m['video_url'],
@@ -1274,6 +1373,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
           forwardedFrom: m['forward_from'],
         );
       }).toList();
+      final resolvedMsgs = await Future.wait(msgs);
       // Защита от «пустой истории» после перезахода: если сервер вернул
       // пусто (кратковременный сбой/REST-нестабильность), а локально есть
       // история — показываем кэш и НЕ затираем его пустым списком.
@@ -1285,9 +1385,9 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       }
       unawaited(_writeCache(
         _cacheMsgsName(chatId),
-        msgs.map(_messageToCacheRow).toList(),
+        resolvedMsgs.map(_messageToCacheRow).toList(),
       ));
-      return msgs;
+      return resolvedMsgs;
     } catch (_) {
       unawaited(_syncConnectivity());
       final rows = await _readCache(_cacheMsgsName(chatId));
@@ -1369,12 +1469,46 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     _chatsController.add(null);
+
+    // E2E: try to encrypt if keys exist for both sides
+    String? encryptedJson;
+    bool isEncrypted = false;
     try {
-      final row = await _client.from('messages').insert({
+      final e2e = E2eService.instance;
+      if (e2e.hasKeys) {
+        final peerId = await _chatPeerId(chatId);
+        if (peerId != null) {
+          final peerKey = await _client
+              .from('profiles')
+              .select('e2e_public_key')
+              .eq('id', peerId)
+              .maybeSingle();
+          if (peerKey != null && peerKey['e2e_public_key'] != null) {
+            encryptedJson = await e2e.encryptToString(
+              plaintext: text,
+              peerId: peerId,
+            );
+            isEncrypted = true;
+          }
+        }
+      }
+    } catch (_) {
+      // Fallback to plaintext
+    }
+
+    try {
+      final insertData = <String, dynamic>{
         'chat_id': chatId,
         'sender_id': myProfileId,
-        'text': text,
-      }).select().single();
+        'text': isEncrypted ? null : text,
+        'is_encrypted': isEncrypted,
+      };
+      if (encryptedJson != null) {
+        insertData['encrypted_content'] = encryptedJson;
+      }
+
+      final row = await _client.from('messages').insert(insertData)
+          .select().single().timeout(const Duration(seconds: 5));
       _broadcastMessageRow(row);
       _chatsController.add(null);
       final sent = _ownMessage(row).copyWith(
@@ -2207,7 +2341,7 @@ _personal = _client.channel('u_$myId')
     }
   }
 
-  void _onBroadcastMessage(Map<String, dynamic> m) {
+  Future<void> _onBroadcastMessage(Map<String, dynamic> m) async {
     // Realtime v2-протокол: данные лежат во вложенном payload.
     final inner = m['payload'];
     final data = (inner is Map<String, dynamic> ||
@@ -2224,34 +2358,54 @@ _personal = _client.channel('u_$myId')
     _seenIds.add(id);
     if (_seenIds.length > 400) _seenIds.remove(_seenIds.first);
 
-unawaited(() async {
-      final sender = await profileById(senderId);
-      if (!streamController.isClosed) {
-        streamController.add(VibeMessage(
-          id: id,
-          chatId: '${data['chat_id']}',
-          senderId: senderId,
-          senderName: sender?.displayName ?? 'Пользователь',
-          senderAvatar: sender?.avatar,
-          text: data['text'],
-          voicePath: data['voice_url'],
-          photoPath: data['photo_url'],
-          videoPath: data['video_url'],
-          created: DateTime.tryParse('${data['created_at']}')?.toLocal() ?? DateTime.now(), // FORCE LOCAL TIME
-          incoming: true,
-          stickerEmoji: data['sticker_emoji'],
-        ));
+    // Используем встроенные в broadcast имя/аватар — показ мгновенный,
+    // без HTTP-запроса. Профиль подгрузим асинхронно для кеша.
+    final senderName = data['sender_name'] as String? ?? 'Пользователь';
+    final senderAvatar = data['sender_avatar'] as String?;
+
+    // E2E: decrypt if encrypted
+    var text = data['text'] as String?;
+    if (data['is_encrypted'] == true && data['encrypted_content'] != null) {
+      try {
+        final e2e = E2eService.instance;
+        if (e2e.hasKeys && senderId != myId) {
+          text = await e2e.decryptFromString(
+            encryptedJson: data['encrypted_content'] as String,
+            peerId: senderId as String,
+          );
+        }
+      } catch (_) {
+        text = '[зашифровано]';
       }
-      // Квитанции отправителю: «доставлено» — всегда, когда моё устройство
-      // получило сообщение; «прочитано» — если чат сейчас открыт у меня.
-      final chatId = '${data['chat_id']}';
-      _ackDelivered(id, chatId, senderId);
-      if (NotificationService.instance.activeChatId == chatId) {
-        markChatRead(chatId);
-      } else {
-        _bumpUnread(chatId);
-      }
-    }());
+    }
+
+    if (!streamController.isClosed) {
+      streamController.add(VibeMessage(
+        id: id,
+        chatId: '${data['chat_id']}',
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatar: senderAvatar,
+        text: text,
+        voicePath: data['voice_url'],
+        photoPath: data['photo_url'],
+        videoPath: data['video_url'],
+        created: DateTime.tryParse('${data['created_at']}')?.toLocal() ?? DateTime.now(),
+        incoming: true,
+        stickerEmoji: data['sticker_emoji'],
+      ));
+    }
+
+    // Квитанции отправителю + обновление кеша профиля (без блокировки UI).
+    final chatId = '${data['chat_id']}';
+    _ackDelivered(id, chatId, senderId);
+    if (NotificationService.instance.activeChatId == chatId) {
+      markChatRead(chatId);
+    } else {
+      _bumpUnread(chatId);
+    }
+    // Тихо обновим кеш профиля (fire-and-forget).
+    unawaited(profileById(senderId));
   }
 
   /// Отправить квитанцию отправителю (на его личный канал).
@@ -2433,10 +2587,13 @@ unawaited(() async {
       final members = await chatMemberIds(chatId);
       if (members.isEmpty) return;
       final senderId = '${row['sender_id']}';
+      final me = _myProfile;
       final payload = {
         'id': row['id'],
         'chat_id': chatId,
         'sender_id': senderId,
+        'sender_name': me?.displayName ?? 'Пользователь',
+        'sender_avatar': me?.avatar,
         'text': row['text'],
         'photo_url': row['photo_url'],
         'voice_url': row['voice_url'],
@@ -2445,20 +2602,47 @@ unawaited(() async {
         'created_at': row['created_at'],
         'forward_from': row['forward_from'],
       };
+      // Realtime broadcast — мгновенная доставка через WebSocket.
       if (members.length > 2) {
         // Группа: каждому участнику, кроме автора.
         for (final m in members) {
           if (m == senderId) continue;
           await _sendRemote('u_$m', 'new_message', payload);
         }
-        return;
+      } else {
+        final peerId = members.firstWhere(
+          (m) => m != myProfileId,
+          orElse: () => myProfileId ?? '',
+        );
+        if (peerId.isNotEmpty && peerId != myProfileId) {
+          await _sendRemote('u_$peerId', 'new_message', payload);
+        }
       }
-      final peerId = members.firstWhere(
-        (m) => m != myProfileId,
-        orElse: () => myProfileId ?? '',
-      );
-      if (peerId.isEmpty || peerId == myProfileId) return;
-      await _sendRemote('u_$peerId', 'new_message', payload);
+      // FCM push — для доставки в фоне.
+      _sendFcmPush(chatId, senderId, me?.displayName, row['text'], row['id']);
+    }());
+  }
+
+  /// Отправить FCM push-уведомление через Edge Function (fire-and-forget).
+  void _sendFcmPush(
+    String chatId,
+    String senderId,
+    String? senderName,
+    dynamic text,
+    dynamic messageId,
+  ) {
+    unawaited(() async {
+      try {
+        await _client.functions.invoke('send-push', body: {
+          'chat_id': chatId,
+          'sender_id': senderId,
+          'sender_name': senderName,
+          'text': text,
+          'message_id': messageId,
+        });
+      } catch (e) {
+        debugPrint('FCM push error: $e');
+      }
     }());
   }
 

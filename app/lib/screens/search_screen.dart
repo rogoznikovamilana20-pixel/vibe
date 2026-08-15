@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
@@ -9,6 +10,7 @@ import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
+import '../core/localization/vibe_localizations.dart';
 import 'chat_screen.dart';
 
 /// Экран поиска по чатам и контактам. Фильтрация по запросу в реальном времени.
@@ -66,6 +68,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: VibeCollapsibleScreen(
@@ -75,7 +79,7 @@ class _SearchScreenState extends State<SearchScreen> {
               leading: VibeTopBarIcon(
                 icon: Icons.arrow_back_ios_new_rounded,
                 onTap: () => Navigator.of(context).pop(),
-                tooltip: 'Назад',
+                tooltip: l.tooltipBack,
               ),
               actions: [
                 if (_query.isEmpty)
@@ -87,7 +91,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       _controller.clear();
                       _onQueryChanged('');
                     },
-                    tooltip: 'Очистить',
+                    tooltip: l.tooltipClear,
                   ),
               ],
               title: _buildSearchField(context, VibeTypography.body),
@@ -103,7 +107,7 @@ class _SearchScreenState extends State<SearchScreen> {
           leading: VibeTopBarIcon(
             icon: Icons.arrow_back_ios_new_rounded,
             onTap: () => Navigator.of(context).pop(),
-            tooltip: 'Назад',
+            tooltip: l.tooltipBack,
           ),
           title: _buildSearchField(context, VibeTypography.bodyMedium),
           actions: [
@@ -114,7 +118,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   _controller.clear();
                   _onQueryChanged('');
                 },
-                tooltip: 'Очистить',
+                tooltip: l.tooltipClear,
               ),
           ],
         ),
@@ -139,7 +143,7 @@ class _SearchScreenState extends State<SearchScreen> {
         decoration: InputDecoration(
           border: InputBorder.none,
           isCollapsed: true,
-          hintText: 'Поиск по никнейму или телефону...',
+          hintText: VibeLocalizations.of(context).searchByNickHint,
           hintStyle: style.copyWith(color: context.vibeTextTertiary, fontSize: 13),
         ),
       ),
@@ -149,12 +153,12 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Widget> _buildSuggestions() {
     return [
       const SliverToBoxAdapter(child: SizedBox(height: VibeSpacing.sm)),
-      SliverToBoxAdapter(child: _SectionTitle('Глобальный поиск')),
+      SliverToBoxAdapter(child: _SectionTitle(VibeLocalizations.of(context).searchGlobalTitle)),
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.all(VibeSpacing.lg),
           child: Text(
-            'Введите @никнейм или номер телефона, чтобы найти человека в Vibe.',
+            VibeLocalizations.of(context).searchGlobalSubtitle,
             style: VibeTypography.caption.copyWith(color: context.vibeTextSecondary),
           ),
         ),
@@ -172,7 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
               children: [
                 Icon(Icons.search_off_rounded, size: 56, color: context.vibeTextTertiary),
                 const SizedBox(height: VibeSpacing.md),
-                Text('Ничего не найдено', style: VibeTypography.subtitle.copyWith(color: context.vibeTextSecondary)),
+                Text(VibeLocalizations.of(context).searchNothingFound, style: VibeTypography.subtitle.copyWith(color: context.vibeTextSecondary)),
               ],
             ),
           ),
@@ -234,7 +238,29 @@ class _ContactTile extends StatelessWidget {
             peerName: profile.displayName,
             peerAvatar: profile.avatar,
           );
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)));
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (_, _, _) => ChatScreen(chat: chat),
+              transitionsBuilder: (_, animation, _, child) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.3, 0),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: VibeAnimations.standard,
+                      ),
+                    ),
+                    child: child,
+                  ),
+                );
+              },
+              transitionDuration: VibeAnimations.fadeIn,
+            ),
+          );
         }
       },
     );

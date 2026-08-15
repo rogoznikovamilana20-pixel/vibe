@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../core/localization/vibe_localizations.dart';
+
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
@@ -44,6 +46,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _load() async {
+    final l = VibeLocalizations.of(context);
     setState(() => _loading = true);
     try {
       final list = await VibeBackend.instance.listContacts();
@@ -57,7 +60,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _applyFilter();
       });
     } catch (_) {
-      _snack('Не удалось загрузить контакты');
+      _snack(l.contactsLoadFailed);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -88,7 +91,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             opacity: animation,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0.05, 0),
+                begin: const Offset(0.3, 0),
                 end: Offset.zero,
               ).animate(CurvedAnimation(
                 parent: animation,
@@ -112,7 +115,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             opacity: animation,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0.05, 0),
+                begin: const Offset(0.3, 0),
                 end: Offset.zero,
               ).animate(CurvedAnimation(
                 parent: animation,
@@ -133,6 +136,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: VibeCollapsibleScreen(
@@ -143,9 +147,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 icon: const Icon(Icons.person_add_alt_1_rounded),
                 onPressed: _openAddContact,
                 color: context.vibeTextPrimary,
-                tooltip: 'Добавить контакт',
+                tooltip: l.contactAdd,
               ),
-              title: const VibeTopBarTitle('Контакты'),
+              title: VibeTopBarTitle(l.contactTitle),
             ),
           ),
           SliverPadding(
@@ -158,7 +162,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             sliver: SliverToBoxAdapter(
               child: VibeInput(
                 controller: _searchController,
-                hint: 'Поиск по имени или @нику',
+                hint: l.contactSearchHint,
                 prefixIcon: VibeIcons.search,
                 onChanged: (_) => _applyFilter(),
               ),
@@ -186,8 +190,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         const SizedBox(height: VibeSpacing.md),
                         Text(
                           _all.isEmpty
-                              ? 'Пока нет контактов'
-                              : 'Ничего не найдено',
+                              ? l.contactEmptyList
+                              : l.searchNothingFound,
                           style: VibeTypography.body.copyWith(
                             color: context.vibeTextSecondary,
                           ),
@@ -206,10 +210,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
           progress: progress,
           leading: IconButton(
             icon: const Icon(Icons.person_add_alt_1_rounded),
-            onPressed: () => _snack('Добавление контакта — скоро'),
+            onPressed: () => _snack(l.contactsAddSoon),
             color: context.vibeTextPrimary,
           ),
-          title: const VibeTopBarTitle('Контакты'),
+          title: VibeTopBarTitle(l.contactTitle),
         ),
       ),
     );

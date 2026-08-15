@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/vibe_animations.dart';
 import '../theme/vibe_colors.dart';
@@ -75,6 +76,8 @@ class _VibeToastHostState extends State<_VibeToastHost>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _slide;
+  double _dragOffset = 0;
+  bool _dismissed = false;
 
   @override
   void initState() {
@@ -93,6 +96,29 @@ class _VibeToastHostState extends State<_VibeToastHost>
     super.dispose();
   }
 
+  void _onDragUpdate(DragUpdateDetails d) {
+    setState(() => _dragOffset += d.delta.dx);
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    if (_dragOffset.abs() > 80 || (d.primaryVelocity?.abs() ?? 0) > 500) {
+      _dismissWithAnimation();
+    } else {
+      setState(() => _dragOffset = 0);
+    }
+  }
+
+  void _dismissWithAnimation() {
+    if (_dismissed) return;
+    _dismissed = true;
+    HapticFeedback.lightImpact();
+    _controller
+      .animateTo(1.0, duration: const Duration(milliseconds: 150))
+      .then((_) {
+        widget.onDone();
+      });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Positioned(
@@ -101,16 +127,24 @@ class _VibeToastHostState extends State<_VibeToastHost>
       bottom: 0,
       child: SafeArea(
         minimum: const EdgeInsets.all(VibeSpacing.lg),
-        child: IgnorePointer(
+        child: GestureDetector(
+          onHorizontalDragUpdate: _onDragUpdate,
+          onHorizontalDragEnd: _onDragEnd,
           child: AnimatedBuilder(
             animation: _slide,
-            builder: (context, child) => Opacity(
-              opacity: _slide.value,
-              child: Transform.translate(
-                offset: Offset(0, 16 * (1 - _slide.value)),
-                child: child,
-              ),
-            ),
+            builder: (context, child) {
+              final opacity = (_slide.value - (_dragOffset.abs() / 200)).clamp(0.0, 1.0);
+              return Opacity(
+                opacity: opacity,
+                child: Transform.translate(
+                  offset: Offset(
+                    _dragOffset + (16 * (1 - _slide.value)),
+                    16 * (1 - _slide.value),
+                  ),
+                  child: child,
+                ),
+              );
+            },
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(

@@ -10,6 +10,7 @@ import '../../data/backend.dart';
 import '../../data/settings_service.dart';
 import '../../screens/settings/notifications_settings.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../../core/localization/vibe_localizations.dart';
 
 /// Меню чата как в Telegram: столбец «Уведомления» открывает подраздел,
 /// из него — «Выключить на время» со списком длительностей. А кнопка
@@ -25,6 +26,7 @@ class ChatMenuSheet extends StatefulWidget {
     this.onChatInfo,
     this.onArchive,
     this.onDelete,
+    this.onExport,
   });
 
   final VibeChat chat;
@@ -39,6 +41,9 @@ class ChatMenuSheet extends StatefulWidget {
   /// 8.3.2: «Архивировать» / «Удалить чат» — рабочие действия.
   final VoidCallback? onArchive;
   final Future<bool> Function()? onDelete;
+
+  /// 8.5: «Экспорт чата» — выгрузка истории в файл.
+  final VoidCallback? onExport;
 
   @override
   State<ChatMenuSheet> createState() => _ChatMenuSheetState();
@@ -68,6 +73,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -80,16 +86,16 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           duration: VibeAnimations.fast,
           curve: Curves.easeOut,
           child: _level == 0
-              ? _buildMainColumn(context)
+              ? _buildMainColumn(context, l)
               : _level == 1
-                  ? _buildNotificationsColumn(context)
-                  : _buildMuteForAWhileColumn(context),
+                  ? _buildNotificationsColumn(context, l)
+                  : _buildMuteForAWhileColumn(context, l),
         ),
       ),
     );
   }
 
-  Widget _buildMainColumn(BuildContext context) {
+  Widget _buildMainColumn(BuildContext context, VibeLocalizations l) {
     final chat = widget.chat;
     final isGroup = chat.kind == 'group';
     return Column(
@@ -117,13 +123,13 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
                   ),
                   Text(
                     isGroup
-                        ? 'Группа'
+                        ? l.chatStatusGroup
                         : (chat.peerOnline
-                            ? 'в сети'
+                            ? l.statusOnline
                             : (chat.peerLastSeen != null
                                 ? 'был(а) в сети '
                                     '${VibeBackend.formatTime(chat.peerLastSeen)}'
-                                : 'был(а) недавно')),
+                                : l.statusRecently)),
                     style: VibeTypography.caption.copyWith(
                       color: chat.peerOnline
                           ? VibeColors.success
@@ -142,7 +148,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.notifications_none_rounded,
               color: context.vibePrimary),
-          title: const Text('Уведомления'),
+          title: Text(l.chatMenuNotifications),
           trailing: const Icon(Icons.chevron_right_rounded, size: 20),
           onTap: () => setState(() => _level = 1),
         ),
@@ -152,7 +158,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
             _muted ? Icons.volume_off_rounded : Icons.volume_up_outlined,
             color: _muted ? context.vibeError : context.vibePrimary,
           ),
-          title: Text(_muted ? 'Звук выключен' : 'Не беспокоить'),
+          title: Text(_muted ? l.chatMenuSoundOff : l.chatMenuDnd),
           trailing: Switch(
             value: _muted,
             onChanged: _setMuted,
@@ -162,7 +168,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.photo_library_outlined, color: context.vibePrimary),
-          title: const Text('Медиа'),
+          title: Text(l.chatMenuMedia),
           onTap: () {
             Navigator.of(context).pop();
             widget.onTapMedia?.call();
@@ -171,7 +177,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(VibeIcons.search, color: context.vibePrimary),
-          title: const Text('Поиск в чате'),
+          title: Text(l.chatMenuSearch),
           onTap: () {
             Navigator.of(context).pop();
             widget.onTapSearch?.call();
@@ -181,7 +187,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           contentPadding: EdgeInsets.zero,
           leading: Icon(VibeIcons.info,
               color: context.vibePrimary),
-          title: const Text('Сведения о чате'),
+          title: Text(l.chatMenuChatInfo),
           onTap: () {
             Navigator.of(context).pop();
             final info = widget.onChatInfo;
@@ -196,7 +202,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.archive_outlined, color: context.vibePrimary),
-          title: const Text('Архивировать'),
+          title: Text(l.chatMenuArchive),
           onTap: () {
             Navigator.of(context).pop();
             final archive = widget.onArchive;
@@ -210,7 +216,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.delete_outline_rounded, color: context.vibeError),
-          title: Text('Удалить чат', style: TextStyle(color: context.vibeError)),
+          title: Text(l.chatMenuDeleteChat, style: TextStyle(color: context.vibeError)),
           onTap: () async {
             Navigator.of(context).pop();
             final del = widget.onDelete;
@@ -226,7 +232,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.delete_outline_rounded,
               color: context.vibePrimary),
-          title: const Text('Очистить историю'),
+          title: Text(l.chatMenuClearHistory),
           onTap: () {
             Navigator.of(context).pop();
             final clear = widget.onClearHistory;
@@ -237,11 +243,25 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
             }
           },
         ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.file_upload_outlined, color: context.vibePrimary),
+          title: Text(l.chatMenuExport),
+          onTap: () {
+            Navigator.of(context).pop();
+            final export = widget.onExport;
+            if (export != null) {
+              export();
+            } else {
+              widget.onSnack('Экспорт — скоро');
+            }
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildNotificationsColumn(BuildContext context) {
+  Widget _buildNotificationsColumn(BuildContext context, VibeLocalizations l) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -249,7 +269,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(VibeIcons.back, size: 20),
-          title: const Text('Уведомления'),
+          title: Text(l.chatMenuNotifications),
           onTap: () => setState(() => _level = 0),
         ),
         const Divider(height: 1),
@@ -260,21 +280,21 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
             _muted ? Icons.volume_off_rounded : Icons.volume_up_outlined,
             color: context.vibePrimary,
           ),
-          title: const Text('Выключить звук'),
+          title: Text(l.chatMenuMuteSound),
           trailing: Switch(value: _muted, onChanged: _setMuted),
           onTap: () => _setMuted(!_muted),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.timer_outlined, color: context.vibePrimary),
-          title: const Text('Выключить на время'),
+          title: Text(l.chatMenuMuteForAWhile),
           trailing: const Icon(Icons.chevron_right_rounded, size: 20),
           onTap: () => setState(() => _level = 2),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.tune_rounded, color: context.vibePrimary),
-          title: const Text('Настроить'),
+          title: Text(l.chatMenuConfigure),
           onTap: () {
             Navigator.of(context).pop();
             Navigator.of(context).push(
@@ -288,7 +308,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.notifications_off_rounded, color: context.vibeError),
           title: Text(
-            'Выключить уведомления',
+            l.chatMenuNotifications,
             style: TextStyle(color: context.vibeError),
           ),
           onTap: () {
@@ -301,7 +321,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
     );
   }
 
-  Widget _buildMuteForAWhileColumn(BuildContext context) {
+  Widget _buildMuteForAWhileColumn(BuildContext context, VibeLocalizations l) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -309,25 +329,25 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(VibeIcons.back, size: 20),
-          title: const Text('Выключить на время'),
+          title: Text(l.chatMenuMuteForAWhile),
           onTap: () => setState(() => _level = 1),
         ),
         const Divider(height: 1),
         const SizedBox(height: VibeSpacing.xs),
-        for (final entry in {
-          '1 час': const Duration(hours: 1),
-          '8 часов': const Duration(hours: 8),
-          '1 день': const Duration(days: 1),
-          '2 дня': const Duration(days: 2),
-          '1 неделя': const Duration(days: 7),
-        }.entries)
+        for (final entry in [
+          (label: l.muteDuration1Hour, duration: const Duration(hours: 1)),
+          (label: l.muteDuration8Hours, duration: const Duration(hours: 8)),
+          (label: l.muteDuration1Day, duration: const Duration(days: 1)),
+          (label: l.muteDuration2Days, duration: const Duration(days: 2)),
+          (label: l.muteDuration1Week, duration: const Duration(days: 7)),
+        ])
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(VibeIcons.clock, color: context.vibePrimary),
-            title: Text(entry.key),
+            title: Text(entry.label),
             onTap: () {
               _setMuted(true);
-              final until = DateTime.now().add(entry.value);
+              final until = DateTime.now().add(entry.duration);
               VibeBackend.instance.setChatMuted(
                 widget.chat.id,
                 muted: true,
@@ -335,7 +355,7 @@ class _ChatMenuSheetState extends State<ChatMenuSheet> {
                 until: until,
               );
               Navigator.of(context).pop();
-              widget.onSnack('Звук выключен на ${entry.key}');
+              widget.onSnack('Звук выключен на ${entry.label}');
             },
           ),
       ],

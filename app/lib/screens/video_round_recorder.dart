@@ -12,6 +12,7 @@ import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 
 /// Результат записи видеокружка.
 class VideoRoundResult {
@@ -119,7 +120,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
           f.delete();
         } catch (_) {}
       }
-      _snack('Запись слишком короткая');
+      _snack(VibeLocalizations.of(context).recordingTooShort);
       return;
     }
     Navigator.of(context).pop(VideoRoundResult(f, _seconds));
@@ -184,6 +185,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
   @override
   Widget build(BuildContext context) {
     final cam = _cam;
+    final l = VibeLocalizations.of(context);
     return Scaffold(
       backgroundColor: VibeColors.bgDark,
       body: Stack(
@@ -215,9 +217,9 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
             ),
           ),
           if (_initFailed)
-            const Center(
+            Center(
               child: Text(
-                'Камера недоступна',
+                l.recordingCameraUnavailable,
                 style: TextStyle(color: VibeColors.textSecondaryDark),
               ),
             ),
@@ -292,7 +294,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                       onPressed: _cancel,
                       icon: const Icon(VibeIcons.close, size: 26),
                       color: context.vibeError,
-                      tooltip: 'Отмена',
+                      tooltip: l.tooltipCancel,
                     ),
                   const SizedBox(width: VibeSpacing.xl),
                   GestureDetector(
@@ -330,7 +332,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                       onPressed: _finish,
                       icon: const Icon(VibeIcons.send, size: 24),
                       color: context.vibePrimary,
-                      tooltip: 'Отправить',
+                      tooltip: l.tooltipSend,
                     ),
                 ],
               ),
@@ -343,7 +345,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
               bottom: 130,
               child: Center(
                 child: Text(
-                  'Свайп вверх — зафиксировать',
+                  l.recordingSwipeToLock,
                   style: VibeTypography.caption.copyWith(
                     color: VibeColors.textSecondaryDark,
                   ),

@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../core/localization/vibe_localizations.dart';
 import '../core/profile_avatar.dart';
+import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
@@ -51,6 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: VibeCollapsibleScreen(
@@ -61,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.qr_code_2_rounded),
                 onPressed: () => _showQrSheet(context),
                 color: context.vibeTextPrimary,
-                tooltip: 'QR-код профиля',
+                tooltip: l.profileQrCode,
               ),
               title: VibeTopBarTitle(_displayName()),
               actions: [
@@ -69,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: const Icon(VibeIcons.moreVertical),
                   onPressed: () => _showProfileMenu(context),
                   color: context.vibeTextPrimary,
-                  tooltip: 'Ещё',
+                  tooltip: l.actionMore,
                 ),
               ],
             ),
@@ -138,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () => _changeAvatar(context),
                   child: VibeAvatar(
                     name: _displayName(),
-                    size: 108,
+                    size: 90,
                     emoji: profile?.emoji ?? widget.userEmoji,
                     photo: photo,
                     online: true,
@@ -200,6 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildActions(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Column(
       children: [
         // Контактные данные: клик — копировать (телефон / @username).
@@ -213,22 +216,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (hasPhone)
                   _ProfileActionTile(
                     icon: Icons.call_outlined,
-                    title: 'Телефон',
+                    title: l.profileScreenPhone,
                     trailing: phone,
                     onTap: () async {
                       await Clipboard.setData(ClipboardData(text: phone));
-                      _snack('Номер скопирован');
+                      _snack(l.profileScreenNumberCopied);
                     },
                   ),
                 _ProfileActionTile(
                   icon: Icons.alternate_email_rounded,
-                  title: 'Имя пользователя',
+                  title: l.profileScreenUsername,
                   trailing: _username(),
                   onTap: () => _copyProfileLink(context),
                 ),
                 _ProfileActionTile(
                   icon: Icons.link_rounded,
-                  title: 'Мои ссылки',
+                  title: l.profileScreenMyLinks,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => MyLinksScreen(
@@ -242,15 +245,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
         const SizedBox(height: VibeSpacing.lg),
-        const _SectionHeader('Разное'),
+        _SectionHeader(l.profileMisc),
         _ProfileActionTile(
           icon: Icons.bookmark_outline_rounded,
-          title: 'Сохранённое',
+          title: l.profileScreenSaved,
           onTap: () => _openSaved(context),
         ),
         _ProfileActionTile(
           icon: Icons.settings_outlined,
-          title: 'Настройки',
+          title: l.profileScreenSettings,
           onTap: () {
             final cb = widget.onOpenSettings;
             if (cb != null) {
@@ -268,25 +271,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onTap: () => _showQrSheet(context),
         ),
         const SizedBox(height: VibeSpacing.lg),
-        const _SectionHeader('Прочее'),
+        _SectionHeader(l.profileOther),
         _ProfileActionTile(
           icon: Icons.add_a_photo_outlined,
-          title: 'Выбрать фото',
+          title: l.profilePickPhoto,
           onTap: () => _changeAvatar(context),
         ),
         _ProfileActionTile(
           icon: VibeIcons.edit,
-          title: 'Изменить данные',
+          title: l.profileEditData,
           onTap: () => _openEditProfile(context),
         ),
         _ProfileActionTile(
           icon: Icons.person_add_alt_1_rounded,
-          title: 'Добавить аккаунт',
-          onTap: () => _snack('Мультиаккаунты появятся позже'),
+          title: l.profileAddAccount,
+            onTap: () => _snack(l.profileMultiSoon),
         ),
         _ProfileActionTile(
           icon: Icons.logout_rounded,
-          title: 'Выйти',
+          title: l.profileScreenLogout,
           destructive: true,
           onTap: () =>
               _confirmLogout(context, VibeLocalizations.of(context)),
@@ -307,14 +310,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (chatId.isEmpty || !context.mounted) return;
     final chat = await VibeBackend.instance.chatById(chatId);
     if (chat == null || !context.mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)));
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => ChatScreen(chat: chat),
+        transitionsBuilder: (_, animation, _, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.3, 0),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: VibeAnimations.standard,
+                ),
+              ),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: VibeAnimations.fadeIn,
+      ),
+    );
   }
 
   // ── Меню «⋯» в шапке (как в профиле Telegram) ───────────────────────
 
   void _showProfileMenu(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: context.vibeSurface,
@@ -327,7 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.palette_outlined),
-              title: const Text('Изменить цвет профиля'),
+              title: Text(l.profileChangeColor),
               onTap: () {
                 Navigator.pop(ctx);
                 _changeProfileColor(context);
@@ -335,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ListTile(
               leading: const Icon(VibeIcons.edit),
-              title: const Text('Изменить имя'),
+              title: Text(l.profileChangeName),
               onTap: () {
                 Navigator.pop(ctx);
                 _changeName(context);
@@ -343,7 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ListTile(
               leading: const Icon(VibeIcons.copy),
-              title: const Text('Копировать ссылку'),
+              title: Text(l.profileCopyLink),
               onTap: () {
                 Navigator.pop(ctx);
                 _copyProfileLink(context);
@@ -357,6 +381,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _changeProfileColor(BuildContext context) async {
+    final l = VibeLocalizations.of(context);
     final idx = await showModalBottomSheet<int>(
       context: context,
       backgroundColor: context.vibeSurface,
@@ -400,34 +425,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (idx != null && mounted) {
       setState(() => _profileGradientIndex = idx);
-      _snack('Цвет профиля обновлён');
+      _snack(l.profileColorUpdated);
     }
   }
 
   Future<void> _changeName(BuildContext context) async {
+    final l = VibeLocalizations.of(context);
     final current = _displayName();
     final controller = TextEditingController(text: current);
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Изменить имя'),
+        title: Text(l.profileChangeName),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 32,
-          decoration: const InputDecoration(
-            hintText: 'Имя и фамилия',
+          decoration: InputDecoration(
+            hintText: l.profileScreenNameHint,
             counterText: '',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(l.dialogCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Сохранить'),
+            child: Text(l.dialogSave),
           ),
         ],
       ),
@@ -441,9 +467,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         username: p?.username ?? widget.userName.toLowerCase(),
         displayName: name,
       );
-      _snack('Имя обновлено');
+      _snack(l.profileNameUpdated);
     } catch (_) {
-      _snack('Не удалось обновить имя');
+      _snack(l.profileNameUpdateFailed);
     }
   }
 
@@ -456,6 +482,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ── QR-код профиля ──────────────────────────────────────────────────
 
   void _showQrSheet(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final link = _profileLink();
     showModalBottomSheet(
       context: context,
@@ -490,7 +517,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: VibeSpacing.xs),
               Text(
-                'Покажи этот код — по нему найдут твой профиль',
+                l.profileQrSubtitle,
                 style: VibeTypography.caption.copyWith(
                   color: context.vibeTextSecondary,
                 ),
@@ -532,17 +559,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         await VibeBackend.instance.removeRemoteAvatar();
       } catch (_) {}
-      _snack('Аватар удалён');
+      _snack(VibeLocalizations.of(context).profileAvatarRemoved);
       return;
     }
     if (bytes != null) {
       await ProfileAvatar.save(bytes);
       try {
         await VibeBackend.instance.uploadAvatar(bytes);
-        _snack('Аватар обновлён · синхронизирован');
+        _snack(VibeLocalizations.of(context).profileAvatarUpdated);
         return;
       } catch (_) {
-        _snack('Аватар обновлён (без синхронизации)');
+        _snack(VibeLocalizations.of(context).profileAvatarUpdatedLocal);
       }
     }
   }
@@ -552,11 +579,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l.logout),
-        content: const Text('Вы уверены, что хотите выйти из аккаунта?'),
+        content: Text(l.profileLogoutConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(l.dialogCancel),
           ),
           TextButton(
             onPressed: () async {

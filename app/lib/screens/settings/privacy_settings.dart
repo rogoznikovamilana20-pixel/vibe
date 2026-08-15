@@ -4,13 +4,17 @@ import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/settings_widgets.dart';
+import '../../core/widgets/vibe_toast.dart';
 import '../../core/widgets/vibe_top_bar.dart';
+import '../../data/backend.dart';
 import '../../data/settings_service.dart';
 import '../../data/passcode_service.dart';
 import 'privacy/privacy_selector_screen.dart';
 import 'privacy/passcode_screen.dart';
 import 'privacy/devices_screen.dart';
 import 'privacy/two_step_verification_screen.dart';
+import 'privacy/devices_screen.dart';
+import '../auth/otp_verification_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
@@ -104,6 +108,23 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                   MaterialPageRoute(builder: (_) => const DevicesScreen()),
                 ),
               ),
+              SettingsTile(
+                icon: Icons.sms_rounded,
+                iconColor: Colors.teal,
+                title: l.locale.languageCode == 'ru' ? 'Верификация телефона' : 'Phone verification',
+                subtitle: l.locale.languageCode == 'ru' ? 'Подтвердить номер через SMS' : 'Verify number via SMS',
+                onTap: () {
+                  final phone = VibeBackend.instance.myProfile?.phone ?? '';
+                  if (phone.isEmpty) {
+                    VibeToast.show(context, 'Номер телефона не задан');
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => OtpVerificationScreen(phone: phone)),
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: VibeSpacing.lg),
@@ -191,6 +212,70 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                   ],
                 ),
                 onTap: () => _showCallsGroupsMenu(context, l, s),
+              ),
+              SettingsTile(
+                icon: Icons.mic_none_rounded,
+                iconColor: Colors.indigo,
+                title: 'Голосовые сообщения',
+                subtitleWidget: _privacyBadge(context, l, s.privacyVoiceMessages),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PrivacySelectorScreen(
+                      title: 'Голосовые сообщения',
+                      description: 'Кто может отправлять вам голосовые и видеосообщения.',
+                      initialValue: s.privacyVoiceMessages,
+                      onChanged: (v) => s.setPrivacyVoiceMessages(v).then((_) => setState(() {})),
+                    ),
+                  ),
+                ),
+              ),
+              SettingsTile(
+                icon: Icons.info_outline_rounded,
+                iconColor: Colors.cyan,
+                title: 'Биография',
+                subtitleWidget: _privacyBadge(context, l, s.privacyBio),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PrivacySelectorScreen(
+                      title: 'Биография',
+                      description: 'Кто может видеть информацию о себе в вашем профиле.',
+                      initialValue: s.privacyBio,
+                      onChanged: (v) => s.setPrivacyBio(v).then((_) => setState(() {})),
+                    ),
+                  ),
+                ),
+              ),
+              SettingsTile(
+                icon: Icons.cake_outlined,
+                iconColor: Colors.pinkAccent,
+                title: 'День рождения',
+                subtitleWidget: _privacyBadge(context, l, s.privacyBirthday),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PrivacySelectorScreen(
+                      title: 'День рождения',
+                      description: 'Кто может видеть дату вашего рождения.',
+                      initialValue: s.privacyBirthday,
+                      onChanged: (v) => s.setPrivacyBirthday(v).then((_) => setState(() {})),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          SettingsSection(
+            title: 'Заблокированные',
+            children: [
+              SettingsTile(
+                icon: Icons.block_rounded,
+                iconColor: context.vibeError,
+                title: 'Заблокированные пользователи',
+                subtitle: '${s.blockedUsers.length}',
+                onTap: () => _showBlockedUsers(context, s),
               ),
             ],
           ),
@@ -290,6 +375,122 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
       ),
     );
   }
+
+  void _showBlockedUsers(BuildContext context, SettingsService s) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (ctx, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: context.vibeSurfaceHigh,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(VibeRadius.bottomSheet)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: context.vibeTextTertiary.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.lg),
+                child: Row(
+                  children: [
+                    Text(
+                      'Заблокированные',
+                      style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.person_add_alt_1_rounded, color: context.vibePrimary),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _addBlockedUser(context, s);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: s.blockedUsers.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Нет заблокированных',
+                          style: VibeTypography.body.copyWith(color: context.vibeTextSecondary),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: s.blockedUsers.length,
+                        itemBuilder: (_, i) {
+                          final userId = s.blockedUsers[i];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: context.vibePrimary.withValues(alpha: 0.15),
+                              child: Text(
+                                userId.substring(0, 2).toUpperCase(),
+                                style: TextStyle(color: context.vibePrimary, fontSize: 14),
+                              ),
+                            ),
+                            title: Text(userId, style: TextStyle(color: context.vibeTextPrimary)),
+                            trailing: IconButton(
+                              icon: Icon(Icons.close_rounded, color: context.vibeTextSecondary),
+                              onPressed: () async {
+                                await s.removeBlockedUser(userId);
+                                if (ctx.mounted) setState(() {});
+                                if (mounted) setState(() {});
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addBlockedUser(BuildContext context, SettingsService s) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.vibeSurface,
+        title: Text('Заблокировать', style: TextStyle(color: context.vibeTextPrimary)),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: 'ID пользователя',
+            hintStyle: TextStyle(color: context.vibeTextTertiary),
+          ),
+          style: TextStyle(color: context.vibeTextPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Отмена', style: TextStyle(color: context.vibePrimary)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final id = controller.text.trim();
+              if (id.isNotEmpty) {
+                await s.addBlockedUser(id);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) setState(() {});
+              }
+            },
+            child: const Text('Заблокировать', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 

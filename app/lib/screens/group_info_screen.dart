@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../core/localization/vibe_localizations.dart';
+
 import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
@@ -63,12 +65,13 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
   }
 
   Future<void> _rename() async {
+    final l = VibeLocalizations.of(context);
     final controller = TextEditingController(text: widget.title);
     final newTitle = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: context.vibeSurface,
-        title: const Text('Название группы'),
+        title: Text(l.groupNameTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -78,7 +81,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           ),
           cursorColor: context.vibePrimary,
           decoration: InputDecoration(
-            hintText: 'Введите название',
+            hintText: l.groupInfoNameHint,
             hintStyle: VibeTypography.body.copyWith(
               color: context.vibeTextTertiary,
             ),
@@ -87,7 +90,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(l.dialogCancel),
           ),
           FilledButton(
             onPressed: () =>
@@ -95,7 +98,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             style: FilledButton.styleFrom(
               backgroundColor: context.vibePrimary,
             ),
-            child: const Text('Сохранить'),
+            child: Text(l.dialogSave),
           ),
         ],
       ),
@@ -111,11 +114,12 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     if (ok) {
       Navigator.of(context).pop(GroupInfoResult(renamedTitle: newTitle));
     } else {
-      _snack('Не удалось переименовать');
+      _snack(l.groupRenameFailed);
     }
   }
 
   Future<void> _leave() async {
+    final l = VibeLocalizations.of(context);
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -131,7 +135,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Выйти из группы?',
+              l.groupLeaveTitle,
               style: VibeTypography.subtitle.copyWith(
                 color: context.vibeTextPrimary,
               ),
@@ -158,7 +162,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                   ),
                   textStyle: VibeTypography.button,
                 ),
-                child: const Text('Выйти из группы'),
+                child: Text(l.groupLeaveConfirm),
               ),
             ),
           ],
@@ -173,7 +177,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     if (ok) {
       Navigator.of(context).pop(const GroupInfoResult(left: true));
     } else {
-      _snack('Не удалось выйти');
+      _snack(l.groupLeaveFailed);
     }
   }
 
@@ -234,6 +238,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final members = _members;
 
     return Scaffold(
@@ -245,9 +250,9 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               leading: VibeTopBarIcon(
                 icon: Icons.arrow_back_ios_new_rounded,
                 onTap: () => Navigator.of(context).pop(),
-                tooltip: 'Назад',
+                tooltip: l.tooltipBack,
               ),
-              title: const VibeTopBarTitle('Инфо группы'),
+              title: VibeTopBarTitle(l.groupInfoTitle),
             ),
           ),
           SliverToBoxAdapter(
@@ -266,7 +271,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 const SizedBox(height: 4),
                 Text(
                   _loading
-                      ? 'Загружаем…'
+                      ? l.groupLoading
                       : '${members.length} участник(а)',
                   style: VibeTypography.bodyMedium.copyWith(
                     color: context.vibeTextTertiary,
@@ -286,7 +291,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                   Expanded(
                     child: _GroupAction(
                       icon: VibeIcons.edit,
-                      label: 'Переименовать',
+                      label: l.groupInfoRename,
                       onTap: _busy ? null : _rename,
                     ),
                   ),
@@ -294,7 +299,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                   Expanded(
                     child: _GroupAction(
                       icon: Icons.logout_rounded,
-                      label: 'Выйти',
+                      label: l.groupInfoLeave,
                       color: context.vibeError,
                       onTap: _busy ? null : _leave,
                     ),
@@ -312,7 +317,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 VibeSpacing.sm,
               ),
               child: Text(
-                'Участники',
+                l.groupMembers,
                 style: VibeTypography.subtitle.copyWith(
                   color: context.vibeTextPrimary,
                 ),
@@ -320,11 +325,11 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             ),
           ),
           if (members.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.only(top: VibeSpacing.xl),
                 child: Center(
-                  child: Text('Пока нет участников', style: VibeTypography.body),
+                   child: Text(l.groupNoMembers, style: VibeTypography.body),
                 ),
               ),
             )
@@ -356,7 +361,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                       if (isMe) ...[
                         const SizedBox(width: 6),
                         Text(
-                          'Вы',
+                          l.chatYou,
                           style: VibeTypography.caption.copyWith(
                             color: context.vibeTextTertiary,
                           ),
@@ -365,7 +370,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                     ],
                   ),
                   subtitle: Text(
-                    isOnline ? 'в сети' : 'был(а) недавно',
+                    isOnline ? l.statusOnline : l.statusRecently,
                     style: VibeTypography.caption.copyWith(
                       color: isOnline
                           ? VibeColors.success
@@ -381,9 +386,9 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           leading: VibeTopBarIcon(
             icon: Icons.arrow_back_ios_new_rounded,
             onTap: () => Navigator.of(context).pop(),
-            tooltip: 'Назад',
+            tooltip: l.tooltipBack,
           ),
-          title: const VibeTopBarTitle('Инфо группы'),
+              title: VibeTopBarTitle(l.groupInfoTitle),
         ),
       ),
     );

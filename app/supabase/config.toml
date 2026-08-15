@@ -1,4 +1,0 @@
-project_id = "vibe"
-
-[functions.send-push]
-verify_jwt = false

@@ -19,13 +19,21 @@ import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_avatar.dart';
 import '../core/widgets/vibe_offline_banner.dart';
+import '../core/widgets/swipe_back_wrapper.dart';
+import 'gif_search_panel.dart';
 import '../chat/chat_controller.dart';
 import '../chat/chat_media_gallery_screen.dart';
 import '../chat/models.dart';
 import '../chat/widgets/chat_app_bar.dart';
 import '../chat/widgets/chat_composer.dart';
 import '../chat/widgets/chat_menu_sheet.dart';
+import '../chat/chat_export_service.dart';
+import '../chat/widgets/chat_toolbar_widgets.dart';
+import '../chat/widgets/attachment_menu.dart';
+import '../chat/widgets/chat_planks.dart';
 import '../chat/widgets/message_bubble.dart';
+import '../chat/widgets/telegram_context_menu.dart';
+import '../chat/widgets/mentions_autocomplete.dart';
 import '../core/services/notification_service.dart';
 import '../core/services/scheduled_service.dart';
 import '../data/backend.dart';
@@ -39,17 +47,31 @@ import 'forward_message_screen.dart';
 import 'group_info_screen.dart';
 import 'peer_profile_screen.dart';
 import 'video_round_recorder.dart';
+import 'call_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../core/localization/vibe_localizations.dart';
 
 /// Экран чата. Собирает ввод и отображает ленту; вся работа с данными —
 /// в `ChatController` (Single Writer, см. docs/vibe/STATE_MACHINE.md).
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.chat, this.backend});
+  const ChatScreen({
+    super.key,
+    required this.chat,
+    this.backend,
+    this.chats,
+    this.initialIndex = 0,
+  });
 
   final VibeChat chat;
 
   /// Тестовая подмена данных (widget-тесты); null — живой бэкенд.
   final VibeBackendApi? backend;
+
+  /// Список чатов для свайпа между ними (V2.3).
+  final List<VibeChat>? chats;
+
+  /// Начальный индекс в списке чатов.
+  final int initialIndex;
 
   /// Запись гифки во временный файл для отправки (инжектируемо для тестов —
   /// в widget-тестах реальный файловый I/O не завершается в FakeAsync).
@@ -117,6 +139,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _stickDateLabel;
   int _noIdSeq = 0;
 
+  // ─── @mentions autocomplete ───
+  String _mentionQuery = '';
+
   GlobalKey _keyOf(dynamic id) {
     final key = _msgKeys[id];
     if (key != null) return key;
@@ -154,6 +179,25 @@ class _ChatScreenState extends State<ChatScreen> {
     final canSend = _input.text.trim().isNotEmpty;
     if (canSend != _canSend) {
       setState(() => _canSend = canSend);
+    }
+    // @mentions: detect @ and extract query after it.
+    final text = _input.text;
+    final cursorPos = _input.selection.base.offset;
+    if (cursorPos > 0) {
+      final beforeCursor = text.substring(0, cursorPos);
+      final atIndex = beforeCursor.lastIndexOf('@');
+      if (atIndex >= 0 && (atIndex == 0 || beforeCursor[atIndex - 1] == ' ')) {
+        final query = beforeCursor.substring(atIndex + 1);
+        if (query.length <= 20 && !query.contains(' ')) {
+          if (_mentionQuery != query) {
+            setState(() => _mentionQuery = query);
+          }
+          return;
+        }
+      }
+    }
+    if (_mentionQuery.isNotEmpty) {
+      setState(() => _mentionQuery = '');
     }
   }
 
@@ -222,7 +266,7 @@ class _ChatScreenState extends State<ChatScreen> {
         best = i;
       }
     }
-    final label = best < 0 ? null : fmtDateLabel(msgs[best].date);
+    final label = best < 0 ? null : fmtDateLabel(context, msgs[best].date);
     if (label != _stickDateLabel) {
       setState(() => _stickDateLabel = label);
     }
@@ -247,6 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 3.9: отложить отправку текста (удержание кнопки отправки).
   void _showScheduleSheet(String text) {
     HapticFeedback.selectionClick();
+    final l = VibeLocalizations.of(context);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -263,7 +308,7 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Отложить отправку',
+                l.scheduleTitle,
                 style: VibeTypography.subtitle.copyWith(
                   color: context.vibeTextPrimary,
                 ),
@@ -284,7 +329,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   VibeIcons.clock,
                   color: context.vibePrimary,
                 ),
-                title: const Text('Через 1 час'),
+                title: Text(l.scheduleIn1Hour),
                 onTap: () => _applySchedule(
                   sheetCtx,
                   text,
@@ -297,7 +342,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   VibeIcons.clock,
                   color: context.vibePrimary,
                 ),
-                title: const Text('Завтра в 09:00'),
+                title: Text(l.scheduleTomorrow9am),
                 onTap: () => _applySchedule(
                   sheetCtx,
                   text,
@@ -315,7 +360,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.event_rounded, color: context.vibePrimary),
-                title: const Text('Выбрать дату и время…'),
+                title: Text(l.schedulePickDatetime),
                 onTap: () async {
                   Navigator.of(sheetCtx).pop();
                   final now = DateTime.now();
@@ -358,7 +403,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _input.clear();
     _chat.saveDraft('');
     setState(() {});
-    _snack('Запланировано на ${_scheduleLabel(when)}');
+    _snack('${VibeLocalizations.of(context).scheduleScheduled} ${_scheduleLabel(when)}');
   }
 
   /// Список отложенных сообщений чата с отменой по строке.
@@ -366,6 +411,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final pending = ScheduledService.instance.pendingFor(widget.chat.id);
     if (pending.isEmpty) return;
     HapticFeedback.selectionClick();
+    final l = VibeLocalizations.of(context);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -382,7 +428,7 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Запланированные сообщения',
+                l.scheduleListTitle,
                 style: VibeTypography.subtitle.copyWith(
                   color: context.vibeTextPrimary,
                 ),
@@ -415,11 +461,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         widget.chat.id,
                         m.localId,
                       );
-                      _snack('Отправка отменена');
+                      _snack(l.scheduleCancelled);
                     },
                     icon: const Icon(VibeIcons.close, size: 20),
                     color: context.vibeError,
-                    tooltip: 'Отменить отправку',
+                    tooltip: l.scheduleCancelSend,
                   ),
                 ),
             ],
@@ -450,7 +496,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final tmp = await ChatScreen.writeGifTemp(assetName);
       await _chat.sendGif(tmp, assetName);
     } catch (e) {
-      _snack('Не удалось отправить гифку: $e');
+      _snack('${VibeLocalizations.of(context).errorGifSendFailed}: $e');
     }
   }
 
@@ -471,7 +517,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await _stopPlayback();
     final hasPermission = await _recorder.hasPermission();
     if (!hasPermission) {
-      _snack('Нет разрешения на микрофон');
+      _snack(VibeLocalizations.of(context).errorNoMicPermission);
       return;
     }
     final dir = await getTemporaryDirectory();
@@ -483,7 +529,7 @@ class _ChatScreenState extends State<ChatScreen> {
         path: path,
       );
     } catch (_) {
-      _snack('Не удалось начать запись');
+      _snack(VibeLocalizations.of(context).errorRecordStartFailed);
       return;
     }
     HapticFeedback.mediumImpact();
@@ -536,7 +582,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     if (path != null) {
       if (seconds < 1) {
-        _snack('Слишком короткая запись');
+        _snack(VibeLocalizations.of(context).errorTooShortRecording);
         return;
       }
       await _chat.sendVoice(path: path, seconds: seconds);
@@ -556,6 +602,53 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd());
   }
 
+  /// Reply privately to a message in a group chat (V4.2).
+  void _replyPrivately(int i) {
+    HapticFeedback.mediumImpact();
+    _snack(VibeLocalizations.of(context).actionPrivateReplySoon);
+  }
+
+  void _reportMessage(ChatMsg msg) {
+    HapticFeedback.mediumImpact();
+    final l = VibeLocalizations.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: context.vibeSurfaceHigh,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(VibeRadius.bottomSheet)),
+        ),
+        padding: const EdgeInsets.all(VibeSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l.reportTitle,
+                style: VibeTypography.subtitle
+                    .copyWith(color: context.vibeTextPrimary)),
+            const SizedBox(height: VibeSpacing.md),
+            Text(l.reportSelectReason,
+                style: VibeTypography.body
+                    .copyWith(color: context.vibeTextSecondary)),
+            const SizedBox(height: VibeSpacing.lg),
+            ...[l.reportSpam, l.reportViolence, l.reportCp, l.reportPersonal,
+                l.reportIncitement, l.reportOther].map((reason) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(reason,
+                      style: TextStyle(color: context.vibeTextPrimary)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _snack('${l.reportSubmitted}: $reason');
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _startEdit(int i) {
     _chat.startEdit(i);
     setState(() => _input.text = _chat.messages[i].text);
@@ -565,6 +658,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _deleteMsg(int i) async {
     final msg = _chat.messages[i];
     final isMine = !msg.incoming;
+    final l = VibeLocalizations.of(context);
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -580,7 +674,7 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Удалить сообщение',
+              l.msgDeleteTitle,
               style: VibeTypography.subtitle.copyWith(
                 color: context.vibeTextPrimary,
               ),
@@ -589,14 +683,14 @@ class _ChatScreenState extends State<ChatScreen> {
             if (isMine && msg.serverId != null) ...[
               ActionRow(
                 icon: Icons.group_off_rounded,
-                label: 'Удалить для всех',
+                label: l.msgDeleteForEveryone,
                 onTap: () => Navigator.of(context).pop('everyone'),
               ),
               const SizedBox(height: VibeSpacing.xs),
             ],
             ActionRow(
               icon: Icons.delete_outline_rounded,
-              label: 'Удалить для меня',
+              label: l.msgDeleteForMe,
               onTap: () => Navigator.of(context).pop('me'),
             ),
           ],
@@ -628,7 +722,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
     ];
     if (items.isEmpty) {
-      _snack('В чате пока нет текстовых сообщений');
+      _snack(VibeLocalizations.of(context).chatNoTextMessages);
       return;
     }
     final id = await Navigator.of(context).push<String>(
@@ -656,7 +750,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (result.renamedTitle != null) {
       HapticFeedback.lightImpact();
       _chat.setGroupTitle(result.renamedTitle!);
-      _snack('Группа переименована');
+      _snack(VibeLocalizations.of(context).groupRenamed);
     }
   }
 
@@ -679,6 +773,9 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Выбор способа звонка — как в TG: жмём «трубку», появляется
   /// аккуратный лист с аудио- и видеозвонком.
   void _chooseCall(BuildContext context) {
+    final l = VibeLocalizations.of(context);
+    final peerId = widget.chat.peerId ?? '';
+    final callId = widget.chat.id;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -696,24 +793,44 @@ class _ChatScreenState extends State<ChatScreen> {
             SheetCallTile(
               icon: VibeIcons.phone,
               color: VibeColors.success,
-              title: 'Аудиозвонок',
-              subtitle: 'Через Vibe',
+              title: l.callAudio,
+              subtitle: l.callViaVibe,
               onTap: () {
-                HapticFeedback.mediumImpact(); // БОЛЕЕ МОЩНЫЙ ОТКЛИК
+                HapticFeedback.mediumImpact();
                 Navigator.of(sheetCtx).pop();
-                _snack('Аудиозвонок — в v2.0');
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CallScreen(
+                      peerName: widget.chat.title,
+                      peerEmoji: '',
+                      callId: callId,
+                      peerId: peerId,
+                      video: false,
+                    ),
+                  ),
+                );
               },
             ),
             const SizedBox(height: VibeSpacing.xs),
             SheetCallTile(
               icon: VibeIcons.video,
               color: context.vibePrimary,
-              title: 'Видеозвонок',
-              subtitle: 'Через Vibe',
+              title: l.callVideo,
+              subtitle: l.callViaVibe,
               onTap: () {
-                HapticFeedback.mediumImpact(); // БОЛЕЕ МОЩНЫЙ ОТКЛИК
+                HapticFeedback.mediumImpact();
                 Navigator.of(sheetCtx).pop();
-                _snack('Видеозвонок — в v2.0');
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CallScreen(
+                      peerName: widget.chat.title,
+                      peerEmoji: '',
+                      callId: callId,
+                      peerId: peerId,
+                      video: true,
+                    ),
+                  ),
+                );
               },
             ),
           ],
@@ -741,6 +858,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onChatInfo: _showChatInfo,
         onArchive: _archiveChat,
         onDelete: _deleteChat,
+        onExport: _exportChat,
       ),
     );
   }
@@ -748,29 +866,27 @@ class _ChatScreenState extends State<ChatScreen> {
     /// 8.3.2: «Архивировать» из меню чата — чат уходит в облачный архив.
   void _archiveChat() {
     _backend.setChatArchived(widget.chat.id, archived: true);
-    _snack('Чат в архиве');
+    _snack(VibeLocalizations.of(context).chatArchivedSnack);
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   /// 8.3.2: «Удалить чат» — для себя, локально (как в TG: чат исчезает
   /// из ленты; у собеседника история остаётся). Серверного deleteChat нет.
   Future<bool> _deleteChat() async {
+    final l = VibeLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Text('Удалить чат?'),
-        content: const Text(
-          'Чат исчезнет из вашего списка. История останется '
-          'у собеседника — удаление локальное, для этого устройства.',
-        ),
+        title: Text(l.chatDeleteTitle),
+        content: Text(l.chatDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(l.dialogCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Удалить'),
+            child: Text(l.dialogDelete),
           ),
         ],
       ),
@@ -784,13 +900,26 @@ class _ChatScreenState extends State<ChatScreen> {
     return true;
   }
 
+  void _exportChat() {
+    ChatExportService.instance.exportChat(
+      chatId: widget.chat.id,
+      chatTitle: widget.chat.peerName ?? widget.chat.id,
+      messages: _chat.messages,
+    ).then((path) {
+      if (path != null && mounted) {
+        _snack(VibeLocalizations.of(context).chatExportDone);
+      }
+    });
+  }
+
   /// 2.12: сведения о чате — тип, участник, число сообщений (локальные данные).
   void _showChatInfo() {    final chat = widget.chat;
+    final l = VibeLocalizations.of(context);
     final kind = switch (chat.kind) {
-      'pm' => 'Личный чат',
-      'group' => 'Группа',
-      'channel' => 'Канал',
-      _ => 'Чат',
+      'pm' => l.chatKindPm,
+      'group' => l.chatKindGroup,
+      'channel' => l.chatKindChannel,
+      _ => l.chatKindChat,
     };
     final peer = chat.peerName != null && chat.peerName!.isNotEmpty
         ? chat.peerName!
@@ -849,13 +978,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   VibeIcons.user,
                   color: context.vibePrimary,
                 ),
-                title: const Text('Участник'),
+                title: Text(l.chatMember),
                 trailing: Text(peer, style: VibeTypography.bodyMedium),
               ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.forum_outlined, color: context.vibePrimary),
-              title: const Text('Сообщений'),
+              title: Text(l.chatMessagesCount),
               trailing: Text(
                 '${_chat.messages.length}',
                 style: VibeTypography.bodyMedium,
@@ -868,21 +997,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _confirmClearHistory() async {
+    final l = VibeLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Text('Очистить историю?'),
-        content: const Text(
-          'Все сообщения этого чата будут удалены у всех участников.',
-        ),
+        title: Text(l.chatClearHistoryTitle),
+        content: Text(l.chatClearHistoryBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(l.dialogCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Очистить'),
+            child: Text(l.actionClear),
           ),
         ],
       ),
@@ -905,107 +1033,42 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openAttachmentMenu(BuildContext context) {
     HapticFeedback.lightImpact();
-    Widget row(List<Widget> items) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: items,
-      );
-    }
-
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          VibeSpacing.xl,
-          VibeSpacing.sm,
-          VibeSpacing.xl,
-          VibeSpacing.xxl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Вложение',
-              style: VibeTypography.subtitle.copyWith(
-                color: context.vibeTextPrimary,
-              ),
-            ),
-            const SizedBox(height: VibeSpacing.lg),
-            row([
-              AttachmentItem(
-                icon: VibeIcons.camera,
-                color: VibeColors.vivid,
-                label: 'Фото',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _sendPhoto();
-                },
-              ),
-              AttachmentItem(
-                icon: VibeIcons.mic,
-                color: const Color(0xFFEC4899),
-                label: 'Голос',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _startRecording();
-                },
-              ),
-              AttachmentItem(
-                icon: Icons.photo_library_rounded,
-                color: VibeColors.primary,
-                label: 'Медиа',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showAttachments();
-                },
-              ),
-            ]),
-            const SizedBox(height: VibeSpacing.lg),
-            row([
-              AttachmentItem(
-                icon: VibeIcons.file,
-                color: const Color(0xFFF59E0B),
-                label: 'Файл',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _sendFile();
-                },
-              ),
-              AttachmentItem(
-                icon: VibeIcons.pin,
-                color: const Color(0xFF10B981),
-                label: 'Локация',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _sendLocation(context);
-                },
-              ),
-              AttachmentItem(
-                icon: VibeIcons.user,
-                color: const Color(0xFF3B82F6),
-                label: 'Контакт',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _sendContact(context);
-                },
-              ),
-            ]),
-            const SizedBox(height: VibeSpacing.lg),
-            row([
-              AttachmentItem(
-                icon: VibeIcons.bubble,
-                color: context.vibePrimary,
-                label: 'Опрос',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _sendPoll(context);
-                },
-              ),
-            ]),
-          ],
-        ),
+      builder: (context) => AttachmentMenu(
+        onPhoto: () {
+          Navigator.of(context).pop();
+          _sendPhoto();
+        },
+        onVoice: () {
+          Navigator.of(context).pop();
+          _startRecording();
+        },
+        onMedia: () {
+          Navigator.of(context).pop();
+          _showAttachments();
+        },
+        onFile: () {
+          Navigator.of(context).pop();
+          _sendFile();
+        },
+        onLocation: () {
+          Navigator.of(context).pop();
+          _sendLocation(context);
+        },
+        onContact: () {
+          Navigator.of(context).pop();
+          _sendContact(context);
+        },
+        onPoll: () {
+          Navigator.of(context).pop();
+          _sendPoll(context);
+        },
+        onGif: () {
+          Navigator.of(context).pop();
+          _openGifSearch();
+        },
       ),
     );
   }
@@ -1014,7 +1077,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _sendFile() {
     unawaited(() async {
       final result = await FilePicker.pickFiles(
-        dialogTitle: 'Выберите файл',
+        dialogTitle: VibeLocalizations.of(context).actionPickFile,
       );
       if (result == null || result.files.isEmpty) return;
       final path = result.files.first.path;
@@ -1028,39 +1091,40 @@ class _ChatScreenState extends State<ChatScreen> {
     final latCtrl = TextEditingController();
     final lngCtrl = TextEditingController();
     final labelCtrl = TextEditingController();
+    final l = VibeLocalizations.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Локация'),
+        title: Text(l.locationTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: latCtrl,
               keyboardType: TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Широта (например 55.7558)',
+              decoration: InputDecoration(
+                labelText: l.locationLatitude,
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: lngCtrl,
               keyboardType: TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Долгота (например 37.6173)',
+              decoration: InputDecoration(
+                labelText: l.locationLongitude,
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: labelCtrl,
-              decoration: const InputDecoration(labelText: 'Подпись (необяз.)'),
+              decoration: InputDecoration(labelText: l.locationLabel),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(l.dialogCancel),
           ),
           FilledButton(
             onPressed: () {
@@ -1076,7 +1140,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   lat > 90 ||
                   lng < -180 ||
                   lng > 180) {
-                VibeToast.show(ctx, 'Введите валидные координаты');
+                VibeToast.show(ctx, l.locationInvalidCoords);
                 return;
               }
               Navigator.of(ctx).pop();
@@ -1098,7 +1162,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 attach,
               );
             },
-            child: const Text('Отправить'),
+            child: Text(l.actionSend),
           ),
         ],
       ),
@@ -1158,7 +1222,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Padding(
                 padding: const EdgeInsets.all(VibeSpacing.lg),
                 child: Text(
-                  'Контактов пока нет — добавьте их на вкладке «Контакты»',
+                  VibeLocalizations.of(context).contactEmpty,
                   style: VibeTypography.bodyMedium.copyWith(
                     color: context.vibeTextSecondary,
                   ),
@@ -1171,16 +1235,52 @@ class _ChatScreenState extends State<ChatScreen> {
     }());
   }
 
+  /// GIF search panel with Tenor API.
+  Color _getWallpaperColor() {
+    final s = SettingsService.instance;
+    final type = s.wallpaperType;
+    if (type == 'color') {
+      return Color(s.wallpaperColor);
+    } else if (type == 'gradient') {
+      return Color(s.wallpaperColor);
+    }
+    return context.isDarkMode
+        ? context.vibeSurfaceLow
+        : const Color(0xFFEBE9F4);
+  }
+
+  void _openGifSearch() {
+    showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => GifSearchPanel(
+        onGifSelected: (path) {
+          _sendGifFromFile(path);
+        },
+      ),
+    );
+  }
+
+  void _sendGifFromFile(String path) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) return;
+      await _chat.sendGif(file, 'gif.gif');
+    } catch (_) {}
+  }
+
   /// Опрос: вопрос + 2–4 варианта → опрос в чате.
   void _sendPoll(BuildContext context) {
     final questionCtrl = TextEditingController();
     final optionCtrls = [TextEditingController(), TextEditingController()];
+    final l = VibeLocalizations.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) => AlertDialog(
-            title: const Text('Опрос'),
+            title: Text(l.pollTitle),
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
@@ -1189,8 +1289,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     TextField(
                       controller: questionCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Вопрос',
+                      decoration: InputDecoration(
+                        labelText: l.pollQuestion,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1198,7 +1298,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       TextField(
                         controller: optionCtrls[i],
                         decoration: InputDecoration(
-                          labelText: 'Вариант ${i + 1}',
+                          labelText: '${l.pollOption} ${i + 1}',
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1213,7 +1313,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             });
                           },
                           icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Добавить вариант'),
+                          label: Text(l.pollAddOption),
                         ),
                       ),
                   ],
@@ -1223,7 +1323,7 @@ class _ChatScreenState extends State<ChatScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Отмена'),
+                child: Text(l.dialogCancel),
               ),
               FilledButton(
                 onPressed: () {
@@ -1233,7 +1333,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       .where((o) => o.isNotEmpty)
                       .toList();
                   if (q.isEmpty || options.length < 2) {
-                    VibeToast.show(ctx, 'Нужны вопрос и минимум 2 варианта');
+                    VibeToast.show(ctx, l.pollValidation);
                     return;
                   }
                   Navigator.of(ctx).pop();
@@ -1252,7 +1352,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     attach,
                   );
                 },
-                child: const Text('Опубликовать'),
+                child: Text(l.actionPublish),
               ),
             ],
           ),
@@ -1273,11 +1373,12 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     } catch (_) {
-      if (mounted) VibeToast.show(context, 'Не удалось открыть чат');
+      if (mounted) VibeToast.show(context, VibeLocalizations.of(context).errorChatOpenFailed);
     }
   }
 
   void _showAttachments() {
+    final l = VibeLocalizations.of(context);
     final photos = _chat.messages
         .where((m) => m.type == MsgType.photo)
         .toList();
@@ -1301,14 +1402,14 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Вложения',
+                l.attachmentListTitle,
                 style: VibeTypography.subtitle.copyWith(
                   color: context.vibeTextPrimary,
                 ),
               ),
               const SizedBox(height: VibeSpacing.sm),
               Text(
-                '${photos.length} фото · ${voices.length} голосовых',
+                '${photos.length} ${l.attachmentPhoto} · ${voices.length} ${l.attachmentVoice}',
                 style: VibeTypography.caption.copyWith(
                   color: context.vibeTextTertiary,
                 ),
@@ -1319,7 +1420,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   padding: const EdgeInsets.symmetric(vertical: VibeSpacing.lg),
                   child: Center(
                     child: Text(
-                      'В этом чате пока нет вложений',
+                      l.attachmentEmpty,
                       style: VibeTypography.body.copyWith(
                         color: context.vibeTextTertiary,
                       ),
@@ -1370,148 +1471,209 @@ class _ChatScreenState extends State<ChatScreen> {
   ];
 
   void _showMessageActions(int i) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      // SingleChildScrollView: меню на маленьких экранах не помещается
-      // (переполнение Column) — нижние пункты должны оставаться доступными.
-      builder: (context) => SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            VibeSpacing.xl,
-            VibeSpacing.xs,
-            VibeSpacing.xl,
-            VibeSpacing.xxl,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Действия',
-                style: VibeTypography.subtitle.copyWith(
-                  color: context.vibeTextPrimary,
-                ),
-              ),
-              const SizedBox(height: VibeSpacing.md),
-              Wrap(
-                spacing: VibeSpacing.sm,
-                runSpacing: VibeSpacing.sm,
-                children: [
-                  for (final (_, r) in _emojiOptions.indexed)
-                    ReactionButton(
-                      emoji: r.$1,
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        _chat.addReaction(i, r.$1);
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: VibeSpacing.md),
-              ActionRow(
-                icon: VibeIcons.reply,
-                label: 'Ответить',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _replyToMsg(i);
-                },
-              ),
-              ActionRow(
-                icon: VibeIcons.copy,
-                label: 'Копировать',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Clipboard.setData(
-                    ClipboardData(text: _chat.messages[i].text),
-                  );
-                  _snack('Скопировано');
-                },
-              ),
-              ActionRow(
-                icon: Icons.bookmark_add_outlined,
-                label: 'Сохранить в Избранное',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _saveToSaved(_chat.messages[i]);
-                },
-              ),
-              ActionRow(
-                icon: Icons.reply_all_rounded,
-                label: 'Переслать',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _openForward(_chat.messages[i]);
-                },
-              ),
-              if (_chat.messages[i].serverId != null &&
-                  _chat.pins.contains(_chat.messages[i].serverId))
-                ActionRow(
-                  icon: VibeIcons.pin,
-                  label: 'Открепить',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _chat.unpin(_chat.messages[i].serverId!);
-                  },
-                )
-              else if (_chat.messages[i].serverId != null)
-                ActionRow(
-                  icon: VibeIcons.pin,
-                  label: 'Закрепить',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _chat.setPin(_chat.messages[i].serverId);
-                  },
-                ),
-              if (!_chat.messages[i].incoming &&
-                  _chat.messages[i].type == MsgType.text)
-                ActionRow(
-                  icon: VibeIcons.edit,
-                  label: 'Редактировать',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _startEdit(i);
-                  },
-                ),
-              if (_chat.messages[i].edited)
-                ActionRow(
-                  icon: Icons.history_rounded,
-                  label: 'История правок',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _showEditHistory(_chat.messages[i]);
-                  },
-                ),
-              ActionRow(
-                icon: Icons.delete_outline_rounded,
-                label: 'Удалить',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _deleteMsg(i);
-                },
-              ),
-            ],
-          ),
+    final l = VibeLocalizations.of(context);
+    final msg = _chat.messages[i];
+    final isMy = !msg.incoming;
+    final hasText = msg.text.isNotEmpty;
+
+    TelegramContextMenu.show(
+      context,
+      reactions: _emojiOptions.map((e) => e.$1).toList(),
+      onReactionTap: (emoji) {
+        _chat.addReaction(i, emoji);
+      },
+      children: [
+        ActionTile(
+          icon: VibeIcons.reply,
+          label: l.msgReply,
+          onTap: () {
+            Navigator.of(context).pop();
+            _replyToMsg(i);
+          },
         ),
-      ),
+        if (widget.chat.kind == 'group' && msg.incoming)
+          ActionTile(
+            icon: Icons.reply_all_rounded,
+            label: l.msgReplyPrivately,
+            onTap: () {
+              Navigator.of(context).pop();
+              _replyPrivately(i);
+            },
+          ),
+        ActionTile(
+          icon: VibeIcons.copy,
+          label: l.msgCopy,
+          onTap: () {
+            Navigator.of(context).pop();
+            Clipboard.setData(ClipboardData(text: msg.text));
+            _snack(l.msgCopied);
+          },
+        ),
+        if (msg.serverId != null)
+          ActionTile(
+            icon: Icons.link_rounded,
+            label: l.msgCopyLink,
+            onTap: () {
+              Navigator.of(context).pop();
+              final link = 'vibe.me/chat/${widget.chat.id}?msg=${msg.serverId}';
+              Clipboard.setData(ClipboardData(text: link));
+              _snack(l.msgLinkCopied);
+            },
+          ),
+        ActionTile(
+          icon: Icons.reply_all_rounded,
+          label: l.msgForward,
+          onTap: () {
+            Navigator.of(context).pop();
+            _openForward(msg);
+          },
+        ),
+        ActionTile(
+          icon: Icons.bookmark_add_outlined,
+          label: l.msgSaveToSaved,
+          onTap: () {
+            Navigator.of(context).pop();
+            _saveToSaved(msg);
+          },
+        ),
+        ActionTile(
+          icon: Icons.check_circle_outline_rounded,
+          label: l.msgSelect,
+          onTap: () {
+            Navigator.of(context).pop();
+            final id = msg.serverId;
+            if (id != null) _chat.toggleSelect(id);
+          },
+        ),
+        if (msg.text.isNotEmpty)
+          ActionTile(
+            icon: Icons.translate_rounded,
+            label: l.msgTranslate,
+            onTap: () {
+              Navigator.of(context).pop();
+              _translateMessage(msg);
+            },
+          ),
+        if (msg.serverId != null && _chat.pins.contains(msg.serverId))
+          ActionTile(
+            icon: VibeIcons.pin,
+            label: l.msgUnpin,
+            onTap: () {
+              Navigator.of(context).pop();
+              _chat.unpin(msg.serverId!);
+            },
+          )
+        else if (msg.serverId != null)
+          ActionTile(
+            icon: VibeIcons.pin,
+            label: l.msgPin,
+            onTap: () {
+              Navigator.of(context).pop();
+              _chat.setPin(msg.serverId);
+            },
+          ),
+        if (isMy && msg.type == MsgType.text && hasText)
+          ActionTile(
+            icon: VibeIcons.edit,
+            label: l.msgEdit,
+            onTap: () {
+              Navigator.of(context).pop();
+              _startEdit(i);
+            },
+          ),
+        if (msg.edited)
+          ActionTile(
+            icon: Icons.history_rounded,
+            label: l.msgEditHistory,
+            onTap: () {
+              Navigator.of(context).pop();
+              _showEditHistory(msg);
+            },
+          ),
+        if (msg.incoming)
+          ActionTile(
+            icon: Icons.flag_outlined,
+            label: l.msgReport,
+            onTap: () {
+              Navigator.of(context).pop();
+              _reportMessage(msg);
+            },
+          ),
+        ActionTile(
+          icon: Icons.delete_outline_rounded,
+          label: l.chatScreenActionDelete,
+          isDestructive: true,
+          onTap: () {
+            Navigator.of(context).pop();
+            _deleteMsg(i);
+          },
+        ),
+      ],
     );
   }
 
   Future<void> _saveToSaved(ChatMsg msg) async {
     final backend = _backend;
+    final l = VibeLocalizations.of(context);
     try {
       final savedId = await backend.ensureSavedChat();
       if (savedId.isEmpty) {
-        _snack('Не удалось сохранить');
+        _snack(l.errorSaveFailed);
         return;
       }
       final m = await backend.forwardMessage(savedId, _msgToBackend(msg));
       if (!mounted) return;
-      _snack(m != null ? 'Сохранено в Избранное' : 'Не удалось сохранить');
+      _snack(m != null ? l.msgSavedToSaved : l.errorSaveFailed);
     } catch (_) {
       if (!mounted) return;
-      _snack('Сервер недоступен');
+      _snack(VibeLocalizations.of(context).errorServerUnavailable);
     }
+  }
+
+  /// Translate message text using device locale (placeholder for API).
+  void _translateMessage(ChatMsg msg) {
+    HapticFeedback.lightImpact();
+    final l = VibeLocalizations.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => TelegramContextMenu(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(VibeSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.translate_rounded, color: context.vibePrimary, size: 20),
+                    const SizedBox(width: VibeSpacing.sm),
+                    Text(
+                      l.msgTranslated,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.vibeTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: VibeSpacing.sm),
+                Text(
+                  msg.text,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: context.vibeTextPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// История правок сообщения: снимки текста от новых к старым
@@ -1519,11 +1681,12 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _showEditHistory(ChatMsg msg) async {
     final serverId = msg.serverId;
     if (serverId == null) return;
+    final l = VibeLocalizations.of(context);
     List<MessageEdit> edits;
     try {
       edits = await _backend.listMessageEdits(serverId);
     } catch (_) {
-      _snack('Сервер недоступен');
+      _snack(l.errorServerUnavailable);
       return;
     }
     if (!mounted) return;
@@ -1543,10 +1706,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: VibeSpacing.lg),
-                    Text('История правок', style: VibeTypography.subtitle),
+                    Text(l.msgEditHistory, style: VibeTypography.subtitle),
                     const SizedBox(height: VibeSpacing.md),
                     Text(
-                      'Правок не найдено',
+                      l.msgNoEdits,
                       style: VibeTypography.body.copyWith(
                         color: context.vibeTextSecondary,
                       ),
@@ -1557,7 +1720,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('История правок', style: VibeTypography.subtitle),
+                    Text(l.msgEditHistory, style: VibeTypography.subtitle),
                     const SizedBox(height: VibeSpacing.sm),
                     Flexible(
                       child: ListView.separated(
@@ -1566,24 +1729,37 @@ class _ChatScreenState extends State<ChatScreen> {
                         separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (_, i) {
                           final e = edits[i];
+                          final dt = e.editedAt;
+                          final date = '${dt.day}.${dt.month}.${dt.year}';
+                          final time = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    e.text,
-                                    style: VibeTypography.body.copyWith(
-                                      color: context.vibeTextPrimary,
+                                Row(
+                                  children: [
+                                    Icon(
+                                      VibeIcons.edit,
+                                      size: 13,
+                                      color: context.vibeTextTertiary,
                                     ),
-                                  ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '$date $time',
+                                      style: VibeTypography.caption.copyWith(
+                                        color: context.vibeTextTertiary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: VibeSpacing.sm),
-                                Icon(
-                                  VibeIcons.edit,
-                                  size: 15,
-                                  color: context.vibeTextTertiary,
+                                const SizedBox(height: 4),
+                                Text(
+                                  e.text,
+                                  style: VibeTypography.body.copyWith(
+                                    color: context.vibeTextPrimary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1599,14 +1775,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openForward(ChatMsg msg) async {
+    HapticFeedback.mediumImpact();
     final backend = _backend;
     final me = backend.myProfileId;
     if (me == null) return;
+    final l = VibeLocalizations.of(context);
     List<VibeChat> chats;
     try {
       chats = await backend.listChats();
     } catch (_) {
-      _snack('Сервер недоступен');
+      _snack(l.errorServerUnavailable);
       return;
     }
     if (!mounted) return;
@@ -1627,7 +1805,39 @@ class _ChatScreenState extends State<ChatScreen> {
       } catch (_) {}
     }
     if (!mounted) return;
-    _snack(ok > 0 ? 'Переслано' : 'Не удалось переслать');
+    _snack(ok > 0 ? l.msgForwarded : l.msgForwardFailed);
+  }
+
+  Future<void> _openForwardSelected() async {
+    final backend = _backend;
+    final me = backend.myProfileId;
+    if (me == null) return;
+    final l = VibeLocalizations.of(context);
+    List<VibeChat> chats;
+    try {
+      chats = await backend.listChats();
+    } catch (_) {
+      _snack(l.errorServerUnavailable);
+      return;
+    }
+    if (!mounted) return;
+    final targets = await Navigator.of(context).push<List<String>>(
+      MaterialPageRoute(
+        builder: (_) => ForwardPickerScreen(
+          chats: chats.where((c) => c.id != _chatId).toList(),
+        ),
+      ),
+    );
+    if (targets == null || targets.isEmpty || !mounted) return;
+    var ok = 0;
+    for (final chatId in targets) {
+      try {
+        await _chat.forwardSelected(chatId);
+        ok++;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    _snack(ok > 0 ? l.msgForwarded : l.msgForwardFailed);
   }
 
   Future<void> _openUrl(String raw) async {
@@ -1635,7 +1845,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ? Uri.parse('https://$raw')
         : Uri.parse(raw);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok) _snack('Не удалось открыть ссылку');
+    if (!ok) _snack(VibeLocalizations.of(context).errorOpenLinkFailed);
   }
 
   VibeMessage _msgToBackend(ChatMsg m) {
@@ -1662,15 +1872,72 @@ class _ChatScreenState extends State<ChatScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  /// V2.3: Свайп между чатами (горизонтальный swipe → следующий/предыдущий чат).
+  void _onHorizontalSwipe(DragEndDetails details) {
+    if (widget.chats == null) return;
+    final velocity = details.primaryVelocity ?? 0;
+    final threshold = 300.0;
+    VibeChat? targetChat;
+    int? targetIndex;
+    if (velocity > threshold) {
+      // Свайп вправо → предыдущий чат
+      final prevIndex = widget.initialIndex - 1;
+      if (prevIndex >= 0 && prevIndex < widget.chats!.length) {
+        targetChat = widget.chats![prevIndex];
+        targetIndex = prevIndex;
+      }
+    } else if (velocity < -threshold) {
+      // Свайп влево → следующий чат
+      final nextIndex = widget.initialIndex + 1;
+      if (nextIndex < widget.chats!.length) {
+        targetChat = widget.chats![nextIndex];
+        targetIndex = nextIndex;
+      }
+    }
+    if (targetChat != null && targetIndex != null) {
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, _, _) => ChatScreen(
+            chat: targetChat!,
+            backend: widget.backend,
+            chats: widget.chats,
+            initialIndex: targetIndex!,
+          ),
+          transitionsBuilder: (_, animation, _, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: velocity > threshold
+                      ? const Offset(-0.05, 0)
+                      : const Offset(0.05, 0),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: VibeAnimations.standard,
+                  ),
+                ),
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: VibeAnimations.fadeIn,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.isDarkMode
-          ? context.vibeSurfaceLow
-          : const Color(0xFFEBE9F4),
-      body: ListenableBuilder(
-        listenable: _chat,
-        builder: (context, _) {
+    final scaffold = GestureDetector(
+      onHorizontalDragEnd: widget.chats != null ? _onHorizontalSwipe : null,
+      child: Scaffold(
+        backgroundColor: _getWallpaperColor(),
+        body: ListenableBuilder(
+          listenable: _chat,
+          builder: (context, _) {
 // «Отменить отправку» вернул текст в черновик — кладём в поле ввода.
           if (_chat.draftRestoreVersion != _seenDraftRestore) {
             _seenDraftRestore = _chat.draftRestoreVersion;
@@ -1691,13 +1958,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: ListenableBuilder(
                       listenable: SettingsService.instance.appearanceVersion,
                       builder: (context, _) => RepaintBoundary(
-                        child: CustomScrollView(
-                          controller: _scroll,
-                          reverse: true, // Инвертированный список сообщений
-                          physics: const BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                          ),
-                          slivers: [
+                        child: RefreshIndicator(
+                          color: context.vibePrimary,
+                          backgroundColor: Colors.transparent,
+                          displacement: 40,
+                          onRefresh: () async {
+                            HapticFeedback.mediumImpact();
+                            await _chat.loadOlderIfNeeded();
+                          },
+                          child: CustomScrollView(
+                            controller: _scroll,
+                            reverse: true, // Инвертированный список сообщений
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            slivers: [
                             // «Отменить отправку»: пилюля над последним пузырём
                             // (окно 5 секунд, как в Telegram).
                             if (_chat.undoAvailable)
@@ -1737,7 +2012,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                                 width: VibeSpacing.xs,
                                               ),
                                               Text(
-                                                'Отменить отправку',
+                                                VibeLocalizations.of(context).actionUndoSend,
                                                 style:
                                                     VibeTypography.bodyMedium,
                                               ),
@@ -1762,31 +2037,31 @@ class _ChatScreenState extends State<ChatScreen> {
                                 delegate: SliverChildBuilderDelegate((
                                   context,
                                   i,
-                                ) {
+                                 ) {
                                   final showDate =
                                       i == 0 ||
                                       !_sameDay(
-                                        _chat.messages[i].date,
-                                        _chat.messages[i - 1].date,
+                                        _chat.visibleMessages[i].date,
+                                        _chat.visibleMessages[i - 1].date,
                                       );
                                   return Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       if (showDate)
                                         MessageDateDivider(
-                                          date: _chat.messages[i].date,
+                                          date: _chat.visibleMessages[i].date,
                                         ),
                                       MessageBubble(
-                                        msg: _chat.messages[i],
+                                        msg: _chat.visibleMessages[i],
                                         key: _keyOf(_bubbleKeyFor(i)),
                                         isFirstInGroup:
                                             ChatController.isFirstInGroup(
-                                              _chat.messages,
+                                              _chat.visibleMessages,
                                               i,
                                             ),
                                         isLastInGroup:
                                             ChatController.isLastInGroup(
-                                              _chat.messages,
+                                              _chat.visibleMessages,
                                               i,
                                             ),
                                         onHeart: () => _chat.heartReact(i),
@@ -1798,40 +2073,48 @@ class _ChatScreenState extends State<ChatScreen> {
                                         player: _player,
                                         highlight:
                                             _chat.pinFlashId != null &&
-                                            _chat.messages[i].serverId ==
+                                            _chat.visibleMessages[i].serverId ==
                                                 _chat.pinFlashId,
                                         chatId: _chat.chatId,
-                                        pollVotes: _chat.messages[i].type ==
+                                        pollVotes: _chat.visibleMessages[i].type ==
                                                     MsgType.poll &&
-                                                _chat.messages[i].serverId !=
+                                                _chat.visibleMessages[i].serverId !=
                                                     null
                                             ? computePollVotes(
-                                                _chat.messages,
-                                                _chat.messages[i].serverId!,
+                                                _chat.visibleMessages,
+                                                _chat.visibleMessages[i].serverId!,
                                               )
                                             : const [],
-                                        myVote: _chat.messages[i].type ==
+                                        myVote: _chat.visibleMessages[i].type ==
                                                     MsgType.poll &&
-                                                _chat.messages[i].serverId !=
+                                                _chat.visibleMessages[i].serverId !=
                                                     null
                                             ? myPollVote(
-                                                _chat.messages,
-                                                _chat.messages[i].serverId!,
+                                                _chat.visibleMessages,
+                                                _chat.visibleMessages[i].serverId!,
                                               )
                                             : null,
                                         onOpenContact: _openContactChat,
-                                        onVote: _chat.messages[i]
+                                        onVote: _chat.visibleMessages[i]
                                                     .serverId !=
                                                 null
                                             ? (opt) => _chat.sendPollVote(
-                                                _chat.messages[i].serverId!,
+                                                _chat.visibleMessages[i].serverId!,
                                                 opt,
                                               )
                                             : null,
+                                        isSelected: _chat.selectedMsgIds.contains(
+                                          _chat.messages[i].serverId,
+                                        ),
+                                        selectionMode: _chat.selectionMode,
+                                        onToggleSelect: () {
+                                          final id = _chat.messages[i].serverId;
+                                          if (id != null) _chat.toggleSelect(id);
+                                        },
                                       ),
                                     ],
                                   );
-                                }, childCount: _chat.messages.length),
+                                }, childCount: _chat.visibleMessages.length),
                               ),
                             ),
                             ListenableBuilder(
@@ -1877,6 +2160,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
+                  ),
                   _buildInputBar(context),
                 ],
               ),
@@ -1889,7 +2173,27 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ChatAppBar(
+                      if (_chat.selectionMode)
+                        SelectionToolbar(
+                          selectedCount: _chat.selectedMsgIds.length,
+                          onClose: () => _chat.clearSelection(),
+                          onDelete: () async {
+                            await _chat.deleteSelected(everyone: false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(VibeLocalizations.of(context).msgDeleted)),
+                              );
+                            }
+                          },
+                          onForward: () => _openForwardSelected(),
+                          onCopy: () {
+                            HapticFeedback.selectionClick();
+                            _chat.copySelectedText();
+                            _chat.clearSelection();
+                          },
+                        )
+                      else
+                        ChatAppBar(
                         chat: widget.chat,
                         groupTitle: _chat.groupTitle,
                         peerTyping: _chat.peerTyping,
@@ -1914,7 +2218,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       VibeSpacing.md +
                       MediaQuery.of(context).viewPadding.bottom,
                   child: Center(
-                    child: _UnreadPlank(
+                    child: UnreadPlank(
                       count: _chat.unreadJumpIndex! + 1,
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -1934,7 +2238,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       MediaQuery.of(context).viewPadding.bottom +
                       56,
                   child: Center(
-                    child: _StickDatePlank(label: _stickDateLabel!),
+                    child: StickDatePlank(label: _stickDateLabel!),
                   ),
                 ),
               // Кнопка «новые сообщения» (прыжок вниз, как в Telegram).
@@ -1956,7 +2260,10 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         },
       ),
+    ),
     );
+
+    return SwipeBackWrapper(child: scaffold);
   }
 
   /// Плашка «Закреплённое сообщение» под шапкой (как в Telegram).
@@ -1966,6 +2273,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (topId == null) return const SizedBox.shrink();
     final extra = _chat.pins.length - 1;
     final preview = _pinPreview(topId);
+    final l = VibeLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         VibeSpacing.md,
@@ -2011,7 +2319,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (extra > 0) ...[
                   const SizedBox(width: VibeSpacing.sm),
                   Text(
-                    'ещё $extra',
+                    '${l.chatMorePins} $extra',
                     style: VibeTypography.caption.copyWith(
                       color: context.vibePrimary,
                     ),
@@ -2035,18 +2343,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _pinPreview(String serverId) {
+    final l = VibeLocalizations.of(context);
     for (final m in _chat.messages) {
       if (m.serverId == serverId) {
         return (m.type == MsgType.text && m.text.isNotEmpty)
             ? m.text
-            : 'Закреплённое медиа';
+            : l.chatPinnedMessage;
       }
     }
-    return 'Закреплённое сообщение';
+    return l.chatPinnedMessage;
   }
 
   /// Список всех закреплённых сообщений чата.
   void _showAllPins() {
+    final l = VibeLocalizations.of(context);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -2057,7 +2367,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Padding(
               padding: const EdgeInsets.all(VibeSpacing.md),
               child: Text(
-                'Закреплённые сообщения',
+                l.chatPinnedMessages,
                 style: VibeTypography.title,
               ),
             ),
@@ -2077,7 +2387,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     trailing: IconButton(
                       icon: const Icon(VibeIcons.close, size: 20),
-                      tooltip: 'Открепить',
+                      tooltip: l.msgUnpin,
                       onPressed: () {
                         Navigator.of(sheetContext).pop();
                         _chat.unpin(id);
@@ -2114,7 +2424,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: VibeSpacing.sm),
                 child: ReplyPanel(
-                  author: 'Редактирование',
+                  author: VibeLocalizations.of(context).chatEditing,
                   text: _chat.messages[_chat.editingIdx!].text,
                   onClose: () {
                     _chat.cancelEdit();
@@ -2129,7 +2439,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: ReplyPanel(
                   author: _chat.messages[_chat.replyTo!].incoming
                       ? widget.chat.title
-                      : 'Вы',
+                      : VibeLocalizations.of(context).chatYou,
                   text: _chat.messages[_chat.replyTo!].text,
                   onClose: () => _chat.setReply(null),
                 ),
@@ -2167,8 +2477,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             Flexible(
                               child: Text(
                                 pending.length == 1
-                                    ? 'Запланировано · ${_scheduleLabel(first.when)}'
-                                    : 'Запланировано: ${pending.length} · до '
+                                    ? '${VibeLocalizations.of(context).scheduleScheduled} · ${_scheduleLabel(first.when)}'
+                                    : '${VibeLocalizations.of(context).scheduleScheduled}: ${pending.length} · '
                                           '${_scheduleLabel(first.when)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -2248,7 +2558,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       : () => _openAttachmentMenu(context),
                   icon: const Icon(VibeIcons.attach),
                   color: context.vibePrimary,
-                  tooltip: 'Вложение',
+                  tooltip: VibeLocalizations.of(context).attachmentTitle,
                 ),
 Expanded(
                   child: _videoRolling
@@ -2301,29 +2611,49 @@ Expanded(
                                     ),
                                   ],
                           ),
-                          child: TextField(
-                            controller: _input,
-                            maxLines: 5,
-                            minLines: 1,
-                            style: VibeTypography.body.copyWith(
-                              color: context.vibeTextPrimary,
-                            ),
-                            cursorColor: context.vibePrimary,
-                            decoration: InputDecoration(
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              errorBorder: InputBorder.none,
-                              focusedErrorBorder: InputBorder.none,
-                              hintText: 'Сообщение…',
-                              hintStyle: VibeTypography.body.copyWith(
-                                color: context.vibeTextTertiary,
+                          child: MentionsAutocomplete(
+                            query: _mentionQuery,
+                            onMentionSelected: (username) {
+                              final text = _input.text;
+                              final cursorPos = _input.selection.base.offset;
+                              final beforeCursor = text.substring(0, cursorPos);
+                              final atIndex = beforeCursor.lastIndexOf('@');
+                              if (atIndex >= 0) {
+                                final afterCursor = text.substring(cursorPos);
+                                final newText = '${text.substring(0, atIndex)}@$username $afterCursor';
+                                _input.text = newText;
+                                final newCursorPos = atIndex + username.length + 2;
+                                _input.selection = TextSelection.collapsed(offset: newCursorPos);
+                              }
+                              setState(() => _mentionQuery = '');
+                            },
+                            child: TextField(
+                              controller: _input,
+                              maxLines: 5,
+                              minLines: 1,
+                              style: VibeTypography.body.copyWith(
+                                color: context.vibeTextPrimary,
                               ),
+                              cursorColor: context.vibePrimary,
+                              decoration: InputDecoration(
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
+                                hintText: VibeLocalizations.of(context).chatMessageHint,
+                                hintStyle: VibeTypography.body.copyWith(
+                                  color: context.vibeTextTertiary,
+                                ),
+                              ),
+                              onSubmitted: SettingsService.instance.sendByEnter
+                                  ? (_) => _send()
+                                  : null,
                             ),
                           ),
-                        ),
+                          ),
                 ),
                 const SizedBox(width: VibeSpacing.sm),
                 IconButton(
@@ -2336,7 +2666,7 @@ Expanded(
                         : Icons.emoji_emotions_outlined,
                   ),
                   color: context.vibePrimary,
-                  tooltip: 'Эмодзи и стикеры',
+                  tooltip: VibeLocalizations.of(context).chatEmojiStickers,
                 ),
                 SendButton(
                   canSend: _canSend,
@@ -2432,7 +2762,7 @@ Expanded(
     try {
       await cam.startVideoRecording();
     } catch (_) {
-      _snack('Не удалось начать запись');
+      _snack(VibeLocalizations.of(context).errorRecordStartFailed);
       return;
     }
     setState(() {
@@ -2478,7 +2808,7 @@ Expanded(
           File(xf.path).delete();
         } catch (_) {}
       }
-      if (send) _snack('Слишком короткая запись');
+      if (send) _snack(VibeLocalizations.of(context).errorTooShortRecording);
       return;
     }
     if (!send) {
@@ -2517,88 +2847,5 @@ Expanded(
     if (res == null || !mounted) return;
     await _chat.sendVideo(res.file);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd());
-  }
-}
-
-/// Плашка «N непрочитанных» — прыжок к первому непрочитанному (как в ТГ).
-class _UnreadPlank extends StatelessWidget {
-  const _UnreadPlank({required this.count, required this.onTap});
-
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: context.vibeSurfaceElevated,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: context.vibeBorder.withValues(alpha: 0.6)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.arrow_downward_rounded,
-              size: 16,
-              color: context.vibePrimary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Непрочитанные: $count',
-              style: VibeTypography.caption.copyWith(
-                color: context.vibeTextPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 8.4.1: липкая плашка даты — показывает дату верхнего видимого
-/// сообщения, пока лента прокручена от низа (как в Telegram).
-class _StickDatePlank extends StatelessWidget {
-  const _StickDatePlank({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const Key('stick_date'),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: context.vibeSurfaceElevated,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.vibeBorder.withValues(alpha: 0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Text(
-        label,
-        style: VibeTypography.caption.copyWith(
-          color: context.vibeTextPrimary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 }

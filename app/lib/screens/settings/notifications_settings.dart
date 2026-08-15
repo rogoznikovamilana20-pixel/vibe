@@ -1,5 +1,5 @@
 ﻿
-import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/localization/vibe_localizations.dart';
 import '../../core/theme/vibe_spacing.dart';
@@ -23,21 +23,59 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
   late bool _inAppSounds;
   late bool _inAppVibration;
   late bool _chatPreview;
+  late bool _badgeEnabled;
+  late bool _quietHoursEnabled;
+  late int _quietHoursStart;
+  late int _quietHoursEnd;
 
   @override
   void initState() {
     super.initState();
-    _personal = SettingsService.instance.notifyPersonal;
-    _groups = SettingsService.instance.notifyGroups;
-    _inAppSounds = SettingsService.instance.inAppSounds;
-    _inAppVibration = SettingsService.instance.inAppVibration;
-    _chatPreview = SettingsService.instance.chatPreview;
+    final s = SettingsService.instance;
+    _personal = s.notifyPersonal;
+    _groups = s.notifyGroups;
+    _inAppSounds = s.inAppSounds;
+    _inAppVibration = s.inAppVibration;
+    _chatPreview = s.chatPreview;
+    _badgeEnabled = s.badgeEnabled;
+    _quietHoursEnabled = s.quietHoursEnabled;
+    _quietHoursStart = s.quietHoursStart;
+    _quietHoursEnd = s.quietHoursEnd;
+  }
+
+  Future<void> _pickTime({required bool isStart}) async {
+    final current = isStart ? _quietHoursStart : _quietHoursEnd;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current, minute: 0),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: context.vibeSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _quietHoursStart = picked.hour;
+          SettingsService.instance.setQuietHoursStart(picked.hour);
+        } else {
+          _quietHoursEnd = picked.hour;
+          SettingsService.instance.setQuietHoursEnd(picked.hour);
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    
+
     return Scaffold(
       backgroundColor: context.vibeBackground,
       appBar: VibeTopBarAppBar(
@@ -76,13 +114,6 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
                   setState(() => _groups = v);
                   SettingsService.instance.setNotifyGroups(v);
                 },
-              ),
-              SettingsTile(
-                icon: Icons.campaign_outlined,
-                iconColor: context.vibePrimary,
-                title: l.channels,
-                subtitle: l.active,
-                onTap: () {},
               ),
             ],
           ),
@@ -128,16 +159,48 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
           ),
           const SizedBox(height: VibeSpacing.lg),
           SettingsSection(
+            title: 'Badge и тихие часы',
             children: [
-              SettingsTile(
-                icon: Icons.refresh_rounded,
-                iconColor: context.vibeError,
-                title: l.resetNotifications,
-                destructive: true,
-                onTap: () {
-                  VibeToast.show(context, l.resetNotifications);
+              _buildSwitchTile(
+                icon: Icons.notifications_active_outlined,
+                color: context.vibePrimary,
+                title: 'Счётчик на иконке',
+                subtitle: _badgeEnabled ? 'Показывать' : 'Скрыт',
+                value: _badgeEnabled,
+                onChanged: (v) {
+                  setState(() => _badgeEnabled = v);
+                  SettingsService.instance.setBadgeEnabled(v);
                 },
               ),
+              _buildSwitchTile(
+                icon: Icons.do_not_disturb_on_outlined,
+                color: context.vibePrimary,
+                title: 'Тихие часы',
+                subtitle: _quietHoursEnabled
+                    ? '${_quietHoursStart.toString().padLeft(2, '0')}:00 — ${_quietHoursEnd.toString().padLeft(2, '0')}:00'
+                    : 'Выкл',
+                value: _quietHoursEnabled,
+                onChanged: (v) {
+                  setState(() => _quietHoursEnabled = v);
+                  SettingsService.instance.setQuietHoursEnabled(v);
+                },
+              ),
+              if (_quietHoursEnabled) ...[
+                SettingsTile(
+                  icon: Icons.access_time_rounded,
+                  iconColor: context.vibePrimary,
+                  title: 'Начало',
+                  subtitle: '${_quietHoursStart.toString().padLeft(2, '0')}:00',
+                  onTap: () => _pickTime(isStart: true),
+                ),
+                SettingsTile(
+                  icon: Icons.access_time_filled_rounded,
+                  iconColor: context.vibePrimary,
+                  title: 'Конец',
+                  subtitle: '${_quietHoursEnd.toString().padLeft(2, '0')}:00',
+                  onTap: () => _pickTime(isStart: false),
+                ),
+              ],
             ],
           ),
         ],
@@ -152,12 +215,14 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
     required bool value,
     required ValueChanged<bool> onChanged,
     Widget? iconWidget,
+    String? subtitle,
   }) {
     return SettingsTile(
       icon: icon,
       iconColor: color,
       iconWidget: iconWidget,
       title: title,
+      subtitle: subtitle,
       trailing: Switch(
         value: value,
         onChanged: (v) {
@@ -174,4 +239,3 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
     );
   }
 }
-

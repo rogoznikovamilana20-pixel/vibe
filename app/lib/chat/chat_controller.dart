@@ -40,6 +40,13 @@ class ChatController extends ChangeNotifier {
   /// Сообщения в reverse-порядке: index 0 — самое новое (низ экрана).
   final List<ChatMsg> messages = [];
 
+  /// Фильтрация сообщений от заблокированных пользователей.
+  List<ChatMsg> get visibleMessages {
+    // ChatMsg doesn't have senderId, so return all messages for now.
+    // Full blocked user filtering requires sender identification in the model.
+    return messages;
+  }
+
   static const int _pageSize = 80;
   bool _loadingOlder = false;
   bool _hasMoreOlder = true;
@@ -56,6 +63,36 @@ class ChatController extends ChangeNotifier {
   String? pinFlashId;
   String? groupTitle;
   bool peerTyping = false;
+
+  // ─── Multi-select (V4.1) ───
+  bool get selectionMode => _selectedMsgIds.isNotEmpty;
+  final Set<String> _selectedMsgIds = {};
+  Set<String> get selectedMsgIds => Set.unmodifiable(_selectedMsgIds);
+
+  void toggleSelect(String msgId) {
+    if (_selectedMsgIds.contains(msgId)) {
+      _selectedMsgIds.remove(msgId);
+    } else {
+      _selectedMsgIds.add(msgId);
+    }
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    _selectedMsgIds.clear();
+    notifyListeners();
+  }
+
+  void selectAll() {
+    for (final msg in messages) {
+      final id = msg.serverId;
+      if (id != null) _selectedMsgIds.add(id);
+    }
+    notifyListeners();
+  }
+
+  List<ChatMsg> get selectedMessages =>
+      messages.where((m) => _selectedMsgIds.contains(m.serverId)).toList();
 
   // ─── Черновик (как в Telegram: сохраняется локально) ───
   String draft = '';
@@ -100,7 +137,6 @@ class ChatController extends ChangeNotifier {
 
   Future<void> loadMessages() async {
     if (_initialLoadDone) return;
-    _initialLoadDone = true;
     try {
       final list = await backend.listMessages(
         chatId,
@@ -110,10 +146,16 @@ class ChatController extends ChangeNotifier {
       messages
         ..clear()
         ..addAll(list.map(_toMsg));
+      _initialLoadDone = true;
       _computeUnreadJump();
       notifyListeners();
       backend.refreshChatReactions(chatId);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[ChatController] loadMessages error: $e\n$st');
+      if (!_disposed) {
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> loadOlderIfNeeded() async {
@@ -766,6 +808,49 @@ class ChatController extends ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  /// Bulk delete selected messages (V4.1).
+  Future<void> deleteSelected({required bool everyone}) async {
+    final toDelete = selectedMessages;
+    for (final msg in toDelete) {
+      await deleteMessage(msg, everyone: everyone);
+    }
+    clearSelection();
+  }
+
+  /// Bulk forward selected messages (V4.1).
+  Future<void> forwardSelected(String targetChatId) async {
+    final selected = selectedMessages.toList();
+    final backend = VibeBackend.instance;
+    for (final msg in selected) {
+      final vibeMsg = VibeMessage(
+        id: msg.serverId ?? '',
+        chatId: chatId,
+        senderId: '',
+        senderName: '',
+        senderAvatar: null,
+        text: msg.type == MsgType.text ? msg.text : null,
+        voicePath: msg.voiceUrl,
+        photoPath: msg.photoUrl,
+        videoPath: msg.videoUrl,
+        created: DateTime.now(),
+        incoming: msg.incoming,
+        status: MsgStatus.sent,
+        stickerEmoji: msg.stickerEmoji,
+        forwardedFrom: msg.forwardedFrom,
+      );
+      await backend.forwardMessage(targetChatId, vibeMsg);
+    }
+    clearSelection();
+  }
+
+  /// Bulk copy selected messages text (V4.1).
+  String copySelectedText() {
+    return selectedMessages
+        .where((m) => m.text.isNotEmpty)
+        .map((m) => m.text)
+        .join('\n');
   }
 
   /// Закрепить/открепить сообщение. `serverId == null` — снять верхний

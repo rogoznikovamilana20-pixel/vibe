@@ -106,9 +106,11 @@ class _LockScreenState extends State<LockScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final locked = _lockLeft != null;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
         children: [
           const Positioned.fill(child: VibeBackdrop()),
           SafeArea(
@@ -224,6 +226,7 @@ class _LockScreenState extends State<LockScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

@@ -29,7 +29,7 @@ class VibeIsland extends StatelessWidget {
       ),
       child: AnimatedContainer(
         duration: VibeAnimations.pulse,
-        curve: VibeAnimations.standard,
+        curve: VibeAnimations.springy,
         decoration: BoxDecoration(
           color: selected
               ? context.vibePrimary.withValues(alpha: 0.12)

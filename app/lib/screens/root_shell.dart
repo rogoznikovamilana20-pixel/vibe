@@ -21,6 +21,7 @@ import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
+import 'incoming_call_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Оболочка приложения: стеклянная нижняя навигация
@@ -85,6 +86,9 @@ class _RootShellState extends State<RootShell>
     // Навигация с тапа по пущу: открыть чат.
     NotificationService.instance.onOpenChatRequested = _openChatById;
 
+    // Входящие звонки: показываем IncomingCallScreen.
+    NotificationService.instance.onIncomingCall = _onIncomingCall;
+
     // Foreground-баннеры.
     _pushSub = NotificationService.instance.events.listen(_onPush);
 
@@ -100,15 +104,36 @@ class _RootShellState extends State<RootShell>
     _pushSub?.cancel();
     _pushTimer?.cancel();
     NotificationService.instance.onOpenChatRequested = null;
+    NotificationService.instance.onIncomingCall = null;
     super.dispose();
   }
 
   Future<void> _openChatById(String chatId) async {
     final chat = await VibeBackend.instance.chatById(chatId);
     if (chat == null || !mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)));
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => ChatScreen(chat: chat),
+        transitionsBuilder: (_, animation, _, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.3, 0),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: VibeAnimations.springy,
+                ),
+              ),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: VibeAnimations.fadeIn,
+      ),
+    );
   }
 
   void _onPush(VibePushEvent e) {
@@ -131,6 +156,21 @@ class _RootShellState extends State<RootShell>
     }
   }
 
+  void _onIncomingCall(VibePushEvent event) {
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => IncomingCallScreen(
+          callerName: event.title,
+          callerId: event.callerId ?? '',
+          callId: event.callId ?? event.id,
+          callType: event.callType ?? 'voice',
+          chatId: event.chatId,
+        ),
+      ),
+    );
+  }
+
   void _openTab(int i) {
     if (i != _index) {
       HapticFeedback.selectionClick();
@@ -144,7 +184,16 @@ class _RootShellState extends State<RootShell>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          // Predictive back: switch to first tab with haptic feedback.
+          HapticFeedback.lightImpact();
+          _openTab(0);
+        }
+      },
+      child: Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -211,6 +260,7 @@ class _RootShellState extends State<RootShell>
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -319,37 +369,40 @@ class _NavItem extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(VibeRadius.pill),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    iconWidget,
-                    if (badge > 0)
-                      Positioned(
-                        top: -6,
-                        right: -10,
-                        child: _UnreadBadge(count: badge),
-                      ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: VibeSpacing.xs),
-                  child: Text(
-                    label,
-                    style: VibeTypography.label.copyWith(
-                      color: active
-                          ? context.vibePrimary
-                          : VibeColors.textTertiaryDark,
-                      fontWeight: FontWeight.w600,
-                    ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: VibeSizes.iconMd,
+                height: VibeSizes.iconMd,
+                child: Center(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      iconWidget,
+                      if (badge > 0)
+                        Positioned(
+                          top: -6,
+                          right: -10,
+                          child: _UnreadBadge(count: badge),
+                        ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: VibeSpacing.xs),
+                child: Text(
+                  label,
+                  style: VibeTypography.label.copyWith(
+                    color: active
+                        ? context.vibePrimary
+                        : VibeColors.textTertiaryDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -358,30 +411,70 @@ class _NavItem extends StatelessWidget {
 }
 
 /// Компактный счётчик непрочитанных в нижней навигации (как в Telegram).
-class _UnreadBadge extends StatelessWidget {
+class _UnreadBadge extends StatefulWidget {
   const _UnreadBadge({required this.count});
 
   final int count;
 
   @override
+  State<_UnreadBadge> createState() => _UnreadBadgeState();
+}
+
+class _UnreadBadgeState extends State<_UnreadBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _scaleAnim = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(_UnreadBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.count != widget.count) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final text = count > 99 ? '99+' : '$count';
-    return Container(
-      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: VibeColors.unreadBlue,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white, width: 1),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          height: 1,
+    final text = widget.count > 99 ? '99+' : '${widget.count}';
+    return ScaleTransition(
+      scale: _scaleAnim,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: VibeColors.unreadBlue,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white, width: 1),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            height: 1,
+          ),
         ),
       ),
     );

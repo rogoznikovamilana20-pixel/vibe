@@ -377,7 +377,7 @@ class _RollingPillState extends State<RollingPill> {
           if (locked)
             IconButton(
               onPressed: widget.onSend,
-              icon: const Icon(VibeIcons.send, size: 20),
+              icon: const Icon(VibeIcons.send, size: 24),
               color: context.vibePrimary,
               tooltip: 'Отправить',
             ),
@@ -496,7 +496,7 @@ class _VideoRollPillState extends State<VideoRollPill> {
           if (locked)
             IconButton(
               onPressed: widget.onSend,
-              icon: const Icon(VibeIcons.send, size: 20),
+              icon: const Icon(VibeIcons.send, size: 24),
               color: context.vibePrimary,
               tooltip: 'Отправить',
             ),

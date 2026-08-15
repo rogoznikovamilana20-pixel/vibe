@@ -89,17 +89,33 @@ SystemUiOverlayStyle _overlayFor(ThemeMode mode) {
 class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
   static final _navigatorKey = GlobalKey<NavigatorState>();
   bool _lockPushed = false;
+  Timer? _autoNightTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _applyAutoNight();
+    _autoNightTimer = Timer.periodic(const Duration(minutes: 5), (_) => _applyAutoNight());
   }
 
   @override
   void dispose() {
+    _autoNightTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _applyAutoNight() {
+    final s = SettingsService.instance;
+    if (!s.autoNightEnabled) return;
+    final shouldBeDark = s.shouldUseDarkBySchedule;
+    final currentMode = VibeApp.themeModeNotifier.value;
+    final targetMode = shouldBeDark ? ThemeMode.dark : ThemeMode.light;
+    if (currentMode != targetMode) {
+      VibeApp.themeModeNotifier.value = targetMode;
+      SystemChrome.setSystemUIOverlayStyle(_overlayFor(targetMode));
+    }
   }
 
   @override
@@ -111,6 +127,7 @@ class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
         backend.setOnline(true);
         backend.startPresence();
         _maybeLockOnResume();
+        _applyAutoNight();
       case AppLifecycleState.paused:
         PasscodeService.instance.onAppPaused();
         _lockPushed = false;

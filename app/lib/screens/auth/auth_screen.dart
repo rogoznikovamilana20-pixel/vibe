@@ -12,8 +12,10 @@ import '../../core/widgets/vibe_backdrop.dart';
 import '../../core/widgets/vibe_button.dart';
 import '../../core/widgets/vibe_input.dart';
 import '../../data/backend.dart';
+import '../../data/e2e_service.dart';
 import '../profile_setup_screen.dart';
 import '../root_shell.dart';
+import 'two_factor_verify_screen.dart';
 
 /// Вход/регистрация по номеру телефона и паролю (без SMS-кодов).
 class AuthScreen extends StatefulWidget {
@@ -83,6 +85,40 @@ class _AuthScreenState extends State<AuthScreen> {
       }
 
       if (!mounted) return;
+
+      // 2FA: check after login (not registration)
+      if (!_signup) {
+        final twoFaEnabled = await backend.isTwoFactorEnabled();
+        if (twoFaEnabled && mounted) {
+          final hint = await backend.getTwoFactorHint();
+          if (!mounted) return;
+          final verified = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorVerifyScreen(hint: hint),
+            ),
+          );
+          if (verified != true) {
+            // User backed out — sign out
+            await backend.logout();
+            setState(() {
+              _loading = false;
+              _error = 'Двухэтапная аутентификация не пройдена';
+            });
+            return;
+          }
+        }
+      }
+
+      // E2E: generate keys if not exist
+      try {
+        final e2e = E2eService.instance;
+        if (!e2e.hasKeys) {
+          await e2e.generateAndStoreKeys();
+        }
+      } catch (_) {
+        // Non-critical: E2E will be unavailable but app continues
+      }
+
       if (profile.displayName.isEmpty) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(

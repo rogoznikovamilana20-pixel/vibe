@@ -72,6 +72,23 @@ class SettingsService {
   static const _keyFolders = 'vibe_folders';
   static const _keyFolderAssign = 'vibe_folder_assign';
 
+  // Уведомления: бейдж и тихие часы
+  static const _keyBadgeEnabled = 'vibe_badge_enabled';
+  static const _keyQuietHoursEnabled = 'vibe_quiet_hours_enabled';
+  static const _keyQuietHoursStart = 'vibe_quiet_hours_start';
+  static const _keyQuietHoursEnd = 'vibe_quiet_hours_end';
+
+  // Внешний вид: отправка по Enter, авто-ночь
+  static const _keySendByEnter = 'vibe_send_by_enter';
+  static const _keyAutoNightEnabled = 'vibe_auto_night_enabled';
+  static const _keyAutoNightStart = 'vibe_auto_night_start';
+  static const _keyAutoNightEnd = 'vibe_auto_night_end';
+
+  // Приватность: голосовые сообщения, био, день рождения
+  static const _keyPrivacyVoiceMessages = 'vibe_privacy_voice_messages';
+  static const _keyPrivacyBio = 'vibe_privacy_bio';
+  static const _keyPrivacyBirthday = 'vibe_privacy_birthday';
+
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     bio.value = _prefs.getString(_keyBio) ?? '';
@@ -90,7 +107,7 @@ class SettingsService {
   }
 
   // Акцентный цвет
-  int get accentColorValue => _prefs.getInt(_keyAccentColor) ?? 0xFF3390EC;
+  int get accentColorValue => _prefs.getInt(_keyAccentColor) ?? 0xFF8B4DFF;
 
   /// Сигнал об изменении акцентного цвета — тема пересобирается на лету.
   final ValueNotifier<int> accentVersion = ValueNotifier<int>(0);
@@ -101,7 +118,7 @@ class SettingsService {
   }
 
   // Радиус пузырей
-  double get bubbleRadius => _prefs.getDouble(_keyBubbleRadius) ?? 18.0;
+  double get bubbleRadius => _prefs.getDouble(_keyBubbleRadius) ?? 17.0;
 
   Future<void> setBubbleRadius(double val) async {
     await _prefs.setDouble(_keyBubbleRadius, val);
@@ -167,6 +184,101 @@ class SettingsService {
   Future<void> setChatPreview(bool val) async {
     await _prefs.setBool(_keyChatPreview, val);
     _bumpNotifications();
+  }
+
+  // Бейдж-счётчик на иконке
+  bool get badgeEnabled => _prefs.getBool(_keyBadgeEnabled) ?? true;
+  Future<void> setBadgeEnabled(bool val) async {
+    await _prefs.setBool(_keyBadgeEnabled, val);
+    _bumpNotifications();
+  }
+
+  // Тихие часы (DND)
+  bool get quietHoursEnabled => _prefs.getBool(_keyQuietHoursEnabled) ?? false;
+  Future<void> setQuietHoursEnabled(bool val) async {
+    await _prefs.setBool(_keyQuietHoursEnabled, val);
+    _bumpNotifications();
+  }
+
+  int get quietHoursStart => _prefs.getInt(_keyQuietHoursStart) ?? 23;
+  Future<void> setQuietHoursStart(int hour) async {
+    await _prefs.setInt(_keyQuietHoursStart, hour);
+    _bumpNotifications();
+  }
+
+  int get quietHoursEnd => _prefs.getInt(_keyQuietHoursEnd) ?? 7;
+  Future<void> setQuietHoursEnd(int hour) async {
+    await _prefs.setInt(_keyQuietHoursEnd, hour);
+    _bumpNotifications();
+  }
+
+  bool get isQuietHoursNow {
+    if (!quietHoursEnabled) return false;
+    final now = DateTime.now().hour;
+    final s = quietHoursStart;
+    final e = quietHoursEnd;
+    if (s <= e) {
+      return now >= s && now < e;
+    } else {
+      return now >= s || now < e;
+    }
+  }
+
+  // Отправка по Enter
+  bool get sendByEnter => _prefs.getBool(_keySendByEnter) ?? false;
+  Future<void> setSendByEnter(bool val) async {
+    await _prefs.setBool(_keySendByEnter, val);
+    _bumpAppearance();
+  }
+
+  // Авто-ночь
+  bool get autoNightEnabled => _prefs.getBool(_keyAutoNightEnabled) ?? false;
+  Future<void> setAutoNightEnabled(bool val) async {
+    await _prefs.setBool(_keyAutoNightEnabled, val);
+    _bumpAppearance();
+  }
+
+  int get autoNightStart => _prefs.getInt(_keyAutoNightStart) ?? 22;
+  Future<void> setAutoNightStart(int hour) async {
+    await _prefs.setInt(_keyAutoNightStart, hour);
+    _bumpAppearance();
+  }
+
+  int get autoNightEnd => _prefs.getInt(_keyAutoNightEnd) ?? 7;
+  Future<void> setAutoNightEnd(int hour) async {
+    await _prefs.setInt(_keyAutoNightEnd, hour);
+    _bumpAppearance();
+  }
+
+  bool get shouldUseDarkBySchedule {
+    if (!autoNightEnabled) return false;
+    final now = DateTime.now().hour;
+    final s = autoNightStart;
+    final e = autoNightEnd;
+    if (s <= e) {
+      return now >= s && now < e;
+    } else {
+      return now >= s || now < e;
+    }
+  }
+
+  // Приватность: голосовые, био, день рождения (0: Все, 1: Контакты, 2: Никто)
+  int get privacyVoiceMessages => _prefs.getInt(_keyPrivacyVoiceMessages) ?? 0;
+  Future<void> setPrivacyVoiceMessages(int val) async {
+    await _prefs.setInt(_keyPrivacyVoiceMessages, val);
+    _pushPrivacy();
+  }
+
+  int get privacyBio => _prefs.getInt(_keyPrivacyBio) ?? 0;
+  Future<void> setPrivacyBio(int val) async {
+    await _prefs.setInt(_keyPrivacyBio, val);
+    _pushPrivacy();
+  }
+
+  int get privacyBirthday => _prefs.getInt(_keyPrivacyBirthday) ?? 0;
+  Future<void> setPrivacyBirthday(int val) async {
+    await _prefs.setInt(_keyPrivacyBirthday, val);
+    _pushPrivacy();
   }
 
   /// Сигнал об изменении настроек уведомлений — сервис уведомлений
@@ -343,6 +455,19 @@ class SettingsService {
     blockedVersion.value++;
   }
 
+  Future<void> addBlockedUser(String userId) async {
+    final list = blockedUsers;
+    if (list.contains(userId)) return;
+    list.add(userId);
+    await setBlockedUsers(list);
+  }
+
+  Future<void> removeBlockedUser(String userId) async {
+    final list = blockedUsers;
+    list.remove(userId);
+    await setBlockedUsers(list);
+  }
+
   // Показывалась ли обучающая подсказка в сторис (только при первом открытии)
   bool get storiesHintShown => _prefs.getBool(_keyStoriesHint) ?? false;
   Future<void> setStoriesHintShown() async {
@@ -447,6 +572,55 @@ class SettingsService {
     } else {
       await _prefs.setString(key, folderId);
     }
+    foldersVersion.value++;
+  }
+
+  // ── Обои чата ──
+  static const _keyWallpaperType = 'vibe_wallpaper_type'; // 'none' | 'color' | 'gradient'
+  static const _keyWallpaperValue = 'vibe_wallpaper_value'; // int color value
+  static const _keyWallpaperEndValue = 'vibe_wallpaper_end_value';
+
+  String get wallpaperType => _prefs.getString(_keyWallpaperType) ?? 'none';
+  int get wallpaperColor => _prefs.getInt(_keyWallpaperValue) ?? 0xFF1A1A2E;
+  int get wallpaperEndColor => _prefs.getInt(_keyWallpaperEndValue) ?? 0xFF16213E;
+
+  Future<void> setWallpaper(String type, {int? color, int? endColor}) async {
+    await _prefs.setString(_keyWallpaperType, type);
+    if (color != null) await _prefs.setInt(_keyWallpaperValue, color);
+    if (endColor != null) await _prefs.setInt(_keyWallpaperEndValue, endColor);
+    _bumpAppearance();
+  }
+
+  // ── Proxy / VPN ──
+  static const _keyProxyEnabled = 'vibe_proxy_enabled';
+  static const _keyProxyHost = 'vibe_proxy_host';
+  static const _keyProxyPort = 'vibe_proxy_port';
+  static const _keyProxyUsername = 'vibe_proxy_username';
+  static const _keyProxyPassword = 'vibe_proxy_password';
+  static const _keyProxySocks5 = 'vibe_proxy_socks5';
+
+  bool get proxyEnabled => _prefs.getBool(_keyProxyEnabled) ?? false;
+  String get proxyHost => _prefs.getString(_keyProxyHost) ?? '';
+  int get proxyPort => _prefs.getInt(_keyProxyPort) ?? 0;
+  String get proxyUsername => _prefs.getString(_keyProxyUsername) ?? '';
+  String get proxyPassword => _prefs.getString(_keyProxyPassword) ?? '';
+  bool get proxySocks5 => _prefs.getBool(_keyProxySocks5) ?? true;
+
+  Future<void> setProxyEnabled(bool v) async => _prefs.setBool(_keyProxyEnabled, v);
+  Future<void> setProxyHost(String v) async => _prefs.setString(_keyProxyHost, v);
+  Future<void> setProxyPort(int v) async => _prefs.setInt(_keyProxyPort, v);
+  Future<void> setProxyUsername(String v) async => _prefs.setString(_keyProxyUsername, v);
+  Future<void> setProxyPassword(String v) async => _prefs.setString(_keyProxyPassword, v);
+  Future<void> setProxySocks5(bool v) async => _prefs.setBool(_keyProxySocks5, v);
+
+  // ── Сброс всех настроек ──
+  Future<void> resetAll() async {
+    await _prefs.clear();
+    bio.value = '';
+    _bumpAppearance();
+    _bumpNotifications();
+    accentVersion.value++;
+    hiddenVersion.value++;
     foldersVersion.value++;
   }
 }

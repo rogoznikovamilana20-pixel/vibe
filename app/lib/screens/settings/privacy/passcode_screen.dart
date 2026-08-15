@@ -42,6 +42,7 @@ class _PasscodeSettingsScreenState extends State<PasscodeSettingsScreen> {
   }
 
   void _togglePasscode() async {
+    HapticFeedback.selectionClick();
     if (_hasPasscode) {
       // Prompt for current passcode to disable
       final success = await _promptPasscode(isVerifying: true);
@@ -199,6 +200,7 @@ class _PasscodeSettingsScreenState extends State<PasscodeSettingsScreen> {
                   trailing: Switch(
                     value: _biometrics,
                     onChanged: (v) async {
+                      HapticFeedback.selectionClick();
                       if (v) {
                         final can = await PasscodeService.instance.canUseBiometrics();
                         if (!context.mounted) return;

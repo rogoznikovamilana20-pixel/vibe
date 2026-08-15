@@ -13,6 +13,7 @@ import '../data/backend_api.dart';
 import 'aurion_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../core/localization/vibe_localizations.dart';
 
 /// Редактирование данных аккаунта — аналог экрана
 /// «Изменить данные» в профиле Telegram.
@@ -70,13 +71,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    final l = VibeLocalizations.of(context);
     final name = _name.text.trim();
     if (name.isEmpty) {
-      _snack('Введите имя');
+      _snack(l.profileEnterName);
       return;
     }
     if (_usernameTaken) {
-      _snack('Этот никнейм уже занят');
+      _snack(l.profileUsernameTaken);
       return;
     }
     setState(() => _saving = true);
@@ -90,11 +92,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).pop();
-      _snack('Данные сохранены и синхронизированы');
+      _snack(l.profileSavedSynced);
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      _snack('Не удалось сохранить — проверьте соединение');
+      _snack(l.profileSaveFailed);
     }
   }
 
@@ -104,8 +106,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final userName =
-        VibeBackend.myProfileNotifier.value?.displayName ?? 'Пользователь';
+        VibeBackend.myProfileNotifier.value?.displayName ?? l.profileDefaultName;
     return Scaffold(
       body: Column(
         children: [
@@ -115,7 +118,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               onPressed: () => Navigator.of(context).pop(),
               color: context.vibeTextPrimary,
             ),
-            title: const VibeTopBarTitle('Изменить данные'),
+            title: VibeTopBarTitle(l.profileEditData),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -128,21 +131,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   VibeInput(
                     controller: _name,
-                    hint: 'Имя и фамилия',
+                    hint: l.profileScreenNameHint,
                     onSubmitted: (_) => _save(),
                   ),
                   const SizedBox(height: VibeSpacing.md),
                   VibeInput(
                     controller: _username,
-                    hint: 'Имя пользователя (@ник)',
-                    errorText: _usernameTaken ? 'Этот никнейм уже занят' : null,
+                    hint: l.profileScreenNickHint,
+                    errorText: _usernameTaken ? l.profileUsernameTaken : null,
                     onChanged: _checkUsername,
                     onSubmitted: (_) => _save(),
                   ),
                   const SizedBox(height: VibeSpacing.md),
                   VibeInput(
                     controller: _bio,
-                    hint: 'О себе (до 70 символов)',
+                    hint: l.profileScreenBioHint,
                     maxLines: 3,
                     onSubmitted: (_) => _save(),
                   ),
@@ -152,22 +155,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       SettingsTile(
                         icon: Icons.badge_outlined,
                         iconColor: context.vibePrimary,
-                        title: 'Инфо о пользователе',
-                        subtitle: 'Дата рождения, город, пол',
-                        onTap: () => _snack('Инфо о пользователе — скоро'),
+                        title: l.profileInfo,
+                        subtitle: l.profileInfoSubtitle,
+                        onTap: () => _snack(l.profileInfoSoon),
                       ),
                       SettingsTile(
                         icon: Icons.campaign_outlined,
                         iconColor: context.vibePrimary,
-                        title: 'Личный канал',
-                        subtitle: 'Рассказывай о себе подписчикам',
-                        onTap: () => _snack('Создание канала — скоро'),
+                        title: l.profilePersonalChannel,
+                        subtitle: l.profileChannelSubtitle,
+                        onTap: () => _snack(l.profileChannelSoon),
                       ),
                       SettingsTile(
                         icon: Icons.auto_awesome_rounded,
                         iconColor: context.vibePrimary,
-                        title: 'Автоматизация чатов',
-                        subtitle: 'Aurion — твой AI-ассистент',
+                        title: l.profileAutomation,
+                        subtitle: l.profileAurionSubtitle,
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => AurionScreen(userName: userName),
@@ -181,7 +184,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     width: double.infinity,
                     child: VibeButton(
                       type: VibeButtonType.primary,
-                      label: _saving ? 'Сохраняем…' : 'Сохранить',
+                      label: _saving ? l.actionSaving : l.dialogSave,
                       onPressed: _saving ? null : _save,
                     ),
                   ),

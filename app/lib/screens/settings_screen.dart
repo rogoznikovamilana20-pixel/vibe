@@ -22,6 +22,7 @@ import 'settings/notifications_settings.dart';
 import 'settings/privacy_settings.dart';
 import 'settings/data_settings.dart';
 import 'settings/language_settings.dart';
+import 'settings/proxy_settings.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
@@ -89,6 +90,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: l.data,
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const DataSettingsScreen()),
+                      ),
+                    ),
+                    SettingsTile(
+                      icon: Icons.vpn_key_rounded,
+                      iconColor: VibeColors.primary,
+                      title: l.proxyTitle,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ProxySettingsScreen()),
                       ),
                     ),
                     _buildThemeToggleTile(context, l),

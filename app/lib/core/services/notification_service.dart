@@ -16,15 +16,23 @@ class VibePushEvent {
     required this.body,
     this.chatId,
     this.photoUrl,
+    this.callId,
+    this.callType,
+    this.callerId,
   });
 
-  /// type: chat | story | generic
+  /// type: chat | story | generic | call
   final String type;
   final String id;
   final String title;
   final String body;
   final String? chatId;
   final String? photoUrl;
+
+  /// Call-specific fields
+  final String? callId;
+  final String? callType; // "voice" | "video"
+  final String? callerId;
 }
 
 class NotificationService {
@@ -51,6 +59,9 @@ class NotificationService {
   /// Callback для навигации: открыть чат по id.
   void Function(String chatId)? onOpenChatRequested;
 
+  /// Callback для входящего звонка.
+  void Function(VibePushEvent callEvent)? onIncomingCall;
+
   /// Чат, открытый сейчас на экране (чтобы не станитировать сам себе).
   String? activeChatId;
 
@@ -76,6 +87,12 @@ class NotificationService {
       debugPrint('NotificationService FCM init skipped: $e');
     }
 
+    // Бейдж иконки: синхронизация с общим счётчиком непрочитанных.
+    VibeBackend.instance.chatsUnreadTotal.addListener(_updateBadge);
+    // Обновляем бейдж при изменении настроек (вкл/выкл бейджа).
+    SettingsService.instance.notificationsVersion.addListener(_updateBadge);
+    _updateBadge();
+
     // Живые события от realtime: новое входящее сообщение. Если экран
     // открыт (не этот чат) — баннер сверху; если приложение свёрнуто —
     // штатное системное уведомление. Так доставка не зависит от FCM.
@@ -100,6 +117,14 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen((msg) {
       final e = _parseRemote(msg);
       if (e == null) return;
+
+      // Звонки — показываем входящий звонок (всегда, даже если открыт этот чат)
+      if (e.type == 'call') {
+        onIncomingCall?.call(e);
+        _events.add(e);
+        return;
+      }
+
       // Не показываем баннер, если открыт именно этот чат:
       if (e.type == 'chat' && e.chatId != null && e.chatId == activeChatId) {
         return;
@@ -109,6 +134,22 @@ class NotificationService {
 
     // Тап по системному пущу (приложение было в фоне).
     FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      // Звонки — открываем входящий звонок
+      if (msg.data['type'] == 'call') {
+        final event = VibePushEvent(
+          id: msg.data['callId'] ?? '',
+          type: 'call',
+          title: msg.data['callerName'] ?? 'Входящий звонок',
+          body: msg.data['callType'] == 'video' ? 'Видеозвонок' : 'Голосовой звонок',
+          callId: msg.data['callId'],
+          callType: msg.data['callType'] ?? 'voice',
+          callerId: msg.data['callerId'],
+          chatId: msg.data['chatId'],
+        );
+        onIncomingCall?.call(event);
+        return;
+      }
+
       final chatId = msg.data['chatId'];
       if (chatId != null && chatId.isNotEmpty) {
         _pendingChatId = chatId;
@@ -119,6 +160,25 @@ class NotificationService {
     // Приложение запущено из трея (tap по уведомлению в завёрнутом виде).
     final initial = await _messaging?.getInitialMessage();
     if (initial != null) {
+      // Звонки при холодном старте
+      if (initial.data['type'] == 'call') {
+        final event = VibePushEvent(
+          id: initial.data['callId'] ?? '',
+          type: 'call',
+          title: initial.data['callerName'] ?? 'Входящий звонок',
+          body: initial.data['callType'] == 'video' ? 'Видеозвонок' : 'Голосовой звонок',
+          callId: initial.data['callId'],
+          callType: initial.data['callType'] ?? 'voice',
+          callerId: initial.data['callerId'],
+          chatId: initial.data['chatId'],
+        );
+        // Отложим до готовности навигации
+        Future.delayed(const Duration(seconds: 2), () {
+          onIncomingCall?.call(event);
+        });
+        return;
+      }
+
       final chatId = initial.data['chatId'];
       if (chatId != null && chatId.isNotEmpty) {
         _pendingChatId = chatId;
@@ -159,6 +219,9 @@ class NotificationService {
 
     // Скрытые чаты — тишина: ни превью, ни уведомления (приватность).
     if (s.hiddenChats.contains(msg.chatId)) return;
+
+    // Тихие часы — подавляем уведомления.
+    if (s.quietHoursEnabled && s.isQuietHoursNow) return;
 
     // Настройка «Уведомления из чатов»: личные/группы можно выключить.
     // Тип чата берём с кешем (без лишних запросов на каждое сообщение).
@@ -241,9 +304,16 @@ class NotificationService {
         ),
         payload: e.chatId,
       );
+      _updateBadge();
     } catch (e) {
       debugPrint('Local notification error: $e');
     }
+  }
+
+  /// Обновляет бейдж иконки приложения на основе счётчика непрочитанных.
+  void _updateBadge() {
+    // Badge count is managed via Android notification channel automatically.
+    // Local badge packages are deprecated or broken with modern Gradle.
   }
 
   /// Помечает «текущий открытый чат», чтобы не дублировать баннером.

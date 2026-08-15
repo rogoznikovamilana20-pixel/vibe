@@ -9,6 +9,7 @@ import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 
 /// Одна находка поиска по сообщениям чата.
 class ChatSearchItem {
@@ -85,6 +86,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final results = _results;
+    final l = VibeLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -95,7 +97,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
               leading: VibeTopBarIcon(
                 icon: Icons.arrow_back_ios_new_rounded,
                 onTap: () => Navigator.of(context).pop(),
-                tooltip: 'Назад',
+                tooltip: l.tooltipBack,
               ),
               actions: [
                 if (_controller.text.isNotEmpty)
@@ -105,19 +107,19 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                       _controller.clear();
                       setState(() => _query = '');
                     },
-                    tooltip: 'Очистить',
+                    tooltip: l.tooltipClear,
                   ),
               ],
               title: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const VibeTopBarTitle('Поиск'),
+                  VibeTopBarTitle(l.searchTitle),
                   const SizedBox(height: 2),
                   Text(
                     results.isEmpty
-                        ? 'Введите запрос'
-                        : '1 из ${results.length}',
+                        ? l.searchEnterQuery
+                        : '${l.searchResultOf} ${results.length}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: VibeTypography.caption.copyWith(
@@ -167,7 +169,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           isCollapsed: true,
-                          hintText: 'Поиск сообщений',
+                          hintText: l.searchMessagesHint,
                           hintStyle: VibeTypography.body.copyWith(
                             color: context.vibeTextTertiary,
                           ),
@@ -208,12 +210,12 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
             ),
           ),
           if (results.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.only(top: VibeSpacing.xxl * 2),
+                padding: const EdgeInsets.only(top: VibeSpacing.xxl * 2),
                 child: Center(
                   child: Text(
-                    'Сообщения не найдены',
+                    l.searchMessagesNotFound,
                     style: VibeTypography.body,
                   ),
                 ),
@@ -261,14 +263,14 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
           leading: VibeTopBarIcon(
             icon: Icons.arrow_back_ios_new_rounded,
             onTap: () => Navigator.of(context).pop(),
-            tooltip: 'Назад',
+            tooltip: l.tooltipBack,
           ),
-          title: const VibeTopBarTitle('Поиск'),
+          title: VibeTopBarTitle(l.searchTitle),
           actions: [
             if (results.isNotEmpty)
               VibeTopBarIcon(
                 icon: Icons.keyboard_arrow_down_rounded,
-                tooltip: 'Следующее',
+                tooltip: l.tooltipNext,
                 onTap: () => _jump(_current + 1),
               ),
           ],

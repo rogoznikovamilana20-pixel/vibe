@@ -23,6 +23,7 @@ import '../models.dart';
 import 'message_status_tick.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../../core/localization/vibe_localizations.dart';
 
 /// ?????? ?????????: ?????/?????/??????/?????????/???????????, ?????-?????,
 /// ??????? ??? ? ???????? ? ???????, ??????? ? ????????? ???????.
@@ -44,6 +45,9 @@ class MessageBubble extends StatefulWidget {
     this.myVote,
     this.onOpenContact,
     this.onVote,
+    this.isSelected = false,
+    this.selectionMode = false,
+    this.onToggleSelect,
   });
 
   final ChatMsg msg;
@@ -78,6 +82,11 @@ class MessageBubble extends StatefulWidget {
 
   /// ??????????? ? ?????? (????? ????????).
   final ValueChanged<int>? onVote;
+
+  /// Multi-select (V4.1).
+  final bool isSelected;
+  final bool selectionMode;
+  final VoidCallback? onToggleSelect;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -135,12 +144,13 @@ class _MessageBubbleState extends State<MessageBubble>
   }
 
   void _onHorizontalDragUpdate(DragUpdateDetails d) {
-    if (d.delta.dx < 0) {
+    if (d.delta.dx > 0) {
+      final threshold = 80.0;
       setState(() {
-        _dragOffset += d.delta.dx * 0.4; // ????????????? ??????
-        if (_dragOffset < -60 && !_triggeredReply) {
+        _dragOffset += d.delta.dx * 0.6;
+        if (_dragOffset > threshold && !_triggeredReply) {
           _triggeredReply = true;
-          HapticFeedback.mediumImpact();
+          HapticFeedback.heavyImpact();
         }
       });
     }
@@ -191,15 +201,15 @@ class _MessageBubbleState extends State<MessageBubble>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // ?????? ??????, ??????? ?????????? ??? ??????
-          if (_dragOffset < 0)
+          // Reply icon (appears on right swipe)
+          if (_dragOffset > 0)
             Positioned(
-              right: -40,
+              left: -48,
               top: 0,
               bottom: 0,
               child: Center(
                 child: Opacity(
-                  opacity: (_dragOffset.abs() / 60).clamp(0.0, 1.0),
+                  opacity: (_dragOffset / 80).clamp(0.0, 1.0),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
@@ -223,13 +233,18 @@ class _MessageBubbleState extends State<MessageBubble>
               children: [
                 if (!isIncoming) const Spacer(flex: 2),
                 GestureDetector(
-                  onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                  onHorizontalDragEnd: _onHorizontalDragEnd,
-                  onDoubleTap: _onDoubleTap,
+                  onHorizontalDragUpdate: widget.selectionMode ? null : _onHorizontalDragUpdate,
+                  onHorizontalDragEnd: widget.selectionMode ? null : _onHorizontalDragEnd,
+                  onDoubleTap: widget.selectionMode ? null : _onDoubleTap,
                   onLongPress: () {
                     HapticFeedback.selectionClick();
-                    widget.onLongPress();
+                    if (widget.selectionMode) {
+                      widget.onToggleSelect?.call();
+                    } else {
+                      widget.onLongPress();
+                    }
                   },
+                  onTap: widget.selectionMode ? widget.onToggleSelect : null,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.72,
@@ -241,14 +256,18 @@ class _MessageBubbleState extends State<MessageBubble>
                         Container(
                           padding: msg.type == MsgType.photo || msg.stickerEmoji != null
                               ? EdgeInsets.zero
-                              : const EdgeInsets.symmetric(
-                                  horizontal: VibeSpacing.md,
-                                  vertical: VibeSpacing.sm,
+                              : const EdgeInsets.only(
+                                  left: VibeSpacing.md,
+                                  right: VibeSpacing.md,
+                                  top: 6,
+                                  bottom: 5,
                                 ),
                           decoration: BoxDecoration(
-                            color: widget.highlight
-                                ? VibeColors.workBlue.withValues(alpha: 0.35)
-                                : bubbleColor,
+                            color: widget.isSelected
+                                ? context.vibePrimary.withValues(alpha: 0.3)
+                                : widget.highlight
+                                    ? VibeColors.workBlue.withValues(alpha: 0.35)
+                                    : bubbleColor,
                             border: (!context.isDarkMode && isIncoming)
                                 ? Border.all(
                                     color: const Color(0x1F1C1B22),
@@ -323,6 +342,7 @@ class _MessageBubbleState extends State<MessageBubble>
     ChatMsg msg,
     bool isIncoming,
   ) {
+    final l = VibeLocalizations.of(context);
     if (msg.stickerEmoji != null) {
       return _StickerBubble(emoji: msg.stickerEmoji!, incoming: isIncoming);
     }
@@ -396,7 +416,7 @@ class _MessageBubbleState extends State<MessageBubble>
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
-                    'Переслано от ${msg.forwardedFrom}',
+                    l.messageForwardedFrom(msg.forwardedFrom!),
                     overflow: TextOverflow.ellipsis,
                     style: VibeTypography.caption.copyWith(
                       color: isIncoming
@@ -410,7 +430,7 @@ class _MessageBubbleState extends State<MessageBubble>
               ],
             ),
           ),
-        Text.rich(
+        SelectableText.rich(
           TextSpan(
             children: buildLinkSpans(
               msg.text,
@@ -440,7 +460,7 @@ class _MessageBubbleState extends State<MessageBubble>
             const Spacer(),
             if (msg.edited)
               Text(
-'изменено',
+                l.messageEdited,
                 style: VibeTypography.caption.copyWith(
                   color: isIncoming
                       ? (context.isDarkMode
@@ -563,6 +583,7 @@ class _PhotoBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final url = msg.photoUrl;
     if (url != null && url.isNotEmpty) {
       return _NetworkPhotoBubble(url: url, time: msg.time, incoming: incoming);
@@ -615,7 +636,7 @@ class _PhotoBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Фото к чату',
+                    l.messagePhotoToChat,
                     style: const TextStyle(
                       fontSize: 10,
                       color: Colors.white,
@@ -760,6 +781,8 @@ class _VoiceBubbleState extends State<_VoiceBubble>
   StreamSubscription<Duration>? _sub;
   Duration _pos = Duration.zero;
   bool _playing = false;
+  double _speed = 1.0;
+  static const _speedOptions = [0.5, 1.0, 1.5, 2.0];
 
   @override
   void initState() {
@@ -795,11 +818,12 @@ class _VoiceBubbleState extends State<_VoiceBubble>
   }
 
   Future<void> _toggle() async {
+    final l = VibeLocalizations.of(context);
     final localPath = widget.msg.voicePath;
     var url = widget.msg.voiceUrl;
     if ((localPath == null || localPath.isEmpty) &&
         (url == null || url.isEmpty)) {
-      VibeToast.show(context, 'Нет голосового');
+      VibeToast.show(context, l.messageNoVoice);
       return;
     }
     setState(() => _playing = !_playing);
@@ -808,6 +832,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
         await widget.player.stop();
         if (localPath != null && localPath.isNotEmpty) {
           await widget.player.play(DeviceFileSource(localPath));
+          await widget.player.setPlaybackRate(_speed);
         } else {
           final signed = await VibeBackend.instance.mediaUrl(url);
           if (signed == null) {
@@ -816,8 +841,10 @@ class _VoiceBubbleState extends State<_VoiceBubble>
           }
           await widget.player.play(UrlSource(signed));
         }
+        await widget.player.setPlaybackRate(_speed);
       } else {
         await widget.player.resume();
+        await widget.player.setPlaybackRate(_speed);
       }
       _progress
         ..duration = Duration(seconds: widget.msg.voiceSeconds)
@@ -833,6 +860,13 @@ class _VoiceBubbleState extends State<_VoiceBubble>
     final total = widget.msg.voiceSeconds;
     final rest = ((total - s)).clamp(0, total);
     return '${rest % 60}с';
+  }
+
+  void _cycleSpeed() {
+    HapticFeedback.lightImpact();
+    final idx = _speedOptions.indexOf(_speed);
+    setState(() => _speed = _speedOptions[(idx + 1) % _speedOptions.length]);
+    if (_playing) widget.player.setPlaybackRate(_speed);
   }
 
   @override
@@ -899,6 +933,29 @@ class _VoiceBubbleState extends State<_VoiceBubble>
               fontSize: 11,
             ),
           ),
+          if (_speed != 1.0 || _playing) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: _cycleSpeed,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${_speed}x',
+                  style: VibeTypography.caption.copyWith(
+                    color: isIncoming
+                        ? context.vibePrimary
+                        : Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (!isExternal) ...[
             const SizedBox(width: 4),
             const Icon(
@@ -1403,7 +1460,8 @@ class _FileBubble extends StatelessWidget {
 
   Future<void> _download(BuildContext context) async {
     if (attach.url == null) return;
-    VibeToast.show(context, 'Отправка…');
+    final l = VibeLocalizations.of(context);
+    VibeToast.show(context, l.fileSending);
     try {
       final signed = await VibeBackend.instance.mediaUrl(attach.url);
       if (signed == null) throw Exception('no url');
@@ -1416,15 +1474,16 @@ class _FileBubble extends StatelessWidget {
       final file = File('${dir.path}${Platform.pathSeparator}$name');
       await file.writeAsBytes(res.bodyBytes);
       if (!context.mounted) return;
-      VibeToast.show(context, 'Сохранено: $name');
+      VibeToast.show(context, l.fileSaved(name));
     } catch (_) {
       if (!context.mounted) return;
-      VibeToast.show(context, 'Не удалось скачать файл');
+      VibeToast.show(context, l.fileDownloadFailed);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
     return Material(
       color: Colors.transparent,
@@ -1470,7 +1529,7 @@ class _FileBubble extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      attach.name ?? 'файл',
+                      attach.name ?? l.fileDefaultName,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1483,7 +1542,7 @@ class _FileBubble extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      attach.url == null ? 'Неизвестно' : _sizeText,
+                      attach.url == null ? l.fileUnknownSize : _sizeText,
                       style: TextStyle(
                         fontSize: 11,
                         color: incoming
@@ -1530,6 +1589,7 @@ class _LocationBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
     final lat = attach.lat.toStringAsFixed(6);
     final lng = attach.lng.toStringAsFixed(6);
@@ -1545,7 +1605,7 @@ class _LocationBubble extends StatelessWidget {
             Text(
               attach.label?.isNotEmpty == true
                   ? attach.label!
-                  : 'Локация',
+                   : l.messageLocation,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -1576,7 +1636,7 @@ class _LocationBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(VibeRadius.md),
             ),
             child: Text(
-              'Открыть в картах',
+              l.messageOpenInMaps,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -1604,8 +1664,9 @@ class _ContactBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
-    final name = attach.contactName ?? 'Собеседник';
+    final name = attach.contactName ?? l.messageContactDefault;
     final initial = name.isEmpty ? '?' : name.characters.first;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1666,7 +1727,7 @@ class _ContactBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(VibeRadius.md),
             ),
             child: Text(
-              'Написать',
+              l.actionWrite,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -1702,6 +1763,7 @@ class _PollBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
     final options = attach.options;
     return Column(
@@ -1715,7 +1777,7 @@ class _PollBubble extends StatelessWidget {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                attach.question ?? 'Вопрос',
+                attach.question ?? l.pollDefaultQuestion,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -1741,7 +1803,7 @@ class _PollBubble extends StatelessWidget {
         ],
         const SizedBox(height: 6),
         Text(
-          _total == 0 ? '0 голосов' : '$_total ${_plural(_total)}',
+          _total == 0 ? l.pollVotesZero : '$_total ${_plural(_total)}',
           style: TextStyle(
             fontSize: 11,
             color: incoming ? context.vibeTextSecondary : Colors.white60,

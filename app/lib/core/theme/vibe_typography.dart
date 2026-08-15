@@ -28,9 +28,9 @@ class VibeTypography {
   /// H2 — заголовки секций и карточек.
   static const title = TextStyle(
     fontFamily: _inter,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: FontWeight.w600,
-    height: 26 / 20,
+    height: 24 / 18,
   );
 
   /// Вторичный текст / строки списков.

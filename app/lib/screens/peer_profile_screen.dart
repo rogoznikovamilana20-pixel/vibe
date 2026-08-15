@@ -8,6 +8,7 @@ import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_avatar.dart';
+import '../core/widgets/zoomable_avatar.dart';
 import '../core/widgets/vibe_collapsed_top_bar.dart';
 import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
@@ -164,11 +165,14 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                 const SizedBox(height: VibeSpacing.lg),
                 Hero(
                   tag: 'avatar_${chat.id}',
-                  child: VibeAvatar(
-                    name: chat.title,
-                    size: VibeSizes.avatarXl,
-                    online: chat.peerOnline,
-                    photoUrl: chat.peerAvatar,
+                  child: ZoomableAvatar(
+                    maxScale: 3.5,
+                    child: VibeAvatar(
+                      name: chat.title,
+                      size: VibeSizes.avatarXl,
+                      online: chat.peerOnline,
+                      photoUrl: chat.peerAvatar,
+                    ),
                   ),
                 ),
                 const SizedBox(height: VibeSpacing.md),

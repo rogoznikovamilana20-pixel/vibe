@@ -9,6 +9,7 @@ import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../core/localization/vibe_localizations.dart';
 
 /// «Мои ссылки» — список ссылок на профиль (как в Telegram
 /// «Расширенные права» → ссылки): vibe.me-ссылка, @ник, телефон, QR-код.
@@ -38,6 +39,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
   }
 
   void _showQrSheet(BuildContext context, VibeProfile? p) {
+    final l = VibeLocalizations.of(context);
     final link = _link(p);
     showModalBottomSheet(
       context: context,
@@ -74,10 +76,10 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
               FilledButton.icon(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  _copy(context, link, 'Ссылка скопирована: $link');
+                  _copy(context, link, '${l.linksCopyLink}: $link');
                 },
                 icon: const Icon(VibeIcons.copy, size: 18),
-                label: const Text('Копировать ссылку'),
+                label: Text(l.linksCopyLink),
               ),
             ],
           ),
@@ -88,6 +90,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = VibeLocalizations.of(context);
     return Scaffold(
       body: Column(
         children: [
@@ -97,7 +100,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
               onPressed: () => Navigator.of(context).pop(),
               color: context.vibeTextPrimary,
             ),
-            title: const VibeTopBarTitle('Мои ссылки'),
+            title: VibeTopBarTitle(l.linksTitle),
           ),
           Expanded(
             child: ValueListenableBuilder<VibeProfile?>(
@@ -110,19 +113,19 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
                 final rows = <({IconData icon, String title, String value})>[
                   (
                     icon: Icons.link_rounded,
-                    title: 'Ссылка на профиль',
+                    title: l.linksProfileLink,
                     value: link,
                   ),
                   if (nick.isNotEmpty)
                     (
                       icon: Icons.alternate_email_rounded,
-                      title: 'Имя пользователя',
+                      title: l.linksUsername,
                       value: '@$nick',
                     ),
                   if (hasPhone)
                     (
                       icon: Icons.call_outlined,
-                      title: 'Телефон',
+                      title: l.linksPhone,
                       value: phone,
                     ),
                 ];
@@ -141,7 +144,7 @@ class _MyLinksScreenState extends State<MyLinksScreen> {
                                 Icons.qr_code_2_rounded,
                                 size: 18,
                               ),
-                              label: const Text('QR-код профиля'),
+                              label: Text(l.linksQrCode),
                             ),
                           ),
                         ],

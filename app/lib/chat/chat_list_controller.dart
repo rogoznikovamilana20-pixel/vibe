@@ -30,6 +30,8 @@ class ChatListController extends ChangeNotifier {
 
   // ─── Лента ───
   late List<VibeChat> chats = [];
+  bool _loading = false;
+  bool get loading => _loading;
 
   // ─── Статусы ───
   final Set<String> selected = {};
@@ -243,6 +245,8 @@ class ChatListController extends ChangeNotifier {
   }
 
   Future<void> loadChats() async {
+    _loading = true;
+    notifyListeners();
     // 1. Сначала кэш (мгновенно, как в Telegram) — при первом входе,
     //    чтобы не было пустого экрана при плохой сети.
     if (chats.isEmpty) {
@@ -261,6 +265,9 @@ class ChatListController extends ChangeNotifier {
       _mergeChats(fresh);
     } catch (_) {
       // Сеть недоступна — остаёмся на кэше.
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
   }
 
@@ -395,6 +402,33 @@ class ChatListController extends ChangeNotifier {
   /// Отметить чат прочитанным (из меню чата).
   void markChatRead(String id) {
     read.add(id);
+    notifyListeners();
+  }
+
+  /// Переключить «непрочитанное» для чата (как в Telegram: long-press → Mark unread).
+  void toggleUnread(String id) {
+    final i = chats.indexWhere((c) => c.id == id);
+    if (i < 0) return;
+    final old = chats[i];
+    final isCurrentlyUnread = old.unread > 0 && !read.contains(id);
+    final updated = VibeChat(
+      id: old.id,
+      title: old.title,
+      kind: old.kind,
+      lastMessage: old.lastMessage,
+      lastTime: old.lastTime,
+      unread: isCurrentlyUnread ? 0 : 1,
+      peerName: old.peerName,
+      peerAvatar: old.peerAvatar,
+      peerId: old.peerId,
+      peerOnline: old.peerOnline,
+    );
+    if (isCurrentlyUnread) {
+      read.add(id);
+    } else {
+      read.remove(id);
+    }
+    chats[i] = updated;
     notifyListeners();
   }
 

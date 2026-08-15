@@ -10,6 +10,7 @@ import '../core/widgets/vibe_glass_surface.dart';
 import '../core/widgets/vibe_orb.dart';
 import '../data/backend.dart';
 import '../data/passcode_service.dart';
+import '../data/e2e_service.dart';
 import '../core/services/notification_service.dart';
 import 'lock_screen.dart';
 import 'onboarding_screen.dart';
@@ -52,6 +53,9 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _initAndGo() async {
     // Инициализируем бэкенд (подгрузит сессию если есть)
     final backend = await VibeBackend.init();
+
+    // E2E: загружаем ключи шифрования
+    await E2eService.instance.loadKeys();
 
     // Пуши — строго в фоне с таймаутом: без сети FCM может висеть,
     // и сплэш не должен ждать его (см. NotificationService.init).

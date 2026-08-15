@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
+import '../../core/localization/vibe_localizations.dart';
 
 /// Разделитель дат в ленте чата: Сегодня / Вчера / дд.мм.гггг.
 class MessageDateDivider extends StatelessWidget {
@@ -24,7 +25,7 @@ class MessageDateDivider extends StatelessWidget {
             borderRadius: BorderRadius.circular(VibeRadius.pill),
           ),
           child: Text(
-            fmtDateLabel(date),
+            fmtDateLabel(context, date),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.vibeTextSecondary,
                   fontWeight: FontWeight.w600,
@@ -37,14 +38,15 @@ class MessageDateDivider extends StatelessWidget {
 }
 
 /// Короткая подпись даты: Сегодня / Вчера / дд.мм.гггг.
-String fmtDateLabel(DateTime? d) {
+String fmtDateLabel(BuildContext context, DateTime? d) {
   if (d == null) return '';
+  final l = VibeLocalizations.of(context);
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(d.year, d.month, d.day);
-  if (day == today) return 'Сегодня';
+  if (day == today) return l.dateToday;
   final yesterday = today.subtract(const Duration(days: 1));
-  if (day == yesterday) return 'Вчера';
+  if (day == yesterday) return l.dateYesterday;
   return '${d.day.toString().padLeft(2, '0')}.'
       '${d.month.toString().padLeft(2, '0')}.'
       '${d.year}';
