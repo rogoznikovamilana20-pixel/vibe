@@ -1343,4 +1343,48 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 ### Result: **PASS** — спецификация завершена, production-код не затронут, готова к независимому review
 
 ---
+
+## Phase 12B.1 — E2EE V2: Identity Keys & Prekey Infrastructure ✅ (завершена 15.08.2026)
+
+### Цель
+Создать фундамент E2EE V2: identity keys, signed prekeys, one-time prekeys, key bundles, server-side хранилище + RLS. Без Double Ratchet и шифрования сообщений.
+
+### Сделано
+
+**Сервис (`e2e_v2_service.dart`):**
+- Identity key generation: Ed25519 (подписи) + X25519 (DH) из 32-байтного сида
+- Signed prekey: X25519 keypair, подписанный Ed25519 identity key
+- One-time prekey pool: batch 100, consumption, threshold 20
+- Key bundle fetch + валидация (protocol version, key lengths, Ed25519 signature)
+- SecureStorage: seed, DH private, device ID, OTK private keys
+- UUID v4 генератор для стабильного device identity
+
+**База данных (`migrate_v1_14_0_e2e_v2.sql`):**
+- `devices` — identity keys на устройство, ownership, unique constraint
+- `signed_prekeys` — один активный на устройство, Ed25519 signature
+- `one_time_prekeys` — пул на устройство, consumed_at tracking
+- RLS: SELECT открыт для бандлов, INSERT/UPDATE/DELETE scoped to owner
+- Partial indexes для частых запросов
+
+**Тесты (`e2e_v2_test.dart` — 34 новых):**
+- Identity key generation, determinism, key lengths
+- Ed25519 signing/verification, tamper detection
+- Signed prekey signing, wrong key rejection
+- OTK pool uniqueness, key sizes
+- Key bundle validation, signature verification
+- Data classes, protocol version boundary, UUID format
+
+### Совместимость
+
+V1 E2EE (`e2e_service.dart`) **НЕ ИЗМЕНЁН** — продолжает работать. V2 существует параллельно.
+
+### Проверка
+
+- **Analyzer**: 43 issues / 0 errors (без изменений)
+- **Tests**: **348 pass / 0 fail** (было 314, +34 новых)
+- **Commit**: `c8dc502` (pushed to main)
+
+### Result: **PASS** — фундамент E2EE V2 создан, V1 совместим, 0 test failures
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
