@@ -1517,7 +1517,10 @@ peerName: peer?.displayName,
         replyAuthor: replyAuthor,
         status: MsgStatus.sent,
       );
-      _sentById['${row['id']}'] = sent;
+      final rowId = '${row['id']}';
+      _sentById[rowId] = sent;
+      _sentByIdTime[rowId] = DateTime.now();
+      _cleanupSentById();
       streamController.add(sent);
       return sent;
     } catch (_) {
@@ -1553,7 +1556,10 @@ peerName: peer?.displayName,
         localId: lId,
         status: MsgStatus.sent,
       );
-      _sentById['${row['id']}'] = sent;
+      final rowId = '${row['id']}';
+      _sentById[rowId] = sent;
+      _sentByIdTime[rowId] = DateTime.now();
+      _cleanupSentById();
       streamController.add(sent);
       return sent;
     } catch (_) {
@@ -1622,7 +1628,10 @@ peerName: peer?.displayName,
         localId: lId,
         status: MsgStatus.sent,
       );
-      _sentById['${row['id']}'] = sent;
+      final rowId = '${row['id']}';
+      _sentById[rowId] = sent;
+      _sentByIdTime[rowId] = DateTime.now();
+      _cleanupSentById();
       streamController.add(sent);
       return sent;
     } catch (_) {
@@ -1693,7 +1702,10 @@ peerName: peer?.displayName,
         localId: lId,
         status: MsgStatus.sent,
       );
-      _sentById['${row['id']}'] = sent;
+      final rowId = '${row['id']}';
+      _sentById[rowId] = sent;
+      _sentByIdTime[rowId] = DateTime.now();
+      _cleanupSentById();
       streamController.add(sent);
       return sent;
     } catch (_) {
@@ -1766,7 +1778,10 @@ peerName: peer?.displayName,
         voicePath: localPath ?? voiceFile.path,
         status: MsgStatus.sent,
       );
-      _sentById['${row['id']}'] = sent;
+      final rowId = '${row['id']}';
+      _sentById[rowId] = sent;
+      _sentByIdTime[rowId] = DateTime.now();
+      _cleanupSentById();
       streamController.add(sent);
       return sent;
     } catch (_) {
@@ -1814,7 +1829,10 @@ peerName: peer?.displayName,
         videoPath: localPath ?? videoFile.path,
         status: MsgStatus.sent,
       );
-      _sentById['${row['id']}'] = sent;
+      final rowId = '${row['id']}';
+      _sentById[rowId] = sent;
+      _sentByIdTime[rowId] = DateTime.now();
+      _cleanupSentById();
       streamController.add(sent);
       return sent;
     } catch (_) {
@@ -1888,6 +1906,12 @@ peerName: peer?.displayName,
   /// Нужен, чтобы галочки «доставлено/прочитано» находили пузырёк на экране.
   final _sentById = <String, VibeMessage>{};
 
+  /// Время добавления записи в _sentById для периодической очистки.
+  final _sentByIdTime = <String, DateTime>{};
+
+  /// Реалтайм-каналы postgres_changes для отписки при logout.
+  final List<RealtimeChannel> _postgresChannels = [];
+
   /// Непрочитанные по каждому чату (из серверного RPC get_unread_counts).
   final Map<String, int> _unreadByChat = {};
 
@@ -1900,6 +1924,23 @@ peerName: peer?.displayName,
       total += v;
     }
     if (chatsUnreadTotal.value != total) chatsUnreadTotal.value = total;
+  }
+
+  /// Очистка _sentById: удаляем записи старше 1 часа (max 200 за раз).
+  void _cleanupSentById() {
+    if (_sentById.length < 100) return;
+    final cutoff = DateTime.now().subtract(const Duration(hours: 1));
+    final toRemove = <String>[];
+    for (final entry in _sentByIdTime.entries) {
+      if (entry.value.isBefore(cutoff)) {
+        toRemove.add(entry.key);
+        if (toRemove.length >= 200) break;
+      }
+    }
+    for (final id in toRemove) {
+      _sentById.remove(id);
+      _sentByIdTime.remove(id);
+    }
   }
 
   /// Запросить серверные счётчики непрочитанных. Если миграция read_states
@@ -2036,7 +2077,7 @@ peerName: peer?.displayName,
     // Дубль-источник: postgres_changes (если таблица включена в
     // публикацию realtime на сервере). Также мгновенно, но каждое
     // событие проверяется на принадлежность чата мне.
-    _client.channel('public:messages').onPostgresChanges(
+    final pgInsertCh = _client.channel('public:messages').onPostgresChanges(
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'messages',
@@ -2046,15 +2087,19 @@ peerName: peer?.displayName,
         if (myId == null || m['sender_id'] == myId) return;
         final chatId = '${m['chat_id']}';
         if (chatId == 'null' || !await _isMyChat(chatId)) return;
+        // Дедуп: если broadcast уже обработал — пропускаем.
+        final msgId = '${m['id']}';
+        if (_seenIds.contains(msgId)) return;
         _onBroadcastMessage(m);
       },
     ).subscribe();
+    _postgresChannels.add(pgInsertCh);
 
     // Страховка для правок и удалений (если таблица в публикации realtime):
     // бродкаст — основной канал, этот — резервный.
     final myIdSub = myProfileId;
     if (myIdSub != null) {
-      _client.channel('public:messages:changes').onPostgresChanges(
+      final pgUpdateCh = _client.channel('public:messages:changes').onPostgresChanges(
         event: PostgresChangeEvent.update,
         schema: 'public',
         table: 'messages',
@@ -2089,8 +2134,9 @@ peerName: peer?.displayName,
           ));
         },
       ).subscribe();
+      _postgresChannels.add(pgUpdateCh);
 
-      _client.channel('public:messages:deleted').onPostgresChanges(
+      final pgDeleteCh = _client.channel('public:messages:deleted').onPostgresChanges(
         event: PostgresChangeEvent.delete,
         schema: 'public',
         table: 'messages',
@@ -2109,10 +2155,11 @@ peerName: peer?.displayName,
           ));
         },
       ).subscribe();
+      _postgresChannels.add(pgDeleteCh);
 
       // Реакции в реальном времени: кто-то поставил/снял — пересчитываем
       // счётчики чата и рассылаем обновления чат-экрану.
-      _client.channel('public:reactions').onPostgresChanges(
+      final pgReactionInsCh = _client.channel('public:reactions').onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
         table: 'message_reactions',
@@ -2122,7 +2169,8 @@ peerName: peer?.displayName,
           await refreshChatReactions(chatId);
         },
       ).subscribe();
-      _client.channel('public:reactions:delete').onPostgresChanges(
+      _postgresChannels.add(pgReactionInsCh);
+      final pgReactionDelCh = _client.channel('public:reactions:delete').onPostgresChanges(
         event: PostgresChangeEvent.delete,
         schema: 'public',
         table: 'message_reactions',
@@ -2132,10 +2180,11 @@ peerName: peer?.displayName,
           await refreshChatReactions(chatId);
         },
       ).subscribe();
+      _postgresChannels.add(pgReactionDelCh);
 
       // Закрепы в реальном времени: свои пины приходят тоже (отсекаем
       // дубли на стороне контроллера по факту изменения списка).
-      _client.channel('public:chat_pins:insert').onPostgresChanges(
+      final pgPinInsCh = _client.channel('public:chat_pins:insert').onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
         table: 'chat_pins',
@@ -2153,7 +2202,8 @@ peerName: peer?.displayName,
           ));
         },
       ).subscribe();
-      _client.channel('public:chat_pins:delete').onPostgresChanges(
+      _postgresChannels.add(pgPinInsCh);
+      final pgPinDelCh = _client.channel('public:chat_pins:delete').onPostgresChanges(
         event: PostgresChangeEvent.delete,
         schema: 'public',
         table: 'chat_pins',
@@ -2171,6 +2221,7 @@ peerName: peer?.displayName,
           ));
         },
       ).subscribe();
+      _postgresChannels.add(pgPinDelCh);
     }
   }
 
@@ -2708,7 +2759,9 @@ _personal = _client.channel('u_$myId')
     if (row == null) return null;
 
     final updated = _ownMessage(row).copyWith(edited: true);
-    _sentById['${row['id']}'] = updated;
+    final rowId2 = '${row['id']}';
+    _sentById[rowId2] = updated;
+    _sentByIdTime[rowId2] = DateTime.now();
     _chatsController.add(null);
     if (!streamController.isClosed) {
       streamController.add(updated);
@@ -2834,7 +2887,9 @@ _personal = _client.channel('u_$myId')
       forwardedFrom: original.senderName,
       status: MsgStatus.sent,
     );
-    _sentById['${row['id']}'] = sent;
+    final rowId3 = '${row['id']}';
+    _sentById[rowId3] = sent;
+    _sentByIdTime[rowId3] = DateTime.now();
     if (!streamController.isClosed) {
       streamController.add(sent);
     }

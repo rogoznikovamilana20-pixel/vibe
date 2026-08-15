@@ -235,8 +235,12 @@ class ChatController extends ChangeNotifier {
           );
         }
       } else if (msg.incoming) {
-        messages.insert(0, _toMsg(msg));
-        if (!atBottom) newIncoming++;
+        // Дедуп: не вставлять сообщение, если оно уже есть по serverId.
+        final alreadyHas = messages.any((m) => m.serverId == msg.id);
+        if (!alreadyHas) {
+          messages.insert(0, _toMsg(msg));
+          if (!atBottom) newIncoming++;
+        }
       }
       notifyListeners();
     });

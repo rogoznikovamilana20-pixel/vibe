@@ -215,6 +215,14 @@ Future<void> setMyProfile(VibeProfile p) async {
     }
     VibeBackend.instance._dmChannel = null;
 
+    // Unsubscribe postgres_changes channels.
+    for (final ch in VibeBackend.instance._postgresChannels) {
+      try {
+        await ch.unsubscribe();
+      } catch (_) {}
+    }
+    VibeBackend.instance._postgresChannels.clear();
+
     // Clear E2E keys (private from SecureStorage, public from DB).
     await E2eService.instance.deleteKeys();
 
@@ -227,6 +235,7 @@ Future<void> setMyProfile(VibeProfile p) async {
     VibeBackend.instance._peers.clear();
     VibeBackend.instance._seenIds.clear();
     VibeBackend.instance._sentById.clear();
+    VibeBackend.instance._sentByIdTime.clear();
     VibeBackend.instance._unreadByChat.clear();
     VibeBackend._cachedProfile = null;
 
