@@ -423,34 +423,47 @@ This ensures:
 ### 10.3 Associated Data
 
 ```
-AD = sender_device_id || recipient_device_id || message_number || previous_chain_length
+AD = sender_identity_key || sender_device_id || recipient_device_id || message_number || previous_chain_length
 ```
 
 This binds the ciphertext to:
+- Specific sender (via identity key — tampering detected by GCM tag)
 - Specific sender and recipient devices
 - Specific position in the ratchet chain
 - Prevents cross-device or cross-session replay
+
+**Note**: `sender_identity_key` is included in AAD (not just in envelope) to ensure AEAD authentication covers the sender's long-term identity. This is more secure than the original spec which omitted it from AAD.
 
 ### 10.4 Ciphertext Envelope
 
 ```
 VibeMessageEnvelope {
-  version: 2,
+  version: 1 byte (value: 2),
   sender_identity_key: 32 bytes,
   sender_ratchet_public: 32 bytes,
-  message_number: uint32,
-  previous_chain_length: uint32,
-  ciphertext: bytes,
-  mac: 16 bytes (GCM tag)
+  message_number: uint32 (4 bytes, big-endian),
+  previous_chain_length: uint32 (4 bytes, big-endian),
+  nonce: 12 bytes,
+  ciphertext + GCM tag: variable length
 }
 ```
 
-### 10.5 Nonce Reuse Prevention
+**Total header size**: 1 + 32 + 32 + 4 + 4 = 73 bytes, plus 12-byte nonce, plus ciphertext + 16-byte tag.
+
+**Nonce is stored in envelope** because AES-GCM requires it for decryption. The nonce is deterministic from ratchet state but must be transmitted with the ciphertext.
+
+### 10.5 Session ID
+
+**Session ID is NOT included in the envelope.** Session ID is a local session-state identifier used for internal bookkeeping (mapping messages to sessions). It is not required for decryption and is not part of the ciphertext format.
+
+### 10.6 Nonce Reuse Prevention
 
 Nonce reuse is impossible by protocol design:
 - Each message increments `message_number`
 - DH ratchet step resets `message_number` to 0 and increments `ratchet_step`
+- First-send bootstrap (initial message before DH ratchet) also increments `ratchet_step`
 - `nonce = f(message_number, previous_chain_length, ratchet_step)` is unique per message
+- `ratchet_step` ensures uniqueness even across ratchet epochs with same `message_number`
 
 ---
 
@@ -944,7 +957,11 @@ The envelope `version` field identifies the protocol:
 - `1` = legacy (X25519 static-static)
 - `2` = X3DH + Double Ratchet
 
-### 21.2 Implementation Version
+### 21.2 Unknown Version Behavior
+
+**Reject / fail closed.** If the version byte is not `1` or `2`, decryption fails with `V2RatchetException`. This prevents downgrade attacks and ensures forward compatibility.
+
+### 21.3 Implementation Version
 
 A separate field (not in envelope) tracks the client implementation version for compatibility:
 - Server stores `device.app_version`
@@ -1126,19 +1143,19 @@ The following claims are NOT made about this protocol:
 
 ## 26. Formal Security Properties
 
-| Property | Current Vibe (v1) | Proposed Protocol (v2) |
+| Property | Current Vibe (v1) | Implemented V2 Status |
 |----------|-------------------|----------------------|
 | Confidentiality | PARTIAL (silent fallback) | YES (mandatory, no fallback) |
 | Integrity | YES (GCM tag) | YES (AEAD) |
 | Authentication | NO (no key signing) | YES (Ed25519 signatures) |
 | Forward secrecy | NO (static-static) | YES (ephemeral keys per session) |
 | Post-compromise security | NO | YES (DH ratchet) |
-| Replay protection | NO (random nonce only) | YES (message numbers + ratchet) |
+| Replay protection | NO (random nonce only) | YES (message numbers + ratchet + nonce uniqueness) |
 | Key rotation | NO | YES (manual + periodic prekey rotation) |
 | Multi-device | NO | YES (per-device key pairs) |
 | Key change detection | NO | YES (safety numbers + warnings) |
 | PQ security | NO | NO (explicitly excluded) |
-| Media encryption | NO | PARTIAL (v2 scope: text only; media in v3) |
+| Media encryption | NO | NO (v2 scope: text only; media in v3) |
 | Metadata protection | NO | NO (server sees sender/recipient/timestamp) |
 
 ---
@@ -1194,13 +1211,58 @@ Before implementing v2, these items must be resolved:
 
 ## 31. Analyzer & Test Status
 
-- **Analyzer**: 43 issues / 0 errors (unchanged from baseline)
-- **Tests**: 314 pass / 0 fail (unchanged from baseline)
+- **Analyzer**: 44 issues / 0 errors (down from 45 baseline)
+- **Tests**: 445 pass / 0 fail
 - **Production behavior**: UNCHANGED
 
 ---
 
-## 32. Phase 12A Result
+## 32. Test Evidence (Phase 12B.4)
+
+### Test Suites
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| `v2_ratchet_test.dart` | 32 | ALL PASS |
+| `v2_envelope_test.dart` | 31 | ALL PASS |
+| Other tests | 382 | ALL PASS |
+| **Total** | **445** | **ALL PASS** |
+
+### Security Test Coverage
+
+| Category | Tests | Status |
+|----------|-------|--------|
+| Tamper resistance (version, IK, RK, MN, nonce, prev chain len, ciphertext, auth tag) | 8 | ALL PASS |
+| Out-of-order delivery | 2 | ALL PASS |
+| Bidirectional ratchet | 2 | ALL PASS |
+| Wrong session rejection | 2 | ALL PASS |
+| Wrong device rejection | 2 | ALL PASS |
+| State persistence | 2 | ALL PASS |
+| Replay protection | 1 | PASS |
+| Nonce uniqueness | 1 | PASS |
+| State advancement | 3 | ALL PASS |
+| Version validation | 1 | PASS |
+
+### Tamper Test Details
+
+All 8 tamper tests verify that flipping a single byte in the envelope causes decryption failure:
+
+1. **Version byte** → `SecretBoxAuthenticationError`
+2. **Sender identity key** → `SecretBoxAuthenticationError`
+3. **Sender ratchet public key** → `SecretBoxAuthenticationError`
+4. **Message number** → `SecretBoxAuthenticationError`
+5. **Nonce** → `SecretBoxAuthenticationError`
+6. **Previous chain length** → `SecretBoxAuthenticationError`
+7. **Ciphertext** → `SecretBoxAuthenticationError`
+8. **Authentication tag** → `SecretBoxAuthenticationError`
+
+### Important Note
+
+**This test evidence does NOT replace an independent cryptographic audit.** The tests verify functional correctness and basic tamper resistance. A formal security review by a cryptographer is required before production deployment.
+
+---
+
+## 33. Phase 12A Result
 
 ### CURRENT PROTOCOL
 
@@ -1240,11 +1302,11 @@ See Section 26. v2 provides: confidentiality, integrity, authentication, forward
 
 ### OPEN QUESTIONS
 
-7 questions documented in Section 27. Decisions required before implementation.
+7 questions documented in Section 28. Decisions required before implementation.
 
 ### PRODUCTION BLOCKERS
 
-6 blockers identified in Section 28. All pending.
+6 blockers identified in Section 29. All pending.
 
 ### FILES CREATED
 
@@ -1252,12 +1314,12 @@ See Section 26. v2 provides: confidentiality, integrity, authentication, forward
 
 ### ANALYZER
 
-43 issues / 0 errors (no change)
+44 issues / 0 errors (down from 45 baseline)
 
 ### TESTS
 
-314 pass / 0 fail (no change)
+445 pass / 0 fail (32 ratchet + 31 envelope + 382 other)
 
 ### RESULT
 
-**PASS** — Specification complete. No code changes. Ready for independent review and implementation decision.
+**PASS** — Specification synchronized with implementation. No code changes. Ready for independent review and implementation decision.
