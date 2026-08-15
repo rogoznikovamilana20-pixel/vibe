@@ -20,7 +20,7 @@ class MessageStatusTick extends StatefulWidget {
 }
 
 class _MessageStatusTickState extends State<MessageStatusTick>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _drawController;
   late AnimationController _colorController;
   late Animation<double> _drawAnimation;

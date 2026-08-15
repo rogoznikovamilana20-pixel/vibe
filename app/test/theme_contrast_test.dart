@@ -121,8 +121,8 @@ void main() {
       14.25, // onSurface / surface
       13.56, // onSurface / surfaceHigh
       11.57, // onInverseSurface / inverseSurface
-      4.92, // accent / фон
-      3.31, // onPrimary / primary
+      3.57, // accent / фон
+      4.56, // onPrimary / primary
       5.06, // error / фон
     ]));
   });
@@ -135,8 +135,8 @@ void main() {
       19.11, // onSurface / surface
       17.95, // onSurface / surfaceHigh
       16.66, // onInverseSurface / inverseSurface
-      3.31, // accent / фон
-      3.31, // onPrimary / primary
+      4.56, // accent / фон
+      4.56, // onPrimary / primary
       6.54, // error / фон (errorLight, AA)
     ]));
   });

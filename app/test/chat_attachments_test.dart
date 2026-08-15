@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vibe_app/chat/chat_controller.dart';
 import 'package:vibe_app/chat/models.dart';
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 import 'package:vibe_app/core/services/scheduled_service.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/core/widgets/vibe_avatar.dart';
@@ -52,6 +54,14 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('ru'),
+        localizationsDelegates: const [
+          VibeLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('ru')],
         theme: VibeTheme.light(),
         home: ChatScreen(chat: chatFor(), backend: fake),
       ),

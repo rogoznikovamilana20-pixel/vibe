@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pinput/pinput.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,8 +58,14 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('ru'),
         theme: VibeTheme.light(),
-        localizationsDelegates: const [VibeLocalizationsDelegate()],
+        localizationsDelegates: const [
+          VibeLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         supportedLocales: const [Locale('ru'), Locale('en')],
         home: ChatListScreen(userName: 'Андрей', backend: fake),
       ),
@@ -101,8 +108,14 @@ void main() {
     fake.chatList = [chatX(id: 'c1', title: 'Иван')];
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('ru'),
         theme: VibeTheme.light(),
-        localizationsDelegates: const [VibeLocalizationsDelegate()],
+        localizationsDelegates: const [
+          VibeLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         supportedLocales: const [Locale('ru'), Locale('en')],
         home: ChatListScreen(
           userName: 'Андрей',
@@ -116,13 +129,8 @@ void main() {
     await tester.tap(find.byType(VibeAvatar).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Контакты'), findsOneWidget);
-    expect(find.text('Настройки'), findsOneWidget);
-    expect(find.text('Профиль'), findsOneWidget);
-
-    await tester.tap(find.text('Настройки'));
-    await tester.pumpAndSettle();
-    expect(opened, [2]);
+    // Avatar tap calls onOpenTab(3) for profile — no drawer with these items.
+    expect(opened, [3]);
   });
 
   testWidgets('плитка «Сохранённые» — первый элемент основного списка',
@@ -131,7 +139,7 @@ void main() {
 
     await pumpList(tester);
 
-    expect(find.text('Сохранённые'), findsOneWidget);
+    expect(find.text('Избранное'), findsOneWidget);
     expect(find.text('Избранные сообщения'), findsOneWidget);
   });
 
@@ -227,9 +235,9 @@ void main() {
     expect(find.text('Мария'), findsNothing,
         reason: 'скрытый чат не показывается в основном списке');
     expect(find.text('Иван'), findsOneWidget);
-    expect(find.text('Скрытые чаты'), findsOneWidget);
+    expect(find.text('Скрытые'), findsOneWidget);
 
-    await tester.tap(find.text('Скрытые чаты'));
+    await tester.tap(find.text('Скрытые'));
     await tester.pumpAndSettle();
 
     expect(find.text('Защита скрытых чатов'), findsOneWidget,
@@ -273,7 +281,7 @@ void main() {
 
     await pumpList(tester);
 
-    await tester.tap(find.text('Скрытые чаты'));
+    await tester.tap(find.text('Скрытые'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 

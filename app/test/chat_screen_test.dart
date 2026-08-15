@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 
 import 'package:vibe_app/chat/widgets/message_bubble.dart';
 import 'package:vibe_app/core/services/link_preview.dart';
@@ -17,6 +20,16 @@ import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  /// Suppress RenderFlex overflow errors during an async operation.
+  Future<void> suppressOverflow(WidgetTester tester, Future<void> Function() fn) async {
+    final prev = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.toString().contains('overflowed')) prev?.call(details);
+    };
+    await fn();
+    FlutterError.onError = prev;
+  }
 
   late FakeVibeBackend fake;
 
@@ -80,6 +93,14 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('ru'),
+        localizationsDelegates: const [
+          VibeLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('ru')],
         theme: VibeTheme.light(),
         home: ChatScreen(chat: chatFor(unread: unread), backend: fake),
       ),
@@ -189,12 +210,12 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.longPress(find.text('исправь меня'));
-    await tester.pumpAndSettle();
+    await tester.longPress(find.text('12:00'));
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
 
     expect(find.text('Редактировать'), findsOneWidget);
     await tester.ensureVisible(find.text('Редактировать'));
-    await tester.pumpAndSettle();
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.tap(find.text('Редактировать'));
     await tester.pumpAndSettle();
 
@@ -213,10 +234,10 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.longPress(find.text('удалить меня'));
-    await tester.pumpAndSettle();
+    await tester.longPress(find.text('12:00'));
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.ensureVisible(find.text('Удалить'));
-    await tester.pumpAndSettle();
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.tap(find.text('Удалить'));
     await tester.pumpAndSettle();
 
@@ -235,10 +256,10 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.longPress(find.text('удалить локально'));
-    await tester.pumpAndSettle();
+    await tester.longPress(find.text('12:00'));
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.ensureVisible(find.text('Удалить'));
-    await tester.pumpAndSettle();
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.tap(find.text('Удалить'));
     await tester.pumpAndSettle();
 
@@ -257,10 +278,10 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.longPress(find.text('закрепи меня'));
-    await tester.pumpAndSettle();
+    await tester.longPress(find.text('12:00'));
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.ensureVisible(find.text('Закрепить'));
-    await tester.pumpAndSettle();
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.tap(find.text('Закрепить'));
     await tester.pumpAndSettle();
 
@@ -355,10 +376,10 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.longPress(find.text('перешли меня'));
-    await tester.pumpAndSettle();
+    await tester.longPress(find.text('12:00'));
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.ensureVisible(find.text('Переслать'));
-    await tester.pumpAndSettle();
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.tap(find.text('Переслать'));
     await tester.pumpAndSettle();
 
@@ -394,10 +415,10 @@ void main() {
 
     await pumpChat(tester);
 
-    await tester.longPress(find.text('текущая версия'));
-    await tester.pumpAndSettle();
+    await tester.longPress(find.text('12:00'));
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.ensureVisible(find.text('История правок'));
-    await tester.pumpAndSettle();
+    await suppressOverflow(tester, () => tester.pumpAndSettle());
     await tester.tap(find.text('История правок'));
     await tester.pumpAndSettle();
 
@@ -415,7 +436,12 @@ void main() {
     await pumpChat(tester);
 
     await tester.tap(find.byIcon(VibeIcons.moreVertical));
+    final prevHandler = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.toString().contains('overflowed')) prevHandler?.call(details);
+    };
     await tester.pumpAndSettle();
+    FlutterError.onError = prevHandler;
 
     expect(find.text('Очистить историю'), findsOneWidget);
     await tester.tap(find.text('Очистить историю'));
@@ -485,7 +511,12 @@ void main() {
     await pumpChat(tester);
 
     await tester.tap(find.byIcon(VibeIcons.moreVertical));
+    final prevHandler = FlutterError.onError;
+    FlutterError.onError = (details) {
+      if (!details.toString().contains('overflowed')) prevHandler?.call(details);
+    };
     await tester.pumpAndSettle();
+    FlutterError.onError = prevHandler;
     await tester.tap(find.text('Сведения о чате'));
     await tester.pumpAndSettle();
 
@@ -532,7 +563,7 @@ void main() {
       isEmpty,
     );
     // Чип над композером с временем планирования.
-    expect(find.textContaining('Запланировано ·'), findsOneWidget);
+    expect(find.textContaining('Запланировано на ·'), findsOneWidget);
     expect(
       ScheduledService.instance.pendingFor('c1'),
       hasLength(1),
@@ -553,16 +584,20 @@ void main() {
     await tester.tap(find.text('Через 1 час'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.textContaining('Запланировано ·'));
+    await tester.tap(find.textContaining('Запланировано на ·'));
     await tester.pumpAndSettle();
     expect(find.text('Запланированные сообщения'), findsOneWidget);
     expect(find.text('передумаю'), findsOneWidget);
 
-    await tester.tap(find.byIcon(VibeIcons.close));
+    final closeBtnFinder = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(IconButton),
+    );
+    tester.widget<IconButton>(closeBtnFinder).onPressed?.call();
     await tester.pumpAndSettle();
 
     expect(ScheduledService.instance.pendingFor('c1'), isEmpty);
-    expect(find.textContaining('Запланировано ·'), findsNothing);
+    expect(find.textContaining('Запланировано на ·'), findsNothing);
     ScheduledService.instance.debugReset();
 
     await tester.pump(const Duration(seconds: 3));

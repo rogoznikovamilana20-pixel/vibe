@@ -62,6 +62,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('Пир'), findsOneWidget);
     expect(find.text('Как дела?'), findsOneWidget);
@@ -89,6 +90,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('Как дела?'), findsNothing);
     expect(
@@ -116,6 +118,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.byIcon(VibeIcons.pin), findsWidgets);
     expect(find.byIcon(Icons.notifications_off_rounded), findsWidgets);
@@ -140,6 +143,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
 
@@ -168,6 +172,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('В архиве'), findsOneWidget);
     expect(find.text('Секрет'), findsNothing);
@@ -194,6 +199,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byType(ListTile));
     expect(taps, 1);

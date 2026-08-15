@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -92,8 +93,14 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('ru'),
           theme: VibeTheme.light(),
-          localizationsDelegates: const [VibeLocalizationsDelegate()],
+          localizationsDelegates: const [
+            VibeLocalizationsDelegate(),
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           supportedLocales: const [Locale('ru'), Locale('en')],
           home: FoldersScreen(
             chats: [chatX('c1', 'Анна'), chatX('c2', 'Борис')],
@@ -166,8 +173,14 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('ru'),
           theme: VibeTheme.light(),
-          localizationsDelegates: const [VibeLocalizationsDelegate()],
+          localizationsDelegates: const [
+            VibeLocalizationsDelegate(),
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           supportedLocales: const [Locale('ru'), Locale('en')],
           home: ChatListScreen(userName: 'Тест', backend: fake),
         ),

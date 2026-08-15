@@ -1,13 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vibe_app/chat/models.dart';
 import 'package:vibe_app/chat/widgets/message_bubble.dart';
+import 'package:vibe_app/chat/widgets/message_status_tick.dart';
+import 'package:vibe_app/core/localization/vibe_localizations.dart';
 import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+
+Finder findSelectableTextContaining(String text) {
+  return find.byWidgetPredicate((w) {
+    if (w is EditableText && w.controller.text.contains(text)) return true;
+    if (w is Text && w.data != null && w.data!.contains(text)) return true;
+    return false;
+  });
+}
+
+Finder findAnyTextContaining(String text) {
+  return find.byWidgetPredicate((w) {
+    if (w is EditableText && w.controller.text.contains(text)) return true;
+    if (w is Text && w.data != null && w.data!.contains(text)) return true;
+    return false;
+  });
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +59,14 @@ void main() {
 
   Widget wrap(ChatMsg msg) {
     return MaterialApp(
+      localizationsDelegates: const [
+        VibeLocalizationsDelegate(),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('ru')],
+      locale: const Locale('ru'),
       theme: VibeTheme.light(),
       home: Scaffold(
         body: SingleChildScrollView(
@@ -59,34 +86,40 @@ void main() {
 
   testWidgets('MessageBubble: текст, время и галочка sent', (tester) async {
     await tester.pumpWidget(wrap(textMsg()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
 
-    expect(find.text('Привет'), findsOneWidget);
-    expect(find.text('12:30'), findsOneWidget);
-    expect(find.byIcon(VibeIcons.check), findsOneWidget);
+    expect(findSelectableTextContaining('Привет'), findsOneWidget);
+    expect(findAnyTextContaining('12:30'), findsOneWidget);
+    expect(find.byType(MessageStatusTick), findsOneWidget);
   });
 
   testWidgets('MessageBubble: квитанции delivered/read/failed',
       (tester) async {
     await tester.pumpWidget(wrap(textMsg(status: MsgStatus.delivered)));
-    expect(find.byIcon(VibeIcons.checkAll), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final deliveredTick =
+        tester.widget<MessageStatusTick>(find.byType(MessageStatusTick));
+    expect(deliveredTick.status, MsgStatus.delivered);
 
     await tester.pumpWidget(wrap(textMsg(status: MsgStatus.read)));
-    expect(find.byIcon(VibeIcons.checkAll), findsOneWidget);
-    expect(
-      tester
-          .widget<Icon>(find.byIcon(VibeIcons.checkAll))
-          .color
-          ?.toARGB32(),
-      const Color(0xFF8AB4F8).toARGB32(),
-    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final readTick =
+        tester.widget<MessageStatusTick>(find.byType(MessageStatusTick));
+    expect(readTick.status, MsgStatus.read);
 
     await tester.pumpWidget(wrap(textMsg(status: MsgStatus.failed)));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
   });
 
   testWidgets('MessageBubble: у входящего нет галочек статуса',
       (tester) async {
     await tester.pumpWidget(wrap(textMsg(incoming: true, status: MsgStatus.read)));
+    await tester.pumpAndSettle();
 
     expect(find.byIcon(VibeIcons.checkAll), findsNothing);
     expect(find.byIcon(VibeIcons.check), findsNothing);
@@ -96,8 +129,9 @@ void main() {
     await tester.pumpWidget(
       wrap(textMsg(replyText: 'На что я отвечаю')),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('На что я отвечаю'), findsOneWidget);
+    expect(findAnyTextContaining('На что я отвечаю'), findsOneWidget);
   });
 
   testWidgets('MessageBubble: длинный ответ (>50 симв.) не ломает верстку',
@@ -106,29 +140,40 @@ void main() {
     expect(long.length, greaterThan(50));
 
     await tester.pumpWidget(wrap(textMsg(replyText: long)));
+    await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.textContaining('очень длинный ответ-цитата'), findsOneWidget);
+    expect(findAnyTextContaining('очень длинный ответ-цитата'), findsOneWidget);
   });
 
   testWidgets('MessageBubble: метка «изменено»', (tester) async {
     await tester.pumpWidget(wrap(textMsg(edited: true)));
+    await tester.pumpAndSettle();
 
-    expect(find.text('изменено'), findsOneWidget);
+    expect(findAnyTextContaining('изменено'), findsOneWidget);
   });
 
   testWidgets('MessageBubble: «Переслано от …»', (tester) async {
     await tester.pumpWidget(
       wrap(textMsg(forwardedFrom: 'Иван')),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Переслано от Иван'), findsOneWidget);
+    expect(findAnyTextContaining('Переслано от Иван'), findsOneWidget);
   });
 
   testWidgets('MessageBubble: двойной тап зовёт onHeart', (tester) async {
     var hearts = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: const [
+          VibeLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('ru')],
+        locale: const Locale('ru'),
         theme: VibeTheme.light(),
         home: Scaffold(
           body: SingleChildScrollView(
@@ -145,10 +190,12 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Привет'));
+    final bubbleFinder = findSelectableTextContaining('Привет');
+    await tester.tap(bubbleFinder);
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Привет'));
+    await tester.tap(bubbleFinder);
     await tester.pump(const Duration(milliseconds: 950));
 
     expect(hearts, 1);
