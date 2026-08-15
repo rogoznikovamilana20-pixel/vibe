@@ -1093,4 +1093,54 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 ### Result: **PARTIAL** (P0/P1 исправлены, P2 задокументированы)
 
 ---
+
+## Phase 9 — Performance, Memory & Lifecycle Hardening ✅ (завершена 15.08.2026)
+
+### Сделано
+4 параллельных аудита (rebuild, memory leaks, chat message list perf, chat list perf) + исправления.
+
+### Исправления
+
+1. **Backend: _connSub leak** — `StreamSubscription<ConnectivityResult>` не отменялся при logout → connectivity listener продолжал работать после выхода. **Исправлено**: добавлен `stopNetworkMonitor()` который отменяет `_connSub` и `_healthTimer`. Вызывается из `ProfileBackend.logout()`.
+
+2. **Backend: _healthTimer leak** — `Timer.periodic(12s)` health-check не отменялся при logout → health-checkи продолжались после выхода. **Исправлено**: `_healthTimer?.cancel()` в `stopNetworkMonitor()`.
+
+3. **ProfileBackend: _presenceTimer leak** — `Timer.periodic(60s)` heartbeat не отменялся при logout → `online: true` писался в БД каждую минуту после выхода. **Исправлено**: `_presenceTimer?.cancel()` + `_presenceChannel` removal в `logout()`.
+
+4. **Backend: _chatsController orphaned events** — `StreamController<void>.broadcast()` не закрывался при logout → orphaned callbacks могли сработать после выхода. **Исправлено**: `_chatsController.close()` в `logout()` (безопасно: `init()` создаёт новый singleton).
+
+5. **_reconnectRealtime: channel leak** — DM channel отменялся через `unsubscribe()` (оставляя объект в Supabase internals), вместо `removeChannel()`. **Исправлено**: заменено на `_client.removeChannel(dm)`. Аналогично для `_resubscribePostgresChanges`.
+
+6. **ProfileBackend logout: postgres_changes cleanup** — использовал `await ch.unsubscribe()`. **Исправлено**: заменено на `_client.removeChannel(ch)`.
+
+7. **ChatListController: markArchived bug** — `markArchived()` архивировал ВСЕ ранее архивированные чаты (не только выбранные), отправляя `setChatArchived` на все `archived`. **Исправлено**: архивируются только `selected.toList()`.
+
+### Что НЕ исправлялось (обоснованно)
+
+| Finding | Причина |
+|---|---|
+| ChatScreen 18+ setState | Требует декомпозиции монолита — не в scope lifecycle hardening |
+| ChatScreen scroll rebuilds ~12.5/s | Оптимизация через ListenableBuilder — требует архитектурных изменений |
+| messages.any() O(n) dedup | Приемлемо для типичных чатов (<1000 сообщений); O(1) через Set добавляет overhead на вставку |
+| selectedMessages getter O(n) | Вызывается редко (bulk delete/forward/copy) — не горячий путь |
+| ChatController deleteSelected O(n*k) | Аналогично — rare path |
+
+### Тесты
+- `lifecycle_hardening_test.dart`: 5 тестов (ChatController dispose, ChatListController dispose, OfflineQueue clear, hasPending)
+- `chat_list_controller_test.dart`: +1 регрессионный тест `markArchived: архивирует ТОЛЬКО выбранные`
+
+### Analyzer
+- До: 43 issues (0 errors)
+- После: 44 issues (0 errors) — +1 pre-existing unused import
+- Новая регрессия: 0
+
+### Tests
+- До: 222 pass, 74 fail
+- После: 227 pass, 74 fail — +5 новых, все pass
+
+### Commit: `147d623` (pushed to main)
+
+### Result: **COMPLETE** (7 lifecycle fixes + 1 bug fix + 6 tests)
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
