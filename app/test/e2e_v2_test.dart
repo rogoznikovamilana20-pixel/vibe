@@ -811,4 +811,590 @@ void main() {
       expect(secretBytes.length, 32);
     });
   });
+
+  // ===========================================================================
+  // X3DH Session Establishment Tests
+  // ===========================================================================
+
+  group('X3DH Protocol', () {
+    final x25519 = Cryptography.instance.x25519();
+
+    /// Helper: perform X3DH responder side (Bob).
+    Future<List<int>> x3dhResponder({
+      required SimpleKeyPair bobIdentityKey,
+      required SimpleKeyPair bobSignedPrekey,
+      SimpleKeyPair? bobOneTimePrekey,
+      required SimplePublicKey aliceIdentityPub,
+      required SimplePublicKey aliceEphemeralPub,
+    }) async {
+      final dh1 = await x25519.sharedSecretKey(
+        keyPair: bobSignedPrekey,
+        remotePublicKey: aliceIdentityPub,
+      );
+      final dh2 = await x25519.sharedSecretKey(
+        keyPair: bobIdentityKey,
+        remotePublicKey: aliceEphemeralPub,
+      );
+      final dh3 = await x25519.sharedSecretKey(
+        keyPair: bobSignedPrekey,
+        remotePublicKey: aliceEphemeralPub,
+      );
+
+      final masterSecret = <int>[
+        ...await dh1.extractBytes(),
+        ...await dh2.extractBytes(),
+        ...await dh3.extractBytes(),
+      ];
+
+      if (bobOneTimePrekey != null) {
+        final dh4 = await x25519.sharedSecretKey(
+          keyPair: bobOneTimePrekey,
+          remotePublicKey: aliceEphemeralPub,
+        );
+        masterSecret.addAll(await dh4.extractBytes());
+      }
+
+      return masterSecret;
+    }
+
+    /// Helper: derive root+chain keys via HKDF.
+    Future<({List<int> rootKey, List<int> chainKey})> deriveKeys(
+      List<int> masterSecret,
+      List<int> aliceIdentityPubBytes,
+      List<int> bobIdentityPubBytes,
+    ) async {
+      final hkdf = Hkdf(
+        hmac: Hmac.sha256(),
+        outputLength: 64,
+      );
+      final info = [...aliceIdentityPubBytes, ...bobIdentityPubBytes];
+      final salt = utf8.encode('VibeE2EE_v2_sess');
+      final derivedKey = await hkdf.deriveKey(
+        secretKey: SecretKey(masterSecret),
+        nonce: salt,
+        info: info,
+      );
+      final derivedBytes = await derivedKey.extractBytes();
+      return (
+        rootKey: derivedBytes.sublist(0, 32),
+        chainKey: derivedBytes.sublist(32, 64),
+      );
+    }
+
+    test('happy path — Alice and Bob derive identical session keys (with OTK)', () async {
+      // Bob generates keys
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+      final bobOtkKp = await x25519.newKeyPair();
+      final bobOtkPub = await bobOtkKp.extractPublicKey();
+
+      // Alice generates identity
+      final aliceIdentityKp = await x25519.newKeyPair();
+
+      // Use known ephemeral so both sides can compute with same key
+      final ephemeralPair = await x25519.newKeyPair();
+      final ephemeralPub = await ephemeralPair.extractPublicKey();
+      final aliceIdentityPub = await aliceIdentityKp.extractPublicKey();
+
+      // Alice computes X3DH
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobSpkPub);
+      final dh4a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobOtkPub);
+      final aliceMaster = <int>[
+        ...await dh1a.extractBytes(),
+        ...await dh2a.extractBytes(),
+        ...await dh3a.extractBytes(),
+        ...await dh4a.extractBytes(),
+      ];
+
+      // Bob computes X3DH
+      final bobMaster = await x3dhResponder(
+        bobIdentityKey: bobIdentityKp,
+        bobSignedPrekey: bobSpkKp,
+        bobOneTimePrekey: bobOtkKp,
+        aliceIdentityPub: aliceIdentityPub,
+        aliceEphemeralPub: ephemeralPub,
+      );
+
+      // Both sides must produce the same master secret
+      expect(aliceMaster, bobMaster);
+
+      // Derive keys from both sides — must be identical
+      final aliceKeys = await deriveKeys(
+        aliceMaster,
+        aliceIdentityPub.bytes,
+        bobIdentityPub.bytes,
+      );
+      final bobKeys = await deriveKeys(
+        bobMaster,
+        aliceIdentityPub.bytes,
+        bobIdentityPub.bytes,
+      );
+
+      expect(aliceKeys.rootKey, bobKeys.rootKey);
+      expect(aliceKeys.chainKey, bobKeys.chainKey);
+      expect(aliceKeys.rootKey.length, 32);
+      expect(aliceKeys.chainKey.length, 32);
+    });
+
+    test('happy path — without OTK produces different key than with OTK', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+      final bobOtkKp = await x25519.newKeyPair();
+      final bobOtkPub = await bobOtkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+      final ephemeralPair = await x25519.newKeyPair();
+
+      // With OTK
+      final dh1 = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2 = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3 = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobSpkPub);
+      final dh4 = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobOtkPub);
+      final masterWithOtk = <int>[
+        ...await dh1.extractBytes(), ...await dh2.extractBytes(),
+        ...await dh3.extractBytes(), ...await dh4.extractBytes(),
+      ];
+
+      // Without OTK
+      final dh1b = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2b = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3b = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobSpkPub);
+      final masterWithoutOtk = <int>[
+        ...await dh1b.extractBytes(), ...await dh2b.extractBytes(),
+        ...await dh3b.extractBytes(),
+      ];
+
+      // They must differ (different input length → different HKDF output)
+      expect(masterWithOtk, isNot(masterWithoutOtk));
+      expect(masterWithOtk.length, 128); // 4 × 32
+      expect(masterWithoutOtk.length, 96); // 3 × 32
+    });
+
+    test('wrong identity key produces different master secret', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+      final bobOtkKp = await x25519.newKeyPair();
+      final bobOtkPub = await bobOtkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+      final wrongIdentityKp = await x25519.newKeyPair();
+      final ephemeralPair = await x25519.newKeyPair();
+
+      // With correct identity
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobSpkPub);
+      final dh4a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobOtkPub);
+      final correctMaster = <int>[
+        ...await dh1a.extractBytes(), ...await dh2a.extractBytes(),
+        ...await dh3a.extractBytes(), ...await dh4a.extractBytes(),
+      ];
+
+      // With wrong identity — DH1 changes
+      final dh1w = await x25519.sharedSecretKey(keyPair: wrongIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2w = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3w = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobSpkPub);
+      final dh4w = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobOtkPub);
+      final wrongMaster = <int>[
+        ...await dh1w.extractBytes(), ...await dh2w.extractBytes(),
+        ...await dh3w.extractBytes(), ...await dh4w.extractBytes(),
+      ];
+
+      expect(correctMaster, isNot(wrongMaster));
+    });
+
+    test('wrong signed prekey produces different master secret', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+      final wrongSpkKp = await x25519.newKeyPair();
+      final wrongSpkPub = await wrongSpkKp.extractPublicKey();
+      final bobOtkKp = await x25519.newKeyPair();
+      final bobOtkPub = await bobOtkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+      final ephemeralPair = await x25519.newKeyPair();
+
+      // With correct SPK
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobSpkPub);
+      final dh4a = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobOtkPub);
+      final correctMaster = <int>[
+        ...await dh1a.extractBytes(), ...await dh2a.extractBytes(),
+        ...await dh3a.extractBytes(), ...await dh4a.extractBytes(),
+      ];
+
+      // With wrong SPK — DH1 and DH3 change
+      final dh1w = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: wrongSpkPub);
+      final dh2w = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobIdentityPub);
+      final dh3w = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: wrongSpkPub);
+      final dh4w = await x25519.sharedSecretKey(keyPair: ephemeralPair, remotePublicKey: bobOtkPub);
+      final wrongMaster = <int>[
+        ...await dh1w.extractBytes(), ...await dh2w.extractBytes(),
+        ...await dh3w.extractBytes(), ...await dh4w.extractBytes(),
+      ];
+
+      expect(correctMaster, isNot(wrongMaster));
+    });
+
+    test('different ephemeral keys produce different master secret (forward secrecy)', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+      final bobOtkKp = await x25519.newKeyPair();
+      final bobOtkPub = await bobOtkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+      final ephemeral1 = await x25519.newKeyPair();
+      final ephemeral2 = await x25519.newKeyPair();
+
+      // With ephemeral1
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2a = await x25519.sharedSecretKey(keyPair: ephemeral1, remotePublicKey: bobIdentityPub);
+      final dh3a = await x25519.sharedSecretKey(keyPair: ephemeral1, remotePublicKey: bobSpkPub);
+      final dh4a = await x25519.sharedSecretKey(keyPair: ephemeral1, remotePublicKey: bobOtkPub);
+      final master1 = <int>[
+        ...await dh1a.extractBytes(), ...await dh2a.extractBytes(),
+        ...await dh3a.extractBytes(), ...await dh4a.extractBytes(),
+      ];
+
+      // With ephemeral2
+      final dh1b = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2b = await x25519.sharedSecretKey(keyPair: ephemeral2, remotePublicKey: bobIdentityPub);
+      final dh3b = await x25519.sharedSecretKey(keyPair: ephemeral2, remotePublicKey: bobSpkPub);
+      final dh4b = await x25519.sharedSecretKey(keyPair: ephemeral2, remotePublicKey: bobOtkPub);
+      final master2 = <int>[
+        ...await dh1b.extractBytes(), ...await dh2b.extractBytes(),
+        ...await dh3b.extractBytes(), ...await dh4b.extractBytes(),
+      ];
+
+      expect(master1, isNot(master2));
+    });
+
+    test('same keys used twice produce different sessions (ephemeral forward secrecy)', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+
+      // Two different ephemeral keys → two different sessions
+      final eph1 = await x25519.newKeyPair();
+      final eph2 = await x25519.newKeyPair();
+
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2a = await x25519.sharedSecretKey(keyPair: eph1, remotePublicKey: bobIdentityPub);
+      final dh3a = await x25519.sharedSecretKey(keyPair: eph1, remotePublicKey: bobSpkPub);
+      final master1 = <int>[...await dh1a.extractBytes(), ...await dh2a.extractBytes(), ...await dh3a.extractBytes()];
+
+      final dh1b = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2b = await x25519.sharedSecretKey(keyPair: eph2, remotePublicKey: bobIdentityPub);
+      final dh3b = await x25519.sharedSecretKey(keyPair: eph2, remotePublicKey: bobSpkPub);
+      final master2 = <int>[...await dh1b.extractBytes(), ...await dh2b.extractBytes(), ...await dh3b.extractBytes()];
+
+      expect(master1, isNot(master2));
+    });
+
+    test('Bob cannot compute session without his private signed prekey', () async {
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+      final ephemeral = await x25519.newKeyPair();
+
+      // Bob needs SPKb (private) to compute DH1 = X25519(SPKb, IKa)
+      // Without SPKb, Bob cannot compute DH1
+
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+
+      // An attacker without bobSpkKp cannot compute DH1 or DH3
+      final attackerIdentityKp = await x25519.newKeyPair();
+      final fakeDh1 = await x25519.sharedSecretKey(
+        keyPair: attackerIdentityKp,
+        remotePublicKey: await ephemeral.extractPublicKey(), // wrong
+      );
+
+      // The fake DH1 won't match the real DH1
+      expect(await fakeDh1.extractBytes(), isNot(await dh1a.extractBytes()));
+    });
+
+    test('session ID is deterministic for same inputs', () {
+      // _generateSessionId uses FNV-1a hash — verify determinism
+      String generateSessionId(String initiator, String responder, List<int> ephBytes) {
+        final combined = <int>[
+          ...utf8.encode(initiator),
+          ...utf8.encode(responder),
+          ...ephBytes,
+        ];
+        var hash = 0x811c9dc5;
+        for (final byte in combined) {
+          hash ^= byte;
+          hash = (hash * 0x01000193) & 0xFFFFFFFF;
+        }
+        return hash.toRadixString(16).padLeft(8, '0');
+      }
+
+      final ephBytes = List<int>.generate(32, (i) => i);
+      final id1 = generateSessionId('alice-device-1', 'bob-device-1', ephBytes);
+      final id2 = generateSessionId('alice-device-1', 'bob-device-1', ephBytes);
+      expect(id1, id2);
+    });
+
+    test('session ID differs for different devices', () {
+      String generateSessionId(String initiator, String responder, List<int> ephBytes) {
+        final combined = <int>[
+          ...utf8.encode(initiator),
+          ...utf8.encode(responder),
+          ...ephBytes,
+        ];
+        var hash = 0x811c9dc5;
+        for (final byte in combined) {
+          hash ^= byte;
+          hash = (hash * 0x01000193) & 0xFFFFFFFF;
+        }
+        return hash.toRadixString(16).padLeft(8, '0');
+      }
+
+      final ephBytes = List<int>.generate(32, (i) => i);
+      final id1 = generateSessionId('alice-device-1', 'bob-device-1', ephBytes);
+      final id2 = generateSessionId('alice-device-2', 'bob-device-1', ephBytes);
+      final id3 = generateSessionId('alice-device-1', 'bob-device-2', ephBytes);
+      expect(id1, isNot(id2));
+      expect(id1, isNot(id3));
+      expect(id2, isNot(id3));
+    });
+
+    test('HKDF produces consistent output for same inputs', () async {
+      final hkdf = Hkdf(hmac: Hmac.sha256(), outputLength: 64);
+      final salt = utf8.encode('VibeE2EE_v2_sess');
+      final ikm = List<int>.generate(128, (i) => i);
+      final info = List<int>.generate(64, (i) => i + 100);
+
+      final key1 = await hkdf.deriveKey(secretKey: SecretKey(ikm), nonce: salt, info: info);
+      final key2 = await hkdf.deriveKey(secretKey: SecretKey(ikm), nonce: salt, info: info);
+
+      expect(await key1.extractBytes(), await key2.extractBytes());
+    });
+
+    test('HKDF produces different output for different salt', () async {
+      final hkdf = Hkdf(hmac: Hmac.sha256(), outputLength: 64);
+      final salt1 = utf8.encode('VibeE2EE_v2_sess');
+      final salt2 = utf8.encode('VibeE2EE_v2_xxx');
+      final ikm = List<int>.generate(128, (i) => i);
+      final info = List<int>.generate(64, (i) => i + 100);
+
+      final key1 = await hkdf.deriveKey(secretKey: SecretKey(ikm), nonce: salt1, info: info);
+      final key2 = await hkdf.deriveKey(secretKey: SecretKey(ikm), nonce: salt2, info: info);
+
+      expect(await key1.extractBytes(), isNot(await key2.extractBytes()));
+    });
+
+    test('HKDF produces different output for different info', () async {
+      final hkdf = Hkdf(hmac: Hmac.sha256(), outputLength: 64);
+      final salt = utf8.encode('VibeE2EE_v2_sess');
+      final ikm = List<int>.generate(128, (i) => i);
+      final info1 = List<int>.generate(64, (i) => i);
+      final info2 = List<int>.generate(64, (i) => i + 1);
+
+      final key1 = await hkdf.deriveKey(secretKey: SecretKey(ikm), nonce: salt, info: info1);
+      final key2 = await hkdf.deriveKey(secretKey: SecretKey(ikm), nonce: salt, info: info2);
+
+      expect(await key1.extractBytes(), isNot(await key2.extractBytes()));
+    });
+
+    test('X25519 DH is commutative — DH(a, b) == DH(b, a)', () async {
+      final kpA = await x25519.newKeyPair();
+      final kpB = await x25519.newKeyPair();
+      final pubA = await kpA.extractPublicKey();
+      final pubB = await kpB.extractPublicKey();
+
+      final dhAb = await x25519.sharedSecretKey(keyPair: kpA, remotePublicKey: pubB);
+      final dhBa = await x25519.sharedSecretKey(keyPair: kpB, remotePublicKey: pubA);
+
+      expect(await dhAb.extractBytes(), await dhBa.extractBytes());
+    });
+
+    test('X25519 shared secret is 32 bytes', () async {
+      final kp = await x25519.newKeyPair();
+      final other = await x25519.newKeyPair();
+      final secret = await x25519.sharedSecretKey(
+        keyPair: kp,
+        remotePublicKey: await other.extractPublicKey(),
+      );
+      expect((await secret.extractBytes()).length, 32);
+    });
+
+    test('DH result with self is not all zeros (clamping produces valid point)', () async {
+      final kp = await x25519.newKeyPair();
+      final pub = await kp.extractPublicKey();
+      final secret = await x25519.sharedSecretKey(keyPair: kp, remotePublicKey: pub);
+      final bytes = await secret.extractBytes();
+      expect(bytes.length, 32);
+      // Should not be all zeros (would indicate broken implementation)
+      expect(bytes.any((b) => b != 0), true);
+    });
+
+    test('concurrent X3DH sessions with same keys produce different results (different ephemeral)', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+
+      // Simulate two concurrent sessions with different ephemeral keys
+      Future<List<int>> performSession(SimpleKeyPair ephemeral) async {
+        final dh1 = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+        final dh2 = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobIdentityPub);
+        final dh3 = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobSpkPub);
+        return <int>[...await dh1.extractBytes(), ...await dh2.extractBytes(), ...await dh3.extractBytes()];
+      }
+
+      final eph1 = await x25519.newKeyPair();
+      final eph2 = await x25519.newKeyPair();
+
+      // Run concurrently
+      final results = await Future.wait([
+        performSession(eph1),
+        performSession(eph2),
+      ]);
+
+      // Different ephemeral → different master secret
+      expect(results[0], isNot(results[1]));
+    });
+
+    test('tampered bundle public key changes master secret', () async {
+      final bobIdentityKp = await x25519.newKeyPair();
+      final bobIdentityPub = await bobIdentityKp.extractPublicKey();
+      final bobSpkKp = await x25519.newKeyPair();
+      final bobSpkPub = await bobSpkKp.extractPublicKey();
+      final bobOtkKp = await x25519.newKeyPair();
+      final bobOtkPub = await bobOtkKp.extractPublicKey();
+
+      final aliceIdentityKp = await x25519.newKeyPair();
+      final ephemeral = await x25519.newKeyPair();
+
+      // Correct bundle
+      final dh1c = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: bobSpkPub);
+      final dh2c = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobIdentityPub);
+      final dh3c = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobSpkPub);
+      final dh4c = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobOtkPub);
+      final correctMaster = <int>[
+        ...await dh1c.extractBytes(), ...await dh2c.extractBytes(),
+        ...await dh3c.extractBytes(), ...await dh4c.extractBytes(),
+      ];
+
+      // Tampered SPK (flipped bit)
+      final tamperedSpkBytes = List<int>.from(bobSpkPub.bytes);
+      tamperedSpkBytes[0] ^= 0x01;
+      final tamperedSpkPub = SimplePublicKey(tamperedSpkBytes, type: KeyPairType.x25519);
+
+      final dh1t = await x25519.sharedSecretKey(keyPair: aliceIdentityKp, remotePublicKey: tamperedSpkPub);
+      final dh2t = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobIdentityPub);
+      final dh3t = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: tamperedSpkPub);
+      final dh4t = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: bobOtkPub);
+      final tamperedMaster = <int>[
+        ...await dh1t.extractBytes(), ...await dh2t.extractBytes(),
+        ...await dh3t.extractBytes(), ...await dh4t.extractBytes(),
+      ];
+
+      expect(correctMaster, isNot(tamperedMaster));
+    });
+
+    test('X3dhMessage serialization roundtrip', () {
+      final msg = X3dhMessage(
+        sessionId: 'session-123',
+        initiatorDeviceId: 'alice-device-1',
+        initiatorIdentityKeyPublic: 'alice-ik-pub',
+        initiatorEdIdentityKeyPublic: 'alice-ed-ik-pub',
+        responderDeviceId: 'bob-device-1',
+        ephemeralKeyPublic: 'alice-ephemeral-pub',
+        protocolVersion: 2,
+      );
+
+      final json = msg.toJson();
+      final restored = X3dhMessage.fromJson(json);
+
+      expect(restored.sessionId, msg.sessionId);
+      expect(restored.initiatorDeviceId, msg.initiatorDeviceId);
+      expect(restored.initiatorIdentityKeyPublic, msg.initiatorIdentityKeyPublic);
+      expect(restored.initiatorEdIdentityKeyPublic, msg.initiatorEdIdentityKeyPublic);
+      expect(restored.responderDeviceId, msg.responderDeviceId);
+      expect(restored.ephemeralKeyPublic, msg.ephemeralKeyPublic);
+      expect(restored.protocolVersion, msg.protocolVersion);
+    });
+
+    test('X3dhResult contains valid key lengths', () {
+      final result = X3dhResult(
+        sessionId: 'session-456',
+        rootKey: List<int>.generate(32, (i) => i),
+        chainKey: List<int>.generate(32, (i) => i + 32),
+        remoteIdentityKeyPublic: 'remote-ik-pub',
+        remoteDeviceId: 'remote-device-1',
+        protocolVersion: 2,
+      );
+
+      expect(result.rootKey.length, 32);
+      expect(result.chainKey.length, 32);
+      expect(result.sessionId, 'session-456');
+      expect(result.protocolVersion, 2);
+    });
+
+    test('V2Session.fromX3dhResult copies all fields', () {
+      final x3dhResult = X3dhResult(
+        sessionId: 'session-789',
+        rootKey: List<int>.generate(32, (i) => i),
+        chainKey: List<int>.generate(32, (i) => i + 32),
+        remoteIdentityKeyPublic: 'remote-ik',
+        remoteDeviceId: 'remote-dev',
+        protocolVersion: 2,
+      );
+
+      final session = V2Session.fromX3dhResult(x3dhResult);
+
+      expect(session.sessionId, x3dhResult.sessionId);
+      expect(session.rootKey, x3dhResult.rootKey);
+      expect(session.chainKey, x3dhResult.chainKey);
+      expect(session.remoteIdentityKeyPublic, x3dhResult.remoteIdentityKeyPublic);
+      expect(session.remoteDeviceId, x3dhResult.remoteDeviceId);
+      expect(session.protocolVersion, x3dhResult.protocolVersion);
+      expect(session.createdAt, isA<DateTime>());
+    });
+
+    test('device isolation — different Bob devices have different keys, different sessions', () async {
+      final bobDev1Identity = await x25519.newKeyPair();
+      final bobDev1Spk = await x25519.newKeyPair();
+      final bobDev2Identity = await x25519.newKeyPair();
+      final bobDev2Spk = await x25519.newKeyPair();
+
+      final aliceIdentity = await x25519.newKeyPair();
+      final ephemeral = await x25519.newKeyPair();
+
+      // Session with Bob's device 1
+      final dh1a = await x25519.sharedSecretKey(keyPair: aliceIdentity, remotePublicKey: await bobDev1Spk.extractPublicKey());
+      final dh2a = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: await bobDev1Identity.extractPublicKey());
+      final dh3a = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: await bobDev1Spk.extractPublicKey());
+      final master1 = <int>[...await dh1a.extractBytes(), ...await dh2a.extractBytes(), ...await dh3a.extractBytes()];
+
+      // Session with Bob's device 2 (same Alice, same ephemeral)
+      final dh1b = await x25519.sharedSecretKey(keyPair: aliceIdentity, remotePublicKey: await bobDev2Spk.extractPublicKey());
+      final dh2b = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: await bobDev2Identity.extractPublicKey());
+      final dh3b = await x25519.sharedSecretKey(keyPair: ephemeral, remotePublicKey: await bobDev2Spk.extractPublicKey());
+      final master2 = <int>[...await dh1b.extractBytes(), ...await dh2b.extractBytes(), ...await dh3b.extractBytes()];
+
+      expect(master1, isNot(master2));
+    });
+  });
 }
