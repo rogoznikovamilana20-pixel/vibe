@@ -877,4 +877,68 @@
 - Edge-функция `send-call-invite` не найдена в репозитории
 
 ---
+
+## Atomic Release Hardening — Phase 6: Messaging / Realtime / Offline ✅ (завершена 15.08.2026)
+
+### Базовый уровень
+- Анализатор: 43 issues (0 errors) — без изменений
+- Тесты: 192 pass / 74 fail — было 170/74, добавлено 22 теста
+- Коммит: `7ceccc2`
+
+### Фактический Message Flow (документирован)
+
+**Отправка:**
+```
+ChatScreen._send() → ChatController.send() → [optimistic insert с MsgStatus.sending]
+→ VibeBackend.sendText() → [E2E encrypt attempt] → Supabase INSERT →
+[confirmed message с MsgStatus.sent] → streamController.add(sent) →
+ChatController stream listener → [match по localId → update in place]
+```
+
+**Получение:**
+```
+Remote sender → Supabase DB insert → Realtime (broadcast u_<peerId> + postgres_changes) →
+_onBroadcastMessage() → [dedup через _seenIds] → streamController.add(VibeMessage) →
+ChatController stream listener → [msg.incoming == true → insert at index 0]
+```
+
+### Исправлено (5 фиксов)
+
+1. **Double delivery: postgres_changes insert** (High) —канал `public:messages` postgres_changes вызывал `_onBroadcastMessage()` без предварительной проверки `_seenIds`. Если broadcast и postgres_changes доставляли одно сообщение одновременно, `_seenIds` внутри `_onBroadcastMessage` мог не успеть сработать (race condition). Добавлена явная проверка `_seenIds.contains(msgId)` ДО вызова `_onBroadcastMessage()`.
+
+2. **ChatController: нет dedup для входящих** (High) — обработчик `stream.listen()` в `chat_controller.dart:237` делал `messages.insert(0, _toMsg(msg))` без проверки, есть ли уже сообщение с таким `serverId`. Если одно сообщение приходило дважды (broadcast + postgres_changes), оно дублировалось в UI. Добавлена проверка `messages.any((m) => m.serverId == msg.id)` перед вставкой.
+
+3. **Logout: не отменялись postgres_changes каналы** (High) — `logout()` отменял только `_personal` и `_dmChannel`, но 7 каналов postgres_changes (messages insert/update/delete, reactions insert/delete, chat_pins insert/delete) оставались активными → утечка подписок и потенциальные события от старого аккаунта. Добавлено: все postgres_changes каналы сохраняются в `_postgresChannels` и отменяются при logout.
+
+4. **_sentById: неограниченный рост** (Medium) — карта `_sentById` (server ID → VibeMessage) росла бесконечно при отправке сообщений. Добавлен `_sentByIdTime` (время добавления) + `_cleanupSentById()` (удаляет записи старше 1 часа, max 200 за раз, при размере > 100).
+
+5. **_sentByIdTime: не очищался при logout** (Low) — при logout очищался `_sentById` но не `_sentByIdTime`. Добавлена очистка.
+
+### Тесты (22 новых)
+- MsgStatus transitions (sending→sent→delivered→read, failed terminal)
+- Message ordering (index 0 = newest, insert at 0)
+- _seenIds FIFO eviction (cap 400)
+- serverId matching (duplicate detection, null safety)
+- localId matching (own message confirmation)
+- ChatMsg copyWith (field preservation)
+- Unread count logic (read set operations)
+- VibeMessage localId propagation
+- Edit preserves serverId
+- Delete removes correct message
+
+### Source of Truth (документирован)
+- Chat list: сервер через `listChats()` + `_unreadByChat` RPC
+- Message list: `ChatController.messages` (in-memory, reverse order)
+- Unread count: сервер через `get_unread_counts` RPC + `_bumpUnread()` optimistic
+- Message status: `_sentById` map + stream events
+- Presence: `presenceVersion` ValueNotifier + profile cache
+- Typing: `_typingController` stream (6s timeout)
+
+### Известные ограничения (не исправлялись)
+- Offline send не реализован (сообщение показывает `failed` при отсутствии сети)
+- `_reconnectRealtime()` не пересоздаёт postgres_changes каналы (полагается на Supabase internal reconnect)
+- PostgresChanges каналы могут не работать, если таблица не в публикации realtime на сервере
+- Нет recovery для пропущенных realtime событий при долгом disconnect
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
