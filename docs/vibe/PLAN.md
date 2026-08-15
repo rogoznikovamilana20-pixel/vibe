@@ -1203,4 +1203,68 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 ### Result: **COMPLETE** (1 REAL BUG fixed + 74 test failures resolved, 0 remaining)
 
 ---
+
+## Phase 11 — Calling Backend & Signaling Hardening ✅ (завершена 15.08.2026)
+
+### Цель
+Устранение критических уязвимостей безопасности в звонковом стеке и повышение надёжности сигналинга.
+
+### Найденные уязвимости
+
+| # | Уровень | Описание |
+|---|---------|----------|
+| 1 | **CRITICAL** | `send-call-invite`: caller_id из тела запроса, не проверяется `auth.uid()`. Любой аутентифицированный пользователь может отправить push от чужого имени. |
+| 2 | **CRITICAL** | `send-call-invite`: используется `SUPABASE_SERVICE_ROLE_KEY` для чтения `chats` — обход RLS. |
+| 3 | **CRITICAL** | Сигналинг через Broadcast каналы — нет проверки membership. Любой может подписаться на `call:<любойUUID>` и инжектить сигналы. |
+| 4 | **HIGH** | `profile_privacy` RLS полностью открыт: `using(true) with check(true)` — любой может менять чужие настройки приватности. |
+| 5 | **MEDIUM** | TURN credentials захардкожены (openrelayproject, порт 80 non-TLS). |
+| 6 | **MEDIUM** | Нет таймаута на неотвеченные звонки (30 минут → call timer, но нет 30s no-answer timeout). |
+| 7 | **LOW** | Нет ICE reconnect — обрыв соединения = завершение звонка. |
+
+### Сделано
+
+#### Серверная часть (Edge Function)
+
+**`send-call-invite/index.ts`:**
+- Добавлен `userSupabase` (anon key + user JWT) для проверки identity и enforce RLS
+- Проверка `caller_id === auth.uid()` → 403 если не совпадает
+- Проверка membership: `chat.members.includes(user.id)` → 403 если не участник
+- Chat и profiles запросы используют `userSupabase` (RLS enforced)
+- FCM token cleanup остаётся на `serviceSupabase` (admin operation)
+
+**`migrate_v1_13_0_call_safety.sql`:**
+- `profile_privacy` RLS: SELECT — всем (`using(true)`), MODIFY — только `auth.uid() = user_id`
+
+#### Клиентская часть (Flutter)
+
+**`webrtc_service.dart`:**
+
+1. **TURN config** — вынесен в `static List<Map<String, dynamic>> iceServers`. Удалён порт 80 (non-TLS). Оставлен только порт 443 (TLS).
+
+2. **Participant guard** — `_knownParticipants` map. Offer/answer регистрируют отправителя. ICE candidate / hangUp / reject от неизвестного отправителя отклоняются с debug логом.
+
+3. **No-answer timeout** — 30-секундный таймер в `startCall`. Если ответ не получен — автоматический hangUp. Таймер отменяется при получении answer или cleanup.
+
+4. **ICE reconnect** — при `connectionState = failed` — одна попытка ICE restart (offer с `iceRestart: true`). При повторном failed или `closed` — hangUp.
+
+5. **Поля lifecycle** — `_noAnswerTimer`, `_answerReceived`, `_iceRestartAttempted`, `_knownParticipants` — все отменяются в `_cleanup()`.
+
+#### Тесты
+
+Добавлены **13 регрессионных тестов** в `webrtc_signaling_test.dart`:
+- ICE servers configuration (default entries, TLS port, TURN credentials)
+- Participant guard logic (known/unknown participants, offer registration, reject cleanup)
+- No-answer timeout (30s constant, answer cancellation)
+- ICE restart logic (payload flag, single attempt guard)
+- Call timer constants (30min, 60s, 30s)
+
+### Проверка
+
+- **Analyzer**: 43 issues / 0 errors (без изменений от baseline)
+- **Tests**: **314 pass / 0 fail** (было 301, +13 новых)
+- **Commit**: `eaf747b` (pushed to main)
+
+### Result: **COMPLETE** — 2 критические + 1 high + 1 medium уязвимости закрыты, 13 регрессионных тестов добавлены
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
