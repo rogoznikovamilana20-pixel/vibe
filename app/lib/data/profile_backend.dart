@@ -239,6 +239,12 @@ Future<void> setMyProfile(VibeProfile p) async {
     VibeBackend.instance._unreadByChat.clear();
     VibeBackend._cachedProfile = null;
 
+    // Очистить очередь офлайн-отправки.
+    final qAccountId = id ?? '';
+    if (qAccountId.isNotEmpty) {
+      await OfflineQueueService.instance.clear(qAccountId);
+    }
+
     // Delete session file.
     final dir = await getApplicationDocumentsDirectory();
     final f1 = File('${dir.path}${Platform.pathSeparator}session.json');

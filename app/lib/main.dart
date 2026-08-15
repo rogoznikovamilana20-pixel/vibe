@@ -128,6 +128,9 @@ class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
         backend.startPresence();
         _maybeLockOnResume();
         _applyAutoNight();
+        // Обработать очередь офлайн-отправки и восстановить пропущенные события.
+        unawaited(backend.processOfflineQueueOnResume());
+        unawaited(backend.recoverMissedEvents());
       case AppLifecycleState.paused:
         PasscodeService.instance.onAppPaused();
         _lockPushed = false;

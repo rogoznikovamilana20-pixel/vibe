@@ -941,4 +941,36 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 - Нет recovery для пропущенных realtime событий при долгом disconnect
 
 ---
+
+## Atomic Release Hardening — Phase 7: Offline Queue, Reconnect & Missed Events ✅ (завершена 15.08.2026)
+
+### Базовый уровень
+- Анализатор: 43 issues (0 errors) — без изменений
+- Тесты: 218 pass / 74 fail — было 192/74, добавлено 26 тестов
+- Коммит: (pending)
+
+### Исправлено (6 фиксов)
+
+1. **Offline Queue — persistent send queue** (High) — Новый сервис `OfflineQueueService` (singleton). При ошибке отправки сообщение сохраняется в JSON-очередь (привязанная к accountId). При восстановлении сети очередь обрабатывается автоматически. Макс. 3 попытки, дедуп по localId, account isolation. При logout очередь очищается.
+
+2. **ChatController интеграция с очередью** (High) — При `sendText` failure: сообщение автоматически попадает в очередь. Метод `retrySend(localId)` для ручного повтора. При `load()` queued/failed сообщения восстанавливаются в UI как `MsgStatus.failed`.
+
+3. **Reconnect: пересоздание postgres_changes** (High) — `_reconnectRealtime()` теперь вызывает `_resubscribePostgresChanges()`, который отменяет старые каналы и создаёт заново все 7 подписок (messages insert/update/delete, reactions insert/delete, chat_pins insert/delete).
+
+4. **Backend: публичный метод `processOfflineQueueOnResume()`** (Medium) — Вызывается из `main.dart` при `AppLifecycleState.resumed`. Обрабатывает очередь и восстанавливает пропущенные realtime-события.
+
+5. **Backend: публичный метод `recoverMissedEvents()`** (Medium) — При foreground resume: обновляет список чатов (через `_chatsController.add(null)`) и помечает активный чат прочитанным.
+
+6. **ProfileBackend: logout очищает очередь** (Medium) — `logout()` вызывает `OfflineQueueService.instance.clear(accountId)` для удаления файла очереди.
+
+### Тесты (26 новых)
+- `offline_queue_test.dart` (20): QueueItem serialization, canRetry logic, enqueue/markSending/markSent/markFailed lifecycle, dedup, forChat, clear, remove, account isolation, unmodifiable list, hasPending
+- `reconnect_missed_events_test.dart` (6): channel resubscribe pattern, serverId dedup, sentById eviction, foreground resume guards
+
+### Известные ограничения (исправлены)
+- ~~Offline send не реализован~~ → реализован OfflineQueueService с persistent storage
+- ~~`_reconnectRealtime()` не пересоздаёт postgres_changes каналы~~ → теперь пересоздаёт все 7 каналов
+- ~~Нет recovery для пропущенных realtime событий при долгом disconnect~~ → `recoverMissedEvents()` обновляет список чатов при resume
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*

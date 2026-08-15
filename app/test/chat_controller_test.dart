@@ -8,6 +8,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:vibe_app/chat/chat_controller.dart';
 import 'package:vibe_app/chat/models.dart';
 import 'package:vibe_app/data/backend.dart';
+import 'package:vibe_app/data/offline_queue_service.dart';
 import 'package:vibe_app/data/settings_service.dart';
 
 import 'fake_vibe_backend.dart';
@@ -22,6 +23,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await SettingsService.instance.init();
+    await OfflineQueueService.instance.load('_test_reset_');
     fake = FakeVibeBackend();
     controller = ChatController(
       chatId: 'c1',

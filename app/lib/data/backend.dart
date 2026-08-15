@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'offline_queue_service.dart';
+
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
 import 'e2e_service.dart';
@@ -509,6 +511,12 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       }
     }
 
+    // Загрузить очередь офлайн-отправки.
+    final accountId = backend.myProfileId ?? '';
+    if (accountId.isNotEmpty) {
+      unawaited(OfflineQueueService.instance.load(accountId));
+    }
+
     backend.subscribeMessages();
     backend.startNetworkMonitor();
     return backend;
@@ -603,6 +611,8 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       unawaited(_reconnectRealtime());
       if (!_chatsController.isClosed) _chatsController.add(null);
       unawaited(_healthCheck());
+      // Обработать очередь офлайн-отправки.
+      unawaited(_processOfflineQueue());
     }
   }
 
@@ -650,7 +660,194 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
         _dmChannel!.subscribe();
       }
       _ensurePersonalChannel();
+      // Пересоздать postgres_changes каналы после reconnect.
+      _resubscribePostgresChanges();
     } catch (_) {}
+  }
+
+  /// Пересоздать postgres_changes каналы (вызывать при reconnect).
+  void _resubscribePostgresChanges() {
+    // Отменить старые каналы.
+    for (final ch in _postgresChannels) {
+      try {
+        ch.unsubscribe();
+      } catch (_) {}
+    }
+    _postgresChannels.clear();
+    // Переподписаться (subscribeMessages создаёт новые каналы,
+    // но нам нужно только postgres_changes — personal/dm уже пересозданы).
+    _subscribePostgresChanges();
+  }
+
+  /// Подписка только на postgres_changes каналы (без broadcast/dm).
+  void _subscribePostgresChanges() {
+    final myIdSub = myProfileId;
+    if (myIdSub == null) return;
+
+    final pgInsertCh = _client.channel('public:messages').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'messages',
+      callback: (payload) async {
+        final myId = myProfileId;
+        final m = payload.newRecord;
+        if (myId == null || m['sender_id'] == myId) return;
+        final chatId = '${m['chat_id']}';
+        if (chatId == 'null' || !await _isMyChat(chatId)) return;
+        final msgId = '${m['id']}';
+        if (_seenIds.contains(msgId)) return;
+        _onBroadcastMessage(m);
+      },
+    ).subscribe();
+    _postgresChannels.add(pgInsertCh);
+
+    final pgUpdateCh = _client.channel('public:messages:changes').onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'messages',
+      callback: (payload) async {
+        final myId = myProfileId;
+        final m = payload.newRecord;
+        if (myId == null) return;
+        final chatId = '${m['chat_id']}';
+        if (chatId == 'null' || !await _isMyChat(chatId)) return;
+        final msgId = '${m['id']}';
+        final fromMe = '${m['sender_id']}' == myId;
+        if (fromMe) return;
+        if (msgEventsController.isClosed) return;
+        msgEventsController.add(VibeMsgEvent(
+          type: VibeMsgEventType.edited,
+          chatId: chatId,
+          messageId: msgId,
+          updated: VibeMessage(
+            id: msgId,
+            chatId: chatId,
+            senderId: '${m['sender_id']}',
+            senderName: '',
+            senderAvatar: null,
+            text: '${m['text'] ?? ''}',
+            voicePath: null,
+            photoPath: null,
+            videoPath: null,
+            created: DateTime.now(),
+            incoming: true,
+            edited: m['edited_at'] != null,
+          ),
+        ));
+      },
+    ).subscribe();
+    _postgresChannels.add(pgUpdateCh);
+
+    final pgDeleteCh = _client.channel('public:messages:deleted').onPostgresChanges(
+      event: PostgresChangeEvent.delete,
+      schema: 'public',
+      table: 'messages',
+      callback: (payload) async {
+        final myId = myProfileId;
+        final m = payload.oldRecord;
+        if (myId == null) return;
+        final chatId = '${m['chat_id']}';
+        final msgId = '${m['id']}';
+        if (chatId == 'null' || !await _isMyChat(chatId)) return;
+        if (msgEventsController.isClosed) return;
+        msgEventsController.add(VibeMsgEvent(
+          type: VibeMsgEventType.deleted,
+          chatId: chatId,
+          messageId: msgId,
+        ));
+      },
+    ).subscribe();
+    _postgresChannels.add(pgDeleteCh);
+
+    final pgReactionInsCh = _client.channel('public:reactions').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'message_reactions',
+      callback: (payload) async {
+        final chatId = await _chatIdOfMessage('${payload.newRecord['message_id']}');
+        if (chatId == 'null' || chatId.isEmpty || !await _isMyChat(chatId)) return;
+        await refreshChatReactions(chatId);
+      },
+    ).subscribe();
+    _postgresChannels.add(pgReactionInsCh);
+
+    final pgReactionDelCh = _client.channel('public:reactions:delete').onPostgresChanges(
+      event: PostgresChangeEvent.delete,
+      schema: 'public',
+      table: 'message_reactions',
+      callback: (payload) async {
+        final chatId = await _chatIdOfMessage('${payload.oldRecord['message_id']}');
+        if (chatId == 'null' || chatId.isEmpty || !await _isMyChat(chatId)) return;
+        await refreshChatReactions(chatId);
+      },
+    ).subscribe();
+    _postgresChannels.add(pgReactionDelCh);
+
+    final pgPinInsCh = _client.channel('public:chat_pins:insert').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'chat_pins',
+      callback: (payload) async {
+        final myId = myProfileId;
+        final r = payload.newRecord;
+        if (myId == null || '${r['pinned_by']}' == myId) return;
+        final chatId = '${r['chat_id']}';
+        if (chatId == 'null' || !await _isMyChat(chatId)) return;
+        if (_pinEventsController.isClosed) return;
+        _pinEventsController.add(PinChanged(
+          chatId: chatId,
+          messageId: '${r['message_id']}',
+          pinned: true,
+        ));
+      },
+    ).subscribe();
+    _postgresChannels.add(pgPinInsCh);
+
+    final pgPinDelCh = _client.channel('public:chat_pins:delete').onPostgresChanges(
+      event: PostgresChangeEvent.delete,
+      schema: 'public',
+      table: 'chat_pins',
+      callback: (payload) async {
+        final myId = myProfileId;
+        final r = payload.oldRecord;
+        if (myId == null || '${r['pinned_by']}' == myId) return;
+        final chatId = '${r['chat_id']}';
+        if (chatId == 'null' || !await _isMyChat(chatId)) return;
+        if (_pinEventsController.isClosed) return;
+        _pinEventsController.add(PinChanged(
+          chatId: chatId,
+          messageId: '${r['message_id']}',
+          pinned: false,
+        ));
+      },
+    ).subscribe();
+    _postgresChannels.add(pgPinDelCh);
+  }
+
+  /// Обработать очередь офлайн-отправки (вызывать после reconnect).
+  Future<void> _processOfflineQueue() async {
+    final accountId = myProfileId ?? '';
+    if (accountId.isEmpty) return;
+    final queue = OfflineQueueService.instance;
+    await queue.load(accountId);
+    final pending = queue.items.where((q) =>
+        q.state == QueueItemState.queued ||
+        (q.state == QueueItemState.failed && q.canRetry));
+    for (final item in pending) {
+      await queue.markSending(accountId, item.localId);
+      try {
+        await sendText(
+          item.chatId,
+          item.text,
+          localId: item.localId,
+          replyText: item.replyText,
+          replyAuthor: item.replyAuthor,
+        );
+        await queue.markSent(accountId, item.localId);
+      } catch (_) {
+        await queue.markFailed(accountId, item.localId);
+      }
+    }
   }
 
   static final String _cacheDirName = 'vibe_cache';
@@ -2913,6 +3110,26 @@ _personal = _client.channel('u_$myId')
   Future<void> updateFcmToken(String token) async {
     if (myProfileId == null) return;
     await _client.from('profiles').update({'fcm_token': token}).eq('id', myProfileId!);
+  }
+
+  /// Обработать очередь офлайн-отправки (вызывать при resume foreground).
+  Future<void> processOfflineQueueOnResume() async {
+    final accountId = myProfileId ?? '';
+    if (accountId.isEmpty || !_networkAvailable) return;
+    await _processOfflineQueue();
+  }
+
+  /// Восстановить пропущенные realtime-события после foreground resume.
+  /// Обновляет список чатов и активный чат (если открыт).
+  Future<void> recoverMissedEvents() async {
+    if (!_networkAvailable) return;
+    // Обновить список чатов (unread, превью, порядок).
+    if (!_chatsController.isClosed) _chatsController.add(null);
+    // Обновить активный чат (если есть непрочитанные).
+    final activeChat = NotificationService.instance.activeChatId;
+    if (activeChat != null) {
+      markChatRead(activeChat);
+    }
   }
 }
 

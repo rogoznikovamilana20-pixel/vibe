@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/backend.dart';
 import '../data/backend_api.dart';
+import '../data/offline_queue_service.dart';
 import '../data/settings_service.dart';
 import 'models.dart';
 
@@ -132,7 +133,38 @@ class ChatController extends ChangeNotifier {
     backend.markChatRead(chatId);
     _subscribe();
     await loadMessages();
+    _restoreQueuedMessages();
     unawaited(_refreshPinsFromServer());
+  }
+
+  /// Восстановить сообщения из очереди в UI (показать как failed).
+  void _restoreQueuedMessages() {
+    final accountId = backend.myProfileId ?? '';
+    if (accountId.isEmpty) return;
+    final queued = OfflineQueueService.instance.forChat(chatId);
+    for (final item in queued) {
+      if (item.state == QueueItemState.failed ||
+          item.state == QueueItemState.queued) {
+        final alreadyHas = messages.any((m) => m.localId == item.localId);
+        if (!alreadyHas) {
+          messages.insert(
+            0,
+            ChatMsg(
+              type: MsgType.text,
+              incoming: false,
+              time: _fmtTime(item.createdAt),
+              text: item.text,
+              replyText: item.replyText,
+              replyAuthor: item.replyAuthor,
+              status: MsgStatus.failed,
+              localId: item.localId,
+              date: item.createdAt,
+            ),
+          );
+        }
+      }
+    }
+    if (queued.isNotEmpty) notifyListeners();
   }
 
   Future<void> loadMessages() async {
@@ -513,6 +545,54 @@ class ChatController extends ChangeNotifier {
       if (i >= 0) {
         messages[i] = messages[i].copyWith(status: MsgStatus.failed);
       }
+      // Сохранить в очередь для повторной отправки.
+      final accountId = backend.myProfileId ?? '';
+      if (accountId.isNotEmpty) {
+        unawaited(OfflineQueueService.instance.enqueue(
+          accountId,
+          localId: localId,
+          chatId: chatId,
+          text: t,
+          replyText: replyText,
+          replyAuthor: replyAuthor,
+        ));
+      }
+      onError('Не удалось отправить сообщение');
+    }
+  }
+
+  /// Повторить отправку.failed-сообщения из очереди.
+  Future<void> retrySend(String localId) async {
+    final i = messages.indexWhere((m) => m.localId == localId);
+    if (i < 0) return;
+    final msg = messages[i];
+    if (msg.status != MsgStatus.failed) return;
+
+    final accountId = backend.myProfileId ?? '';
+    if (accountId.isEmpty) return;
+
+    messages[i] = msg.copyWith(status: MsgStatus.sending);
+    notifyListeners();
+
+    await OfflineQueueService.instance.markSending(accountId, localId);
+
+    try {
+      await backend.sendText(
+        chatId,
+        msg.text,
+        localId: localId,
+        replyText: msg.replyText,
+        replyAuthor: msg.replyAuthor,
+      );
+      await OfflineQueueService.instance.markSent(accountId, localId);
+      _armUndo(localId);
+    } catch (_) {
+      if (_disposed) return;
+      final j = messages.indexWhere((m) => m.localId == localId);
+      if (j >= 0) {
+        messages[j] = messages[j].copyWith(status: MsgStatus.failed);
+      }
+      await OfflineQueueService.instance.markFailed(accountId, localId);
       onError('Не удалось отправить сообщение');
     }
   }
