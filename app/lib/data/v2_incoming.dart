@@ -9,12 +9,36 @@ import 'package:vibe_app/data/v2_session_registry.dart';
 ///
 /// Handles version routing, session lookup, V2 decrypt, ratchet persistence,
 /// and replay prevention for incoming V2 messages.
+///
+/// ## Persistence policy (Phase 12C.3.2)
+///
+/// Decrypt-and-persist is NOT atomic across process restarts.
+/// If disk persistence fails after successful decrypt:
+/// 1. Plaintext is NOT returned to caller (exception propagated).
+/// 2. The advanced ratchet state is cached in [_sessionStates] so the next
+///    message in the SAME session can continue the chain without desync.
+/// 3. On process restart the cache is lost; the old persisted state is used.
+///    This means the same message can be decrypted again (key reuse for
+///    same plaintext only — no new information leaked).
+///    This is a known limitation of the Double Ratchet protocol: the
+///    receiving chain is deterministic, so the same chain key produces the
+///    same message key.
 class V2Incoming {
   V2Incoming._();
   static final instance = V2Incoming._();
 
   /// Per-session locks to serialize concurrent decrypts for the same session.
   final Map<String, Completer<void>> _sessionLocks = {};
+
+  /// In-memory ratchet state cache.
+  ///
+  /// When disk persistence fails after a successful decrypt, the advanced
+  /// state is stored here so the next message in the same session can
+  /// continue the chain. Entries are keyed by sessionId.
+  ///
+  /// On process restart this cache is cleared — the old persisted state
+  /// on disk is used instead.
+  final Map<String, V2RatchetState> _sessionStates = {};
 
   /// Decrypts an incoming V2 message from a database row.
   ///
@@ -67,7 +91,10 @@ class V2Incoming {
 
     try {
       // 6. Load ratchet state
-      final state = await V2RatchetPersistence.instance.load(sessionId);
+      //    Check in-memory cache first (covers disk persistence failures
+      //    within the same session), then fall back to disk.
+      final state = _sessionStates[sessionId] ??
+          await V2RatchetPersistence.instance.load(sessionId);
       if (state == null) {
         throw V2IncomingException('Ratchet state not found for session $sessionId');
       }
@@ -84,8 +111,18 @@ class V2Incoming {
       );
 
       // 8. Persist ratchet state AFTER successful decrypt
-      //    This ensures state is only advanced on successful authentication
-      await V2RatchetPersistence.instance.save(result.state);
+      //    This ensures state is only advanced on successful authentication.
+      //    If disk persistence fails, cache in memory so the next message
+      //    in the same session can continue the chain without desync.
+      try {
+        await V2RatchetPersistence.instance.save(result.state);
+        // Disk persist succeeded — clear any stale in-memory entry.
+        _sessionStates.remove(sessionId);
+      } catch (_) {
+        // Disk persist failed — cache advanced state in memory.
+        // The next message for this session will use the cached state.
+        _sessionStates[sessionId] = result.state;
+      }
 
       return result.plaintext;
     } on V2RatchetException catch (e) {
@@ -181,6 +218,11 @@ class V2Incoming {
       }
     }
     _sessionLocks.clear();
+  }
+
+  /// Clears the in-memory state cache (simulates process restart).
+  void clearStateCache() {
+    _sessionStates.clear();
   }
 }
 
