@@ -1267,4 +1267,80 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 ### Result: **COMPLETE** — 2 критические + 1 high + 1 medium уязвимости закрыты, 13 регрессионных тестов добавлены
 
 ---
+
+## Phase 12A — E2EE Protocol Redesign: Specification Only ✅ (завершена 15.08.2026)
+
+### Цель
+Спроектировать новый E2EE-протокол Vibe на основе стандартизованных примитивов. Без изменения production-кода.
+
+### Текущий протокол (аудит)
+
+| Компонент | Текущее | Проблема |
+|-----------|---------|----------|
+| Обмен ключами | X25519 static-static | Нет forward secrecy |
+| KDF | Нет (raw 32 bytes) | Нет HKDF, нет domain separation |
+| Шифрование | AES-256-GCM | Ключ статический |
+| Ротация ключей | Нет | Ключ живёт login→logout |
+| Верификация | Нет | Нет safety numbers |
+| Мультиустройство | Н� | Одно устройство |
+| Медиа шифрование | Нет | Фото/ видео в открытом виде |
+| Replay protection | Только random nonce | Нет sequence numbers |
+
+### Найденные проблемы (кроме Phase 4)
+
+1. `editMessage()` пишет plaintext — обход E2EE
+2. FCM push trigger отправляет `text` в открытом виде
+3. Локальный кеш хранит расшифрованные сообщения на диске
+4. Медиа (фото/видео/голос/файлы) не шифруются
+5. Stories не шифруются
+6. Silent plaintext fallback при ошибке шифрования
+
+### Предложенный протокол
+
+**X3DH + Double Ratchet + AES-256-GCM**
+
+| Свойство | v1 (текущий) | v2 (предложенный) |
+|----------|-------------|-------------------|
+| Confidentiality | PARTIAL | YES |
+| Integrity | YES | YES |
+| Authentication | NO | YES (Ed25519) |
+| Forward secrecy | NO | YES |
+| Post-compromise security | NO | YES (DH ratchet) |
+| Replay protection | NO | YES (message numbers) |
+| Key rotation | NO | YES |
+| Multi-device | NO | YES (per-device keys) |
+| Key change detection | NO | YES (safety numbers) |
+| PQ security | NO | NO (explicitly excluded) |
+
+### Threat Model
+
+7 сценариев проанализированы: malicious server, network attacker, compromised device, stolen key, MITM, replay, old session.
+
+### Deliverables
+
+- `docs/security/E2EE_PROTOCOL_V2.md` — 1228 строк, 32 секции
+- Покрывает: identity keys, prekeys, session establishment, KDF (HKDF), message encryption, ratchet model, replay protection, key rotation, identity verification, multi-device, backup policy, offline queue, server data model, push privacy, migration, versioning, threat model, failure/recovery, test vectors, security properties
+
+### Ограничения v2 (документированы)
+
+- Нет шифрования медиа (v3)
+- Нет группового E2EE (v3)
+- Нет PQ security (X25519 не постквантовый)
+- Нет защиты метаданных
+- Нет бэкапа ключей
+
+### Production Blockers
+
+6 блокеров: независимый cryptographic review, решение open questions, выбор референсной реализации, определение scope медиа/групп, утверждение migration strategy.
+
+### Проверка
+
+- **Analyzer**: 43 issues / 0 errors (без изменений)
+- **Tests**: 314 pass / 0 fail (без изменений)
+- **Production code**: НЕ ИЗМЕНЁН
+- **Commit**: `afd999e` (pushed to main)
+
+### Result: **PASS** — спецификация завершена, production-код не затронут, готова к независимому review
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
