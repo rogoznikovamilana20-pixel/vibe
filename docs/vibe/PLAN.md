@@ -1387,4 +1387,58 @@ V1 E2EE (`e2e_service.dart`) **НЕ ИЗМЕНЁН** — продолжает р
 ### Result: **PASS** — фундамент E2EE V2 создан, V1 совместим, 0 test failures
 
 ---
+
+## Phase 12B.1.1 — E2EE V2 Identity Key Cryptographic Sanity Check ✅ (завершена 15.08.2026)
+
+### Цель
+Проверить криптографическую корректность identity key derivation до начала X3DH.
+
+### Ключевые проверки
+
+**Identity derivation:**
+- Ed25519: seed → SHA-512(seed)[0:32] → clamp → multiply by G (RFC 8032)
+- X25519: seed → clamp → multiply by 9 (стандартный X25519)
+- Оба из одного seed — БЕЗОПАСНО: разные scalar derivation paths
+- Ed25519 хеширует seed через SHA-512, X25519 клэмпит raw seed — естественный domain separation
+
+**Signed prekey chain:**
+- Полная цепочка: seed → Ed25519 identity → sign X25519 prekey → verify ✓
+- Неверный seed → другая identity → другая signature ✓
+- Cross-verification отклоняется ✓
+
+**Bundle consistency:**
+- Несовпадение identity key и signature → rejected ✓
+- Swapped keys (Ed25519 как DH, X25519 как identity) → rejected ✓
+
+**OTK safety:**
+- Двойное потребление OTK невозможно (unique constraint) ✓
+- Глобальная уникальность OTK ID ✓
+
+**Key storage audit:**
+- `e2e_v2_service.dart`: CLEAN — нет print/debugPrint, jsonEncode, shared_preferences для секретов
+- `e2e_service.dart`: CLEAN — аналогично
+- Все приватные ключи хранятся только в FlutterSecureStorage
+- Обнаружен latent concern: `PrekeyEntry` экспортирует `privateKeyBytes` (не эксплуатируется сегодня)
+
+**X25519 ECDH:**
+- Shared secret симметричен (A→B = B→A) ✓
+- Неверная key pair → другой secret ✓
+
+### Найденные риски (не blockers)
+
+1. `PrekeyEntry.privateKeyBytes` доступен вызывающему коду — latent risk (нет callers сейчас)
+2. `consumeOneTimePrekey()` возвращает base64 private key — latent risk
+3. `main.dart` логирует PIN в debug mode — не cryptographic key, но noted
+
+### Проверка
+
+- **Analyzer**: 43 issues / 0 errors (без изменений)
+- **Tests**: **361 pass / 0 fail** (было 348, +13 sanity check tests)
+- **Commit**: `3f86dec` (pushed to main)
+
+### Result: **PASS** — identity derivation соответствует стандартной библиотечной модели, no custom crypto, no secret leakage
+
+### X3DH Readiness: **READY**
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
