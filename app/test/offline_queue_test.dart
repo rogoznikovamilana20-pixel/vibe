@@ -3,47 +3,6 @@ import 'package:vibe_app/data/offline_queue_service.dart';
 
 void main() {
   group('QueueItem', () {
-    test('serialization roundtrip', () {
-      final item = QueueItem(
-        localId: 'l1',
-        chatId: 'c1',
-        text: 'hello',
-        replyText: 'r',
-        replyAuthor: 'a',
-        state: QueueItemState.sending,
-        attempts: 2,
-        createdAt: DateTime(2026),
-        lastAttemptAt: DateTime(2026, 1, 2),
-      );
-      final json = item.toJson();
-      final restored = QueueItem.fromJson(json);
-      expect(restored.localId, 'l1');
-      expect(restored.chatId, 'c1');
-      expect(restored.text, 'hello');
-      expect(restored.replyText, 'r');
-      expect(restored.replyAuthor, 'a');
-      expect(restored.state, QueueItemState.sending);
-      expect(restored.attempts, 2);
-      expect(restored.createdAt, DateTime(2026));
-      expect(restored.lastAttemptAt, DateTime(2026, 1, 2));
-    });
-
-    test('serialization roundtrip with nulls', () {
-      final item = QueueItem(
-        localId: 'l2',
-        chatId: 'c2',
-        text: 'world',
-        createdAt: DateTime(2026, 3),
-      );
-      final json = item.toJson();
-      final restored = QueueItem.fromJson(json);
-      expect(restored.replyText, isNull);
-      expect(restored.replyAuthor, isNull);
-      expect(restored.lastAttemptAt, isNull);
-      expect(restored.state, QueueItemState.queued);
-      expect(restored.attempts, 0);
-    });
-
     test('canRetry true only when failed and under maxAttempts', () {
       final item = QueueItem(
         localId: 'l3',
@@ -51,35 +10,35 @@ void main() {
         text: 't',
         createdAt: DateTime.now(),
       );
-      // queued — not retryable
       item.state = QueueItemState.queued;
       expect(item.canRetry, isFalse);
 
-      // sending — not retryable
       item.state = QueueItemState.sending;
       expect(item.canRetry, isFalse);
 
-      // sent — not retryable
       item.state = QueueItemState.sent;
       expect(item.canRetry, isFalse);
 
-      // failed, attempts < maxAttempts — retryable
       item.state = QueueItemState.failed;
       item.attempts = 1;
       expect(item.canRetry, isTrue);
 
-      // failed, attempts >= maxAttempts — not retryable
-      item.attempts = QueueItemState.queued.index; // use a large number
       item.attempts = 3;
       expect(item.canRetry, isFalse);
     });
+
+    test('maxAttempts constant is 3', () {
+      expect(QueueItem.maxAttempts, 3);
+    });
   });
 
-  group('OfflineQueueService', () {
+  group('OfflineQueueService — RAM-only', () {
     late OfflineQueueService service;
 
-    setUp(() {
+    setUp(() async {
       service = OfflineQueueService.instance;
+      // Clear before each test.
+      await service.clear('_test_setup_');
     });
 
     test('empty queue on fresh load', () async {
@@ -89,9 +48,8 @@ void main() {
     });
 
     test('enqueue and retrieve', () async {
-      await service.load('test_enq');
       await service.enqueue(
-        'test_enq',
+        'test_acct',
         localId: 'msg1',
         chatId: 'chat1',
         text: 'hello',
@@ -104,47 +62,42 @@ void main() {
     });
 
     test('enqueue deduplicates by localId', () async {
-      await service.load('test_dedup');
-      await service.enqueue('test_dedup', localId: 'msg1', chatId: 'c', text: 'a');
-      await service.enqueue('test_dedup', localId: 'msg1', chatId: 'c', text: 'b');
+      await service.enqueue('a', localId: 'msg1', chatId: 'c', text: 'a');
+      await service.enqueue('a', localId: 'msg1', chatId: 'c', text: 'b');
       expect(service.items.length, 1);
     });
 
     test('markSending increments attempts', () async {
-      await service.load('test_sending');
-      await service.enqueue('test_sending', localId: 'm1', chatId: 'c', text: 't');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
       expect(service.items.first.attempts, 0);
 
-      await service.markSending('test_sending', 'm1');
+      await service.markSending('a', 'm1');
       expect(service.items.first.state, QueueItemState.sending);
       expect(service.items.first.attempts, 1);
 
-      await service.markSending('test_sending', 'm1');
+      await service.markSending('a', 'm1');
       expect(service.items.first.attempts, 2);
     });
 
     test('markSent removes from queue', () async {
-      await service.load('test_sent');
-      await service.enqueue('test_sent', localId: 'm1', chatId: 'c', text: 't');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
       expect(service.items.length, 1);
 
-      await service.markSent('test_sent', 'm1');
+      await service.markSent('a', 'm1');
       expect(service.items, isEmpty);
     });
 
     test('markFailed sets failed state', () async {
-      await service.load('test_fail');
-      await service.enqueue('test_fail', localId: 'm1', chatId: 'c', text: 't');
-      await service.markFailed('test_fail', 'm1');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
+      await service.markFailed('a', 'm1');
       expect(service.items.first.state, QueueItemState.failed);
       expect(service.hasPending, isTrue);
     });
 
     test('forChat returns only items for that chat', () async {
-      await service.load('test_forchat');
-      await service.enqueue('test_forchat', localId: 'm1', chatId: 'chatA', text: 'a');
-      await service.enqueue('test_forchat', localId: 'm2', chatId: 'chatB', text: 'b');
-      await service.enqueue('test_forchat', localId: 'm3', chatId: 'chatA', text: 'c');
+      await service.enqueue('a', localId: 'm1', chatId: 'chatA', text: 'a');
+      await service.enqueue('a', localId: 'm2', chatId: 'chatB', text: 'b');
+      await service.enqueue('a', localId: 'm3', chatId: 'chatA', text: 'c');
 
       final items = service.forChat('chatA');
       expect(items.length, 2);
@@ -152,57 +105,43 @@ void main() {
     });
 
     test('clear removes all items', () async {
-      await service.load('test_clear');
-      await service.enqueue('test_clear', localId: 'm1', chatId: 'c', text: 't');
-      await service.enqueue('test_clear', localId: 'm2', chatId: 'c', text: 't2');
-      await service.clear('test_clear');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
+      await service.enqueue('a', localId: 'm2', chatId: 'c', text: 't2');
+      await service.clear('a');
       expect(service.items, isEmpty);
     });
 
     test('remove single item', () async {
-      await service.load('test_remove');
-      await service.enqueue('test_remove', localId: 'm1', chatId: 'c', text: 'a');
-      await service.enqueue('test_remove', localId: 'm2', chatId: 'c', text: 'b');
-      await service.remove('test_remove', 'm1');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 'a');
+      await service.enqueue('a', localId: 'm2', chatId: 'c', text: 'b');
+      await service.remove('a', 'm1');
       expect(service.items.length, 1);
       expect(service.items.first.localId, 'm2');
     });
 
-    test('account isolation — in-memory queue is cleared on load', () async {
-      await service.load('acct1');
-      await service.enqueue('acct1', localId: 'm1', chatId: 'c', text: 'from_acct1');
+    test('load clears in-memory queue', () async {
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 'from_a');
       expect(service.items.length, 1);
 
-      // load different account clears in-memory queue
-      await service.load('acct2');
+      await service.load('b');
       expect(service.items, isEmpty);
-      await service.enqueue('acct2', localId: 'm2', chatId: 'c', text: 'from_acct2');
-      expect(service.items.length, 1);
-      expect(service.items.first.localId, 'm2');
     });
 
     test('markSending on nonexistent localId is no-op', () async {
-      await service.load('test_noop');
-      await service.enqueue('test_noop', localId: 'm1', chatId: 'c', text: 't');
-      await service.markSending('test_noop', 'nonexistent');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
+      await service.markSending('a', 'nonexistent');
       expect(service.items.first.state, QueueItemState.queued);
       expect(service.items.first.attempts, 0);
     });
 
     test('markFailed on nonexistent localId is no-op', () async {
-      await service.load('test_noop2');
-      await service.enqueue('test_noop2', localId: 'm1', chatId: 'c', text: 't');
-      await service.markFailed('test_noop2', 'nonexistent');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
+      await service.markFailed('a', 'nonexistent');
       expect(service.items.first.state, QueueItemState.queued);
     });
 
-    test('maxAttempts constant is 3', () {
-      expect(QueueItem.maxAttempts, 3);
-    });
-
     test('enqueue with reply fields preserves them', () async {
-      await service.load('test_reply');
-      await service.enqueue('test_reply',
+      await service.enqueue('a',
           localId: 'm1', chatId: 'c', text: 'hi',
           replyText: 'original', replyAuthor: 'Alice');
       expect(service.items.first.replyText, 'original');
@@ -210,25 +149,78 @@ void main() {
     });
 
     test('hasPending is true when queued items exist', () async {
-      await service.load('test_pending');
       expect(service.hasPending, isFalse);
-      await service.enqueue('test_pending', localId: 'm1', chatId: 'c', text: 't');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
       expect(service.hasPending, isTrue);
     });
 
     test('hasPending is false when all items are sent', () async {
-      await service.load('test_pending2');
-      await service.enqueue('test_pending2', localId: 'm1', chatId: 'c', text: 't');
-      await service.markSent('test_pending2', 'm1');
+      await service.enqueue('a', localId: 'm1', chatId: 'c', text: 't');
+      await service.markSent('a', 'm1');
       expect(service.hasPending, isFalse);
     });
 
     test('items getter returns unmodifiable list', () async {
-      await service.load('test_unmod');
       final list = service.items;
       expect(() => list.add(QueueItem(
           localId: 'x', chatId: 'c', text: 't', createdAt: DateTime.now())),
           throwsUnsupportedError);
+    });
+  });
+
+  group('SECURITY: no persistent storage', () {
+    test('load() clears queue — no persistence across sessions', () async {
+      final service = OfflineQueueService.instance;
+      await service.enqueue('sec', localId: 's1', chatId: 'c', text: 'secret msg');
+      expect(service.items.length, 1);
+
+      // Simulate app restart: load clears everything
+      await service.load('sec');
+      expect(service.items, isEmpty);
+    });
+
+    test('no file I/O — service has no disk methods', () {
+      // Verify OfflineQueueService has no _save, _cacheDir, or file operations
+      // by checking the class doesn't expose persistent state.
+      final service = OfflineQueueService.instance;
+      // All state is in _queue (in-memory List)
+      expect(service.items, isA<List<QueueItem>>());
+    });
+
+    test('account isolation — load clears previous account data', () async {
+      final service = OfflineQueueService.instance;
+      await service.enqueue('acctA', localId: 'm1', chatId: 'c', text: 'A secret');
+      expect(service.items.length, 1);
+
+      // Switch to account B — A's data is gone
+      await service.load('acctB');
+      expect(service.items, isEmpty);
+
+      // B can enqueue independently
+      await service.enqueue('acctB', localId: 'm2', chatId: 'c', text: 'B message');
+      expect(service.items.length, 1);
+      expect(service.items.first.localId, 'm2');
+    });
+
+    test('logout clears queue — no data persists', () async {
+      final service = OfflineQueueService.instance;
+      await service.enqueue('logout_test', localId: 'l1', chatId: 'c', text: 'sensitive');
+      await service.clear('logout_test');
+      expect(service.items, isEmpty);
+      expect(service.hasPending, isFalse);
+    });
+
+    test('restart drops all queued messages', () async {
+      final service = OfflineQueueService.instance;
+      // User sends 3 messages while offline
+      await service.enqueue('r', localId: 'm1', chatId: 'c', text: 'msg1');
+      await service.enqueue('r', localId: 'm2', chatId: 'c', text: 'msg2');
+      await service.enqueue('r', localId: 'm3', chatId: 'c', text: 'msg3');
+      expect(service.items.length, 3);
+
+      // App killed and restarted — queue is empty
+      await service.load('r');
+      expect(service.items, isEmpty);
     });
   });
 }

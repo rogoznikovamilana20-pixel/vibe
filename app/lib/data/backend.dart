@@ -825,11 +825,12 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   }
 
   /// Обработать очередь офлайн-отправки (вызывать после reconnect).
+  /// Очередь RAM-only: обрабатываются только те элементы,
+  /// которые уже в памяти (не загружаются с диска).
   Future<void> _processOfflineQueue() async {
     final accountId = myProfileId ?? '';
     if (accountId.isEmpty) return;
     final queue = OfflineQueueService.instance;
-    await queue.load(accountId);
     final pending = queue.items.where((q) =>
         q.state == QueueItemState.queued ||
         (q.state == QueueItemState.failed && q.canRetry));
@@ -3112,15 +3113,18 @@ _personal = _client.channel('u_$myId')
     await _client.from('profiles').update({'fcm_token': token}).eq('id', myProfileId!);
   }
 
-  /// Обработать очередь офлайн-отправки (вызывать при resume foreground).
+  /// Process in-memory offline queue on foreground resume.
+  /// RAM-only: only processes items already in memory (from current session).
   Future<void> processOfflineQueueOnResume() async {
     final accountId = myProfileId ?? '';
     if (accountId.isEmpty || !_networkAvailable) return;
     await _processOfflineQueue();
   }
 
-  /// Восстановить пропущенные realtime-события после foreground resume.
-  /// Обновляет список чатов и активный чат (если открыт).
+  /// Refresh-based recovery after foreground resume.
+  /// NOT gap-based event recovery — does not detect specific missed messages.
+  /// Reloads chat list (unread, previews, order) and marks active chat as read.
+  /// Full gap-based recovery requires BACKEND SYNC API (cursor/sequence).
   Future<void> recoverMissedEvents() async {
     if (!_networkAvailable) return;
     // Обновить список чатов (unread, превью, порядок).

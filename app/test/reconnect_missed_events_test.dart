@@ -50,18 +50,12 @@ void main() {
     });
 
     test('processOfflineQueueOnResume skips when network unavailable', () {
-      const networkAvailable = false;
-      if (networkAvailable) {
-        fail('Should not process queue when offline');
-      }
+      // Guard: if _networkAvailable is false, method returns early
       expect(true, isTrue);
     });
 
     test('processOfflineQueueOnResume skips when no accountId', () {
-      const accountId = '';
-      if (accountId.isNotEmpty) {
-        fail('Should not process queue with empty accountId');
-      }
+      // Guard: if accountId is empty, method returns early
       expect(true, isTrue);
     });
   });

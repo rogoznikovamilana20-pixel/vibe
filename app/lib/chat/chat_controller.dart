@@ -133,38 +133,7 @@ class ChatController extends ChangeNotifier {
     backend.markChatRead(chatId);
     _subscribe();
     await loadMessages();
-    _restoreQueuedMessages();
     unawaited(_refreshPinsFromServer());
-  }
-
-  /// Восстановить сообщения из очереди в UI (показать как failed).
-  void _restoreQueuedMessages() {
-    final accountId = backend.myProfileId ?? '';
-    if (accountId.isEmpty) return;
-    final queued = OfflineQueueService.instance.forChat(chatId);
-    for (final item in queued) {
-      if (item.state == QueueItemState.failed ||
-          item.state == QueueItemState.queued) {
-        final alreadyHas = messages.any((m) => m.localId == item.localId);
-        if (!alreadyHas) {
-          messages.insert(
-            0,
-            ChatMsg(
-              type: MsgType.text,
-              incoming: false,
-              time: _fmtTime(item.createdAt),
-              text: item.text,
-              replyText: item.replyText,
-              replyAuthor: item.replyAuthor,
-              status: MsgStatus.failed,
-              localId: item.localId,
-              date: item.createdAt,
-            ),
-          );
-        }
-      }
-    }
-    if (queued.isNotEmpty) notifyListeners();
   }
 
   Future<void> loadMessages() async {
