@@ -63,6 +63,19 @@ class V2SessionRegistry {
     return registry[_entryKey(peerId, recipientDeviceId)];
   }
 
+  /// Finds all session IDs for a given peer.
+  Future<List<String>> findSessionsByPeer(String peerId) async {
+    final registry = await _load();
+    final sessions = <String>[];
+    for (final entry in registry.entries) {
+      final parts = entry.key.split(':');
+      if (parts.length == 2 && parts[0] == peerId) {
+        sessions.add(entry.value);
+      }
+    }
+    return sessions;
+  }
+
   /// Removes a session registration.
   Future<void> remove({
     required String peerId,

@@ -13,6 +13,7 @@ import 'offline_queue_service.dart';
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
 import 'e2e_service.dart';
+import 'v2_incoming.dart';
 import 'v2_outgoing.dart';
 part 'profile_backend.dart';
 part 'media_backend.dart';
@@ -1566,19 +1567,39 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
                 displayName: '',
               );
 
-        // E2E: decrypt if encrypted
+        // E2E: decrypt if encrypted — version routing
         var text = m['text'] as String?;
         if (m['is_encrypted'] == true && m['encrypted_content'] != null) {
-          try {
-            final e2e = E2eService.instance;
-            if (e2e.hasKeys && m['sender_id'] != myProfileId) {
-              text = await e2e.decryptFromString(
-                encryptedJson: m['encrypted_content'] as String,
-                peerId: m['sender_id'] as String,
+          final e2eeVersion = m['e2ee_version'];
+
+          if (e2eeVersion == 2) {
+            // --- V2 decrypt path ---
+            try {
+              final plaintext = await V2Incoming.instance.decryptIncomingMessage(
+                row: Map<String, dynamic>.from(m),
+                myUserId: myProfileId ?? '',
               );
+              if (plaintext != null) {
+                text = plaintext;
+              } else {
+                text = '[зашифровано]';
+              }
+            } catch (_) {
+              text = '[зашифровано]';
             }
-          } catch (_) {
-            text = '[зашифровано]';
+          } else {
+            // --- V1 decrypt path (existing) ---
+            try {
+              final e2e = E2eService.instance;
+              if (e2e.hasKeys && m['sender_id'] != myProfileId) {
+                text = await e2e.decryptFromString(
+                  encryptedJson: m['encrypted_content'] as String,
+                  peerId: m['sender_id'] as String,
+                );
+              }
+            } catch (_) {
+              text = '[зашифровано]';
+            }
           }
         }
 
@@ -2683,19 +2704,39 @@ _personal = _client.channel('u_$myId')
     final senderName = data['sender_name'] as String? ?? 'Пользователь';
     final senderAvatar = data['sender_avatar'] as String?;
 
-    // E2E: decrypt if encrypted
+    // E2E: decrypt if encrypted — version routing
     var text = data['text'] as String?;
     if (data['is_encrypted'] == true && data['encrypted_content'] != null) {
-      try {
-        final e2e = E2eService.instance;
-        if (e2e.hasKeys && senderId != myId) {
-          text = await e2e.decryptFromString(
-            encryptedJson: data['encrypted_content'] as String,
-            peerId: senderId as String,
+      final e2eeVersion = data['e2ee_version'];
+
+      if (e2eeVersion == 2) {
+        // --- V2 decrypt path ---
+        try {
+          final plaintext = await V2Incoming.instance.decryptIncomingMessage(
+            row: Map<String, dynamic>.from(data as Map),
+            myUserId: myId,
           );
+          if (plaintext != null) {
+            text = plaintext;
+          } else {
+            text = '[зашифровано]';
+          }
+        } catch (_) {
+          text = '[зашифровано]';
         }
-      } catch (_) {
-        text = '[зашифровано]';
+      } else {
+        // --- V1 decrypt path (existing) ---
+        try {
+          final e2e = E2eService.instance;
+          if (e2e.hasKeys && senderId != myId) {
+            text = await e2e.decryptFromString(
+              encryptedJson: data['encrypted_content'] as String,
+              peerId: senderId as String,
+            );
+          }
+        } catch (_) {
+          text = '[зашифровано]';
+        }
       }
     }
 
@@ -2921,6 +2962,10 @@ _personal = _client.channel('u_$myId')
         'sticker_emoji': row['sticker_emoji'],
         'created_at': row['created_at'],
         'forward_from': row['forward_from'],
+        // V2 encryption fields for incoming decrypt
+        if (row['is_encrypted'] == true) 'is_encrypted': true,
+        if (row['e2ee_version'] != null) 'e2ee_version': row['e2ee_version'],
+        if (row['encrypted_content'] != null) 'encrypted_content': row['encrypted_content'],
       };
       // Realtime broadcast — мгновенная доставка через WebSocket.
       if (members.length > 2) {
