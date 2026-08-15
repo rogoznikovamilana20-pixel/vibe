@@ -1017,4 +1017,80 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 ### Result: **PASS**
 
 ---
+
+## Atomic Release Hardening — Phase 8: Visual & UX Parity ✅ (завершена 16.08.2026)
+
+### Базовый уровень
+- Анализатор: 43 issues (0 errors) — без изменений
+- Тесты: 221 pass / 74 fail — без изменений
+- Коммит: `eb14af7`
+
+### Экраны (аудит)
+
+| Экран | Строк | Находки |
+|---|---|---|
+| ChatListScreen | 1883 | 2 bugs, 20+ hardcoded |
+| ChatScreen | 2851 | 15+ hardcoded, l10n gaps |
+| MessageBubble | 1939 | 1 bug, 90+ hardcoded |
+| Design System | 5 files | 41+ hardcoded radius, 15+ inline fonts, 18+ hardcoded colors |
+
+### P0 — UI ломается / делает функцию непонятной (2 исправлено)
+
+1. **Double Dismissible nesting** (ChatListItem:60+110) — два вложенных `Dismissible` с одинаковым key `'chat_$id'` и конфликтующими direction mappings. Внешний обрабатывал archive/unpin, внутренний — archive/DND с другими цветами. **Исправлено**: удалён внутренний Dismissible.
+
+2. **Double pin icon** (ChatListItem:161+220) — значок пина отрисовывался дважды: в title row (size 16) и в trailing row (size 12). **Исправлено**: удалён из trailing.
+
+### P1 — Существенно хуже Telegram по UX (7 исправлено)
+
+3. **Media bubbles hardcoded checkAll** — photo, voice, GIF bubble использовали `Icon(VibeIcons.checkAll)` вместо `MessageStatusTick`. Всегда показывали двойную галочку无视 actual status. **Исправлено**: заменено на `MessageStatusTick(status: ...)`.
+
+4. **Hardcoded outgoing link color** `#8FC8FF` — использовался 9 раз в message_bubble.dart. **Исправлено**: добавлен `VibeColors.outgoingLink`, все замены.
+
+5. **Hardcoded muted text color** `#5A5766` — 2 вхождения. **Исправлено**: `VibeColors.mutedTextLight`.
+
+6. **Hardcoded border color** `#1C1B22` — 4 вхождения (bubbles, app bar). **Исправлено**: `context.vibeBorder`.
+
+7. **Missing VibeRadius tokens** — значения 2, 6, 10, 14 не имели токенов. **Исправлено**: добавлены `xxs(2)`, `timestamp(10)`, `thumbnail(14)`.
+
+8. **Timestamp font size inconsistency** — text bubble: `10px`, photo/voice: `11px`. **Исправлено**: стандартизировано на `11px` (VibeTypography.label).
+
+9. **Hardcoded swipe colors** — `Color(0xFF3390EC)`, `Color(0xFFEFEDF8)`. **Исправлено**: `context.vibePrimary`, `context.vibeSurfaceVariant`.
+
+### P2 — Непоследовательность (задокументированы, не исправлялись)
+
+- 41+ `BorderRadius.circular()` bypassing VibeRadius tokens
+- 15+ inline `fontSize` bypassing VibeTypography
+- 18+ hardcoded `Color(0x...)` в экранах
+- ReplyPanel + recording pill: hardcoded Russian strings (не в l10n)
+- Duplicate color definitions (5 имён для #8B4DFF)
+- VibeSpacing.sm-2 off-grid expressions (7 locations)
+
+### Design System
+
+| Токен | Кол-во определений | Статус |
+|---|---|---|
+| VibeColors | 65+ цветов | Добавлены 4 семантических |
+| VibeRadius | 15 токенов | Добавлены 3 (xxs, timestamp, thumbnail) |
+| VibeSpacing | 9 токенов | OK |
+| VibeTypography | 10 стилей | OK |
+| VibeAnimations | 8 длительностей + 6 кривых | OK (73 call sites) |
+
+### Тесты
+- 0 новых тестов (аудит — не код)
+
+### Analyzer
+- До: 43 issues (0 errors)
+- После: 43 issues (0 errors)
+- Новая регрессия: 0
+
+### Remaining Visual Blockers
+- 41+ hardcoded borderRadius (P2)
+- 15+ inline fontSize (P2)
+- 18+ hardcoded colors в экранах (P2)
+- Hardcoded Russian в ReplyPanel/recording pill (P2)
+- Missing timestamps на video/file/location/contact/poll bubbles (P1 — требует расширения bubble API)
+
+### Result: **PARTIAL** (P0/P1 исправлены, P2 задокументированы)
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
