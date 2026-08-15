@@ -761,13 +761,19 @@ class V2Ratchet {
 
     final components = envelope.toDecryptComponents();
 
-    return decrypt(
-      state: state,
-      header: components.header,
-      ciphertext: components.secretBoxConcat,
-      senderDeviceId: senderDeviceId,
-      recipientDeviceId: recipientDeviceId,
-    );
+    try {
+      return await decrypt(
+        state: state,
+        header: components.header,
+        ciphertext: components.secretBoxConcat,
+        senderDeviceId: senderDeviceId,
+        recipientDeviceId: recipientDeviceId,
+      );
+    } on V2RatchetException {
+      rethrow;
+    } catch (e) {
+      throw V2RatchetException('Decrypt failed: $e');
+    }
   }
 
   // ===========================================================================

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:vibe_app/data/v2_message_storage.dart';
 import 'package:vibe_app/data/v2_ratchet.dart';
 import 'package:vibe_app/data/v2_ratchet_persistence.dart';
@@ -10,6 +12,9 @@ import 'package:vibe_app/data/v2_session_registry.dart';
 class V2Incoming {
   V2Incoming._();
   static final instance = V2Incoming._();
+
+  /// Per-session locks to serialize concurrent decrypts for the same session.
+  final Map<String, Completer<void>> _sessionLocks = {};
 
   /// Decrypts an incoming V2 message from a database row.
   ///
@@ -55,17 +60,22 @@ class V2Incoming {
       throw const V2IncomingException('No session found for V2 message');
     }
 
-    // 5. Load ratchet state
-    final state = await V2RatchetPersistence.instance.load(sessionId);
-    if (state == null) {
-      throw V2IncomingException('Ratchet state not found for session $sessionId');
-    }
-
-    // 6. Decrypt
-    final senderDeviceId = _extractDeviceIdFromEnvelope(envelope);
-    final recipientDeviceId = await _getDeviceId();
+    // 5. Acquire per-session lock
+    //    Serializes concurrent decrypts for the same session to prevent
+    //    ratchet state corruption from out-of-order processing.
+    await _acquireSessionLock(sessionId);
 
     try {
+      // 6. Load ratchet state
+      final state = await V2RatchetPersistence.instance.load(sessionId);
+      if (state == null) {
+        throw V2IncomingException('Ratchet state not found for session $sessionId');
+      }
+
+      // 7. Decrypt
+      final senderDeviceId = _extractDeviceIdFromEnvelope(envelope);
+      final recipientDeviceId = await _getDeviceId();
+
       final result = await V2Ratchet.decryptFromEnvelope(
         state: state,
         envelope: envelope,
@@ -73,7 +83,7 @@ class V2Incoming {
         recipientDeviceId: recipientDeviceId,
       );
 
-      // 7. Persist ratchet state AFTER successful decrypt
+      // 8. Persist ratchet state AFTER successful decrypt
       //    This ensures state is only advanced on successful authentication
       await V2RatchetPersistence.instance.save(result.state);
 
@@ -81,6 +91,9 @@ class V2Incoming {
     } on V2RatchetException catch (e) {
       // Authentication failed — do NOT advance state
       throw V2IncomingException('Decrypt failed: ${e.message}');
+    } finally {
+      // 9. Release per-session lock
+      _releaseSessionLock(sessionId);
     }
   }
 
@@ -143,6 +156,31 @@ class V2Incoming {
     }
 
     return false;
+  }
+
+  /// Acquires a per-session lock. Blocks until the previous holder releases.
+  Future<void> _acquireSessionLock(String sessionId) async {
+    final existing = _sessionLocks[sessionId];
+    if (existing != null) {
+      await existing.future;
+    }
+    _sessionLocks[sessionId] = Completer<void>();
+  }
+
+  /// Releases the per-session lock.
+  void _releaseSessionLock(String sessionId) {
+    final completer = _sessionLocks.remove(sessionId);
+    completer?.complete();
+  }
+
+  /// Clears all session locks (for testing or cleanup).
+  void clearLocks() {
+    for (final entry in _sessionLocks.entries) {
+      if (!entry.value.isCompleted) {
+        entry.value.complete();
+      }
+    }
+    _sessionLocks.clear();
   }
 }
 

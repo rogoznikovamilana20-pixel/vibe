@@ -2693,7 +2693,7 @@ _personal = _client.channel('u_$myId')
     final myId = myProfileId;
     if (myId == null || senderId == null || senderId == myId) return;
     debugPrint('RTX incoming: id=${data['id']} chat=${data['chat_id']} '
-        'sender=$senderId text=${data['text']}');
+        'sender=$senderId encrypted=${data['is_encrypted']}');
     final id = '${data['id']}';
     if (_seenIds.contains(id)) return;
     _seenIds.add(id);
