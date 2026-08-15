@@ -1441,4 +1441,59 @@ V1 E2EE (`e2e_service.dart`) **НЕ ИЗМЕНЁН** — продолжает р
 ### X3DH Readiness: **READY**
 
 ---
+
+## Phase 12B.2 — X3DH Session Establishment ✅ (завершена 15.08.2026)
+
+### Сделано
+
+**Код (`e2e_v2_service.dart`):**
+- `initiateX3dh()` — Initiator side (Alice): генерация ephemeral key, 4 DH операции, HKDF derivation, session save
+- `respondToX3dh()` — Responder side (Bob): mirror DH, session creation
+- `_computeX3dhDh()` — 4 DH ops: DH1=IKa-SPKb, DH2=EKa-IKb, DH3=EKa-SPKb, DH4=EKa-OPKb
+- `_computeX3dhDhResponder()` — mirror DH ops for Bob
+- `_generateSessionId()` — FNV-1a hash (initiator || responder || ephemeral)
+- `_saveSession()`, `loadSession()`, `deleteSession()` — SecureStorage persistence
+- `_generateUuid()` — UUID v4 для device ID
+- Data classes: `X3dhMessage`, `X3dhResult`, `V2Session`
+
+**Тесты (`e2e_v2_test.dart`):** +21 security test
+
+1. Happy path — Alice+Bob derive identical root+chain keys (with OTK)
+2. OTK presence affects key derivation (different master secret length)
+3. Wrong identity key → different master secret
+4. Wrong signed prekey → different master secret
+5. Different ephemeral keys → different master secret (forward secrecy)
+6. Ephemeral reuse protection (same keys, different sessions)
+7. Bob cannot compute session without private signed prekey
+8. Session ID determinism
+9. Session ID differs for different devices
+10. HKDF consistency (same inputs → same output)
+11. HKDF different salt → different output
+12. HKDF different info → different output
+13. X25519 DH commutativity (A,B) = (B,A)
+14. X25519 shared secret is 32 bytes
+15. Self-DH produces non-zero output
+16. Concurrent sessions with different ephemeral → different result
+17. Tampered bundle → different master secret
+18. X3dhMessage serialization roundtrip
+19. X3dhResult valid key lengths
+20. V2Session.fromX3dhResult field copying
+21. Device isolation (different Bob devices = different keys)
+
+### Фиксы при разработке
+
+- Добавлен `_generateUuid()` — был удалён при рефакторинге, вызывал2 ошибки
+- Удалены unused переменные: `ed25519`, `x25519`, `ephemeralPub`, `initiatorIdentityPub`, `ephemeralPubBytes` — были объявлены но не использованы (DH вычисления идут через ключевые пары, не через промежуточные переменные)
+
+### Проверка
+
+- **Analyzer**: 43 issues / 0 errors (baseline: 43 issues / 0 errors — без изменений)
+- **Tests**: **382 pass / 0 fail** (было 361, +21 X3DH tests)
+- **Commit**: `f6b937e` (pushed to main)
+
+### Result: **PASS** — X3DH key agreement реализован, протокол verified через security tests, session persistence работает
+
+### X3DH Status: **COMPLETE** — Ready for Phase 12B.3 (Double Ratchet)
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
