@@ -161,7 +161,146 @@ void main() {
     });
   });
 
+  group('Envelope: Tamper Resistance', () {
+    late List<int> validBytes;
+    late List<int> rootKey;
+    late List<int> chainKey;
 
+    setUpAll(() async {
+      final x25519 = Cryptography.instance.x25519();
+      final aliceIk = await x25519.newKeyPair();
+      final aliceIkPub = await aliceIk.extractPublicKey();
+      rootKey = List<int>.generate(32, (i) => i + 1);
+      chainKey = List<int>.generate(32, (i) => i + 100);
+      final aliceState = V2Ratchet.createInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey);
+      final enc = await V2Ratchet.encryptToEnvelope(state: aliceState, plaintext: 'tamper-test', identityKeyPublic: aliceIkPub.bytes, senderDeviceId: 'a', recipientDeviceId: 'b');
+      validBytes = enc.envelope.toBytes();
+    });
+
+    test('tamper version → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[0] = 99;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: env.senderRatchetPublicKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper sender identity key → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[1] ^= 0xFF;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper sender ratchet public key → fail', () async {
+      final x25519 = Cryptography.instance.x25519();
+      final aliceIk = await x25519.newKeyPair();
+      final aliceIkPub = await aliceIk.extractPublicKey();
+      var aliceState = V2Ratchet.createInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey);
+      var bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey);
+      final setup = await V2Ratchet.encryptToEnvelope(state: aliceState, plaintext: 'setup', identityKeyPublic: aliceIkPub.bytes, senderDeviceId: 'a', recipientDeviceId: 'b');
+      aliceState = setup.state;
+      bobState = bobState.copyWith(receivingRatchetPublicKey: setup.envelope.senderRatchetPublicKey);
+      final setupDec = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: setup.envelope, senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = setupDec.state;
+      final enc = await V2Ratchet.encryptToEnvelope(state: aliceState, plaintext: 'test', identityKeyPublic: aliceIkPub.bytes, senderDeviceId: 'a', recipientDeviceId: 'b');
+      final tampered = enc.envelope.toBytes();
+      tampered[33] ^= 0xFF;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper message number → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[68] = 99;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: env.senderRatchetPublicKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper nonce → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[73] ^= 0xFF;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: env.senderRatchetPublicKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper previous chain length → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[72] ^= 0xFF;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: env.senderRatchetPublicKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper ciphertext → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[tampered.length - 3] ^= 0xFF;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: env.senderRatchetPublicKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+
+    test('tamper authentication tag → fail', () async {
+      final tampered = List<int>.from(validBytes);
+      tampered[tampered.length - 1] ^= 0xFF;
+      final env = V2MessageEnvelope.fromBytes(tampered);
+      final bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: env.senderRatchetPublicKey);
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: env, senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+  });
+
+  group('Envelope: Out-of-Order', () {
+    test('1, 3, 2 → all decrypt', () async {
+      final x25519 = Cryptography.instance.x25519();
+      final aliceIk = await x25519.newKeyPair();
+      final aliceIkPub = await aliceIk.extractPublicKey();
+      final rootKey = List<int>.generate(32, (i) => i + 1);
+      final chainKey = List<int>.generate(32, (i) => i + 100);
+      var aliceState = V2Ratchet.createInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey);
+      final envs = <V2MessageEnvelope>[];
+      for (var i = 0; i < 3; i++) {
+        final enc = await V2Ratchet.encryptToEnvelope(state: aliceState, plaintext: 'msg-$i', identityKeyPublic: aliceIkPub.bytes, senderDeviceId: 'a', recipientDeviceId: 'b');
+        aliceState = enc.state;
+        envs.add(enc.envelope);
+      }
+      var bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: envs[0].senderRatchetPublicKey);
+      final d1 = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[0], senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = d1.state;
+      expect(d1.plaintext, 'msg-0');
+      final d3 = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[2], senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = d3.state;
+      expect(d3.plaintext, 'msg-2');
+      final d2 = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[1], senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = d2.state;
+      expect(d2.plaintext, 'msg-1');
+    });
+
+    test('replayed message after consumption → fail', () async {
+      final x25519 = Cryptography.instance.x25519();
+      final aliceIk = await x25519.newKeyPair();
+      final aliceIkPub = await aliceIk.extractPublicKey();
+      final rootKey = List<int>.generate(32, (i) => i + 1);
+      final chainKey = List<int>.generate(32, (i) => i + 100);
+      var aliceState = V2Ratchet.createInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey);
+      final envs = <V2MessageEnvelope>[];
+      for (var i = 0; i < 3; i++) {
+        final enc = await V2Ratchet.encryptToEnvelope(state: aliceState, plaintext: 'msg-$i', identityKeyPublic: aliceIkPub.bytes, senderDeviceId: 'a', recipientDeviceId: 'b');
+        aliceState = enc.state;
+        envs.add(enc.envelope);
+      }
+      var bobState = V2Ratchet.createReceiverInitialState(sessionId: 's', rootKey: rootKey, chainKey: chainKey).copyWith(receivingRatchetPublicKey: envs[0].senderRatchetPublicKey);
+      final d1 = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[0], senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = d1.state;
+      final d3 = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[2], senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = d3.state;
+      final d2 = await V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[1], senderDeviceId: 'a', recipientDeviceId: 'b');
+      bobState = d2.state;
+      expect(() => V2Ratchet.decryptFromEnvelope(state: bobState, envelope: envs[1], senderDeviceId: 'a', recipientDeviceId: 'b'), throwsA(isA<Exception>()));
+    });
+  });
 
   group('Envelope: Bidirectional', () {
     test('A1→B1→A2→B2→A3→B3', () async {
