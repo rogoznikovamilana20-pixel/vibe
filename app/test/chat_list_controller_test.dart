@@ -369,4 +369,23 @@ void main() {
     expect(controller.chats.map((c) => c.id), ['c1'],
         reason: 'удалённый чат не возвращается при перезагрузке ленты');
   });
+
+  test('markArchived: архивирует ТОЛЬКО выбранные, не все ранее архивированные',
+      () async {
+    // Pre-populate archived with c5.
+    fake.archivedNotifier.value = {'c5'};
+    await controller.load();
+    expect(controller.archived, {'c5'});
+
+    // Select only c1 and archive.
+    controller.toggleSelect('c1');
+    controller.markArchived();
+
+    // c5 must remain archived; c1 must be added; c2 must NOT be archived.
+    expect(controller.archived, contains('c1'));
+    expect(controller.archived, contains('c5'));
+    expect(controller.archived.length, 2,
+        reason: 'only c1 and c5 should be archived, not c2');
+    expect(fake.setArchivedCalls, [(id: 'c1', archived: true)]);
+  });
 }

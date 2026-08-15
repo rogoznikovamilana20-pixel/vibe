@@ -345,13 +345,14 @@ class ChatListController extends ChangeNotifier {
 
   /// Пометить выделенные чаты (убрать из основного списка).
   void markArchived() {
-    archived.addAll(selected);
+    final toArchive = selected.toList();
+    archived.addAll(toArchive);
     selected.clear();
-    for (final id in archived) {
+    for (final id in toArchive) {
       backend.setChatArchived(id, archived: true);
     }
     notifyListeners();
-    onSnack('В архив: ${archived.length}');
+    onSnack('В архив: ${toArchive.length}');
   }
 
   /// Спрятать выделенные чаты (в скрытую папку, защищённую пасскодом).

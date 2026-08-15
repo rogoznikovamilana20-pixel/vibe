@@ -579,6 +579,14 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   /// Период проверки доступности сервера (health-check).
   static const _healthInterval = Duration(seconds: 12);
 
+  /// Остановить мониторинг сети (вызывать при logout).
+  void stopNetworkMonitor() {
+    _connSub?.cancel();
+    _connSub = null;
+    _healthTimer?.cancel();
+    _healthTimer = null;
+  }
+
   /// Запускает мониторинг сети: подписка на изменение связности устройства
   /// плюс периодический health-check к Supabase. Легковесный запрос, не
   /// тяжёлый — безопасен для тарифа Supabase.
@@ -652,7 +660,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       final dm = _dmChannel;
       if (dm != null) {
         try {
-          await dm.unsubscribe();
+          _client.removeChannel(dm);
         } catch (_) {}
         _dmChannel = _client.channel(_dmChannelName)
           ..onBroadcast(
@@ -670,7 +678,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     // Отменить старые каналы.
     for (final ch in _postgresChannels) {
       try {
-        ch.unsubscribe();
+        _client.removeChannel(ch);
       } catch (_) {}
     }
     _postgresChannels.clear();

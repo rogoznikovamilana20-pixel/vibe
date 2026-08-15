@@ -198,6 +198,21 @@ Future<void> setMyProfile(VibeProfile p) async {
   Future<void> logout() async {
     final id = VibeBackend.instance.myProfileId;
     if (id != null) unawaited(_writeOnline(id, false));
+
+    // Stop presence timer & channel.
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
+    final pch = _presenceChannel;
+    if (pch != null) {
+      try {
+        VibeBackend.instance._client.removeChannel(pch);
+      } catch (_) {}
+    }
+    _presenceChannel = null;
+
+    // Stop network monitor (health timer + connectivity subscription).
+    VibeBackend.instance.stopNetworkMonitor();
+
     await VibeBackend.instance._client.auth.signOut();
 
     // Unsubscribe personal channel.
@@ -218,7 +233,7 @@ Future<void> setMyProfile(VibeProfile p) async {
     // Unsubscribe postgres_changes channels.
     for (final ch in VibeBackend.instance._postgresChannels) {
       try {
-        await ch.unsubscribe();
+        VibeBackend.instance._client.removeChannel(ch);
       } catch (_) {}
     }
     VibeBackend.instance._postgresChannels.clear();
@@ -238,6 +253,11 @@ Future<void> setMyProfile(VibeProfile p) async {
     VibeBackend.instance._sentByIdTime.clear();
     VibeBackend.instance._unreadByChat.clear();
     VibeBackend._cachedProfile = null;
+
+    // Close event bus to prevent orphaned callbacks firing after logout.
+    if (!VibeBackend.instance._chatsController.isClosed) {
+      VibeBackend.instance._chatsController.close();
+    }
 
     // Очистить очередь офлайн-отправки.
     final qAccountId = id ?? '';
