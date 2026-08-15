@@ -45,9 +45,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    // Автоотклонение через 30 секунд
+    // Автоотклонение через 30 секунд с отправкой reject-сигнала
     _timeout = Timer(const Duration(seconds: 30), () {
-      if (mounted && !_answered) Navigator.of(context).pop();
+      if (mounted && !_answered) _reject();
     });
   }
 

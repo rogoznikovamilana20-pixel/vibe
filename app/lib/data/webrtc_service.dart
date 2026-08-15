@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -9,6 +8,12 @@ import 'backend.dart';
 
 /// Сигнальные типы для звонков
 enum CallMessageType { offer, answer, iceCandidate, hangUp, reject }
+
+/// Максимальная длительность звонка (30 минут).
+const _kMaxCallDuration = Duration(minutes: 30);
+
+/// Максимальный возраст сигнала для защиты от устаревших событий (60 сек).
+const _kMaxSignalAge = Duration(seconds: 60);
 
 /// Простой Signaling через Supabase Realtime-каналы.
 /// Каждый звонок создаёт уникальный канал `call:<callId>`.
@@ -29,7 +34,8 @@ class WebRtcService {
   bool get inCall => _inCall;
 
   String? _currentCallId;
-  String? _currentPeerId;
+
+  Timer? _callTimeout;
 
   // ── Public API ──────────────────────────────────────────────
 
@@ -51,7 +57,6 @@ class WebRtcService {
   }) async {
     if (_inCall) return;
     _currentCallId = callId;
-    _currentPeerId = peerId;
     _inCall = true;
 
     await _setupLocalStream(video);
@@ -84,7 +89,10 @@ class WebRtcService {
       'sdpType': offer.type,
       'callerId': _client.auth.currentUser!.id,
       'video': video,
+      'ts': DateTime.now().millisecondsSinceEpoch,
     });
+
+    _startCallTimer();
   }
 
   Future<void> answerCall({
@@ -94,12 +102,12 @@ class WebRtcService {
   }) async {
     if (_inCall) return;
     _currentCallId = callId;
-    _currentPeerId = callerId;
     _inCall = true;
 
     await _setupLocalStream(video);
     await _createPeerConnection();
     _subscribeToChannel(callId);
+    _startCallTimer();
   }
 
   Future<void> hangUp() async {
@@ -107,6 +115,7 @@ class WebRtcService {
       _sendSignal(_currentCallId!, {
         'type': CallMessageType.hangUp.index,
         'userId': _client.auth.currentUser!.id,
+        'ts': DateTime.now().millisecondsSinceEpoch,
       });
     }
     await _cleanup();
@@ -116,7 +125,9 @@ class WebRtcService {
     _sendSignal(callId, {
       'type': CallMessageType.reject.index,
       'userId': _client.auth.currentUser!.id,
+      'ts': DateTime.now().millisecondsSinceEpoch,
     });
+    await _cleanup();
   }
 
   // ── Private ─────────────────────────────────────────────────
@@ -174,6 +185,7 @@ class WebRtcService {
           'sdpMid': candidate.sdpMid,
           'sdpMLineIndex': candidate.sdpMLineIndex,
           'userId': _client.auth.currentUser!.id,
+          'ts': DateTime.now().millisecondsSinceEpoch,
         });
       }
     };
@@ -200,10 +212,29 @@ class WebRtcService {
 
         if (senderId == myId) return;
 
+        // Защита от устаревших событий
+        final ts = data['ts'] as int?;
+        if (ts != null && _isStale(ts)) return;
+
         final type = CallMessageType.values[data['type'] as int];
 
         switch (type) {
           case CallMessageType.offer:
+            // Принимаем offer и отправляем answer (только если уже в звонке)
+            if (_inCall && _peerConnection != null) {
+              await _peerConnection!.setRemoteDescription(
+                RTCSessionDescription(data['sdp'] as String, data['sdpType'] as String),
+              );
+              final answer = await _peerConnection!.createAnswer();
+              await _peerConnection!.setLocalDescription(answer);
+              _sendSignal(callId, {
+                'type': CallMessageType.answer.index,
+                'sdp': answer.sdp,
+                'sdpType': answer.type,
+                'userId': _client.auth.currentUser!.id,
+                'ts': DateTime.now().millisecondsSinceEpoch,
+              });
+            }
             break;
 
           case CallMessageType.answer:
@@ -230,9 +261,6 @@ class WebRtcService {
           case CallMessageType.reject:
             await _cleanup();
             break;
-
-          default:
-            break;
         }
       },
     );
@@ -240,17 +268,35 @@ class WebRtcService {
     _channel!.subscribe();
   }
 
+  bool _isStale(int timestampMs) {
+    final age = Duration(milliseconds: DateTime.now().millisecondsSinceEpoch - timestampMs);
+    return age > _kMaxSignalAge;
+  }
+
+  void _startCallTimer() {
+    _callTimeout?.cancel();
+    _callTimeout = Timer(_kMaxCallDuration, () {
+      hangUp();
+    });
+  }
+
   void _sendSignal(String callId, Map<String, dynamic> data) {
-    _client.channel('call:$callId').sendBroadcastMessage(
-      event: 'signal',
-      payload: data,
-    );
+    final ch = _channel;
+    if (ch != null) {
+      ch.sendBroadcastMessage(event: 'signal', payload: data);
+    } else {
+      _client.channel('call:$callId').sendBroadcastMessage(
+            event: 'signal',
+            payload: data,
+          );
+    }
   }
 
   Future<void> _cleanup() async {
+    _callTimeout?.cancel();
+    _callTimeout = null;
     _inCall = false;
     _currentCallId = null;
-    _currentPeerId = null;
 
     try {
       _localStream?.getTracks().forEach((t) => t.stop());

@@ -97,13 +97,18 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _toggleSpeaker() {
-    setState(() => _speakerOn = !_speakerOn);
+    final audioTrack = _service.localRenderer.srcObject?.getAudioTracks().firstOrNull;
+    if (audioTrack != null) {
+      // Включаем/выключаем маршрутизацию на динамик через WebRTC API
+      audioTrack.enableSpeakerphone(!_speakerOn);
+      setState(() => _speakerOn = !_speakerOn);
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _service.dispose();
+    _service.hangUp();
     super.dispose();
   }
 
