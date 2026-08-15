@@ -1263,6 +1263,7 @@ Future<Map<String, dynamic>> _serializeState(V2RatchetState state) async {
     'previous_sending_chain_length': state.previousSendingChainLength,
     'skipped_keys': state.skippedKeys.map((k, v) => MapEntry(k.toString(), base64Encode(v))),
     'protocol_version': state.protocolVersion,
+    'ratchet_step': state.ratchetStep,
   };
 }
 
@@ -1299,5 +1300,6 @@ Future<V2RatchetState> _deserializeState(Map<String, dynamic> json) async {
     previousSendingChainLength: json['previous_sending_chain_length'] as int,
     skippedKeys: skippedKeys,
     protocolVersion: json['protocol_version'] as int,
+    ratchetStep: (json['ratchet_step'] as int?) ?? 0,
   );
 }

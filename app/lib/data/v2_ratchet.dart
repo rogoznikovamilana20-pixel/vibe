@@ -29,6 +29,7 @@ class V2RatchetState {
   final int previousSendingChainLength;
   final Map<int, List<int>> skippedKeys;
   final int protocolVersion;
+  final int ratchetStep;
 
   const V2RatchetState({
     required this.sessionId,
@@ -43,6 +44,7 @@ class V2RatchetState {
     this.previousSendingChainLength = 0,
     this.skippedKeys = const {},
     this.protocolVersion = 2,
+    this.ratchetStep = 0,
   });
 
   /// Копирует состояние с изменениями.
@@ -59,6 +61,7 @@ class V2RatchetState {
     int? previousSendingChainLength,
     Map<int, List<int>>? skippedKeys,
     int? protocolVersion,
+    int? ratchetStep,
   }) {
     return V2RatchetState(
       sessionId: sessionId ?? this.sessionId,
@@ -73,6 +76,7 @@ class V2RatchetState {
       previousSendingChainLength: previousSendingChainLength ?? this.previousSendingChainLength,
       skippedKeys: skippedKeys ?? this.skippedKeys,
       protocolVersion: protocolVersion ?? this.protocolVersion,
+      ratchetStep: ratchetStep ?? this.ratchetStep,
     );
   }
 }
@@ -137,6 +141,144 @@ class V2MessageHeader {
       senderRatchetPublicKey: senderRk,
       messageNumber: byteData.getUint32(68, Endian.big),
       previousChainLength: byteData.getUint32(72, Endian.big),
+    );
+  }
+}
+
+/// Envelope шифрованного сообщения V2.
+///
+/// Формат (spec §10.4):
+///   [version:1][sender_ik:32][sender_rk:32][msg_num:4][prev_chain_len:4][nonce:12][ciphertext+tag]
+///
+/// Tag включён в ciphertext поле (SecretBox.concatenation() = nonce || ciphertext || tag).
+/// При сериализации nonce вынесен отдельно, tag остаётся в конце ciphertext.
+class V2MessageEnvelope {
+  final int version;
+  final List<int> senderIdentityKey;
+  final List<int> senderRatchetPublicKey;
+  final int messageNumber;
+  final int previousChainLength;
+  final List<int> nonce;
+  final List<int> ciphertextWithMac;
+
+  const V2MessageEnvelope({
+    required this.version,
+    required this.senderIdentityKey,
+    required this.senderRatchetPublicKey,
+    required this.messageNumber,
+    required this.previousChainLength,
+    required this.nonce,
+    required this.ciphertextWithMac,
+  });
+
+  /// Вычисляет размер заголовка (без переменных полей).
+  static const int headerSize = 1 + 32 + 32 + 4 + 4; // 73 bytes
+
+  /// Создаёт envelope из компонентов encrypt().
+  ///
+  /// secretBoxConcat = nonce(12) || ciphertext || tag(16).
+  factory V2MessageEnvelope.fromComponents({
+    required V2MessageHeader header,
+    required List<int> secretBoxConcat,
+  }) {
+    return V2MessageEnvelope(
+      version: header.protocolVersion,
+      senderIdentityKey: header.senderIdentityKey,
+      senderRatchetPublicKey: header.senderRatchetPublicKey,
+      messageNumber: header.messageNumber,
+      previousChainLength: header.previousChainLength,
+      nonce: secretBoxConcat.sublist(0, 12),
+      ciphertextWithMac: secretBoxConcat.sublist(12),
+    );
+  }
+
+  /// Сериализует envelope в bytes.
+  ///
+  /// Формат: [version:1][sender_ik:32][sender_rk:32][mn:4][pcl:4][nonce:12][ct_with_mac]
+  List<int> toBytes() {
+    final ctLen = ciphertextWithMac.length;
+    final totalSize = headerSize + 12 + ctLen;
+    final result = Uint8List(totalSize);
+    final byteData = ByteData.view(result.buffer);
+
+    var offset = 0;
+    // version (1 byte)
+    result[offset++] = version;
+    // sender identity key (32 bytes)
+    result.setRange(offset, offset + 32, senderIdentityKey);
+    offset += 32;
+    // sender ratchet public key (32 bytes)
+    result.setRange(offset, offset + 32, senderRatchetPublicKey);
+    offset += 32;
+    // message number (4 bytes)
+    byteData.setUint32(offset, messageNumber, Endian.big);
+    offset += 4;
+    // previous chain length (4 bytes)
+    byteData.setUint32(offset, previousChainLength, Endian.big);
+    offset += 4;
+    // nonce (12 bytes)
+    result.setRange(offset, offset + 12, nonce);
+    offset += 12;
+    // ciphertext + mac
+    result.setRange(offset, offset + ctLen, ciphertextWithMac);
+
+    return result;
+  }
+
+  /// Десериализует envelope из bytes.
+  ///
+  /// Throws [V2RatchetException] если формат невалиден.
+  factory V2MessageEnvelope.fromBytes(List<int> bytes) {
+    if (bytes.length < headerSize + 12) {
+      throw V2RatchetException(
+        'Envelope too short: ${bytes.length} < ${headerSize + 12}',
+      );
+    }
+
+    var offset = 0;
+    final version = bytes[offset++];
+
+    final senderIk = List<int>.generate(32, (i) => bytes[offset + i]);
+    offset += 32;
+
+    final senderRk = List<int>.generate(32, (i) => bytes[offset + i]);
+    offset += 32;
+
+    final byteData = ByteData.view(Uint8List.fromList(bytes).buffer);
+    final messageNumber = byteData.getUint32(offset, Endian.big);
+    offset += 4;
+
+    final previousChainLength = byteData.getUint32(offset, Endian.big);
+    offset += 4;
+
+    final nonce = List<int>.generate(12, (i) => bytes[offset + i]);
+    offset += 12;
+
+    final ciphertextWithMac = List<int>.from(bytes.sublist(offset));
+
+    return V2MessageEnvelope(
+      version: version,
+      senderIdentityKey: senderIk,
+      senderRatchetPublicKey: senderRk,
+      messageNumber: messageNumber,
+      previousChainLength: previousChainLength,
+      nonce: nonce,
+      ciphertextWithMac: ciphertextWithMac,
+    );
+  }
+
+  /// Конвертирует в header + secretBox concatenation для decrypt().
+  ({V2MessageHeader header, List<int> secretBoxConcat}) toDecryptComponents() {
+    final header = V2MessageHeader(
+      protocolVersion: version,
+      senderIdentityKey: senderIdentityKey,
+      senderRatchetPublicKey: senderRatchetPublicKey,
+      messageNumber: messageNumber,
+      previousChainLength: previousChainLength,
+    );
+    return (
+      header: header,
+      secretBoxConcat: [...nonce, ...ciphertextWithMac],
     );
   }
 }
@@ -288,7 +430,7 @@ class V2Ratchet {
       dh2Bytes,
     );
 
-    // 4. Reset counters, clear skipped keys
+    // 4. Reset counters, clear skipped keys, increment ratchet step
     return state.copyWith(
       rootKey: ratchet2.rootKey,
       sendingChainKey: ratchet2.chainKey,
@@ -300,6 +442,7 @@ class V2Ratchet {
       receivingMessageNumber: 0,
       previousSendingChainLength: state.sendingMessageNumber,
       skippedKeys: {},
+      ratchetStep: state.ratchetStep + 1,
     );
   }
 
@@ -351,6 +494,7 @@ class V2Ratchet {
         sendingRatchetPubBytes: newRatchetPub.bytes,
         sendingMessageNumber: 0,
         previousSendingChainLength: currentState.sendingMessageNumber,
+        ratchetStep: currentState.ratchetStep + 1,
       );
     }
 
@@ -374,10 +518,12 @@ class V2Ratchet {
     final nonce = _computeNonce(
       currentState.sendingMessageNumber,
       currentState.previousSendingChainLength,
+      currentState.ratchetStep,
     );
 
     // 3. Compute AAD
     final aad = _computeAad(
+      senderIdentityKey: identityKeyPublic,
       senderDeviceId: senderDeviceId,
       recipientDeviceId: recipientDeviceId,
       messageNumber: currentState.sendingMessageNumber,
@@ -450,6 +596,7 @@ class V2Ratchet {
       state: workingState,
       header: header,
       ciphertext: ciphertext,
+      senderIdentityKey: header.senderIdentityKey,
       senderDeviceId: senderDeviceId,
       recipientDeviceId: recipientDeviceId,
     );
@@ -460,6 +607,7 @@ class V2Ratchet {
     required V2RatchetState state,
     required V2MessageHeader header,
     required List<int> ciphertext,
+    required List<int> senderIdentityKey,
     required String senderDeviceId,
     required String recipientDeviceId,
   }) async {
@@ -478,6 +626,7 @@ class V2Ratchet {
         messageKey: messageKey,
         ciphertext: ciphertext,
         header: header,
+        senderIdentityKey: senderIdentityKey,
         senderDeviceId: senderDeviceId,
         recipientDeviceId: recipientDeviceId,
       );
@@ -515,6 +664,7 @@ class V2Ratchet {
       messageKey: messageKey,
       ciphertext: ciphertext,
       header: header,
+      senderIdentityKey: senderIdentityKey,
       senderDeviceId: senderDeviceId,
       recipientDeviceId: recipientDeviceId,
     );
@@ -537,10 +687,12 @@ class V2Ratchet {
     required List<int> messageKey,
     required List<int> ciphertext,
     required V2MessageHeader header,
+    required List<int> senderIdentityKey,
     required String senderDeviceId,
     required String recipientDeviceId,
   }) async {
     final aad = _computeAad(
+      senderIdentityKey: senderIdentityKey,
       senderDeviceId: senderDeviceId,
       recipientDeviceId: recipientDeviceId,
       messageNumber: header.messageNumber,
@@ -563,24 +715,82 @@ class V2Ratchet {
   }
 
   // ===========================================================================
+  // Envelope API
+  // ===========================================================================
+
+  /// Шифрует сообщение и возвращает envelope (единый формат).
+  ///
+  /// Envelope содержит заголовок + nonce + ciphertext + tag в одном байте.
+  /// Формат: [version:1][sender_ik:32][sender_rk:32][mn:4][pcl:4][nonce:12][ct+tag]
+  static Future<({V2MessageEnvelope envelope, V2RatchetState state})> encryptToEnvelope({
+    required V2RatchetState state,
+    required String plaintext,
+    required List<int> identityKeyPublic,
+    required String senderDeviceId,
+    required String recipientDeviceId,
+  }) async {
+    final result = await encrypt(
+      state: state,
+      plaintext: plaintext,
+      identityKeyPublic: identityKeyPublic,
+      senderDeviceId: senderDeviceId,
+      recipientDeviceId: recipientDeviceId,
+    );
+
+    final envelope = V2MessageEnvelope.fromComponents(
+      header: result.header,
+      secretBoxConcat: result.ciphertext,
+    );
+
+    return (envelope: envelope, state: result.state);
+  }
+
+  /// Дешифрует сообщение из envelope.
+  ///
+  /// Парсит envelope, восстанавливает header и ciphertext,
+  /// вызывает decrypt() с существующей логикой.
+  static Future<({String plaintext, V2RatchetState state})> decryptFromEnvelope({
+    required V2RatchetState state,
+    required V2MessageEnvelope envelope,
+    required String senderDeviceId,
+    required String recipientDeviceId,
+  }) async {
+    if (envelope.version != 2) {
+      throw V2RatchetException('Unsupported protocol version: ${envelope.version}');
+    }
+
+    final components = envelope.toDecryptComponents();
+
+    return decrypt(
+      state: state,
+      header: components.header,
+      ciphertext: components.secretBoxConcat,
+      senderDeviceId: senderDeviceId,
+      recipientDeviceId: recipientDeviceId,
+    );
+  }
+
+  // ===========================================================================
   // Helpers
   // ===========================================================================
 
   /// Вычисляет nonce (12 bytes).
   ///
-  /// spec: nonce = Encode32BE(msgNum) || Encode32BE(prevChainLen) || Encode32BE(0)
-  static List<int> _computeNonce(int messageNumber, int previousChainLength) {
+  /// spec §10.2: nonce = Encode32BE(msgNum) || Encode32BE(prevChainLen) || Encode32BE(ratchetStep)
+  static List<int> _computeNonce(int messageNumber, int previousChainLength, int ratchetStep) {
     final byteData = ByteData(12);
     byteData.setUint32(0, messageNumber, Endian.big);
     byteData.setUint32(4, previousChainLength, Endian.big);
-    byteData.setUint32(8, 0, Endian.big);
+    byteData.setUint32(8, ratchetStep, Endian.big);
     return byteData.buffer.asUint8List();
   }
 
   /// Вычисляет AAD.
   ///
-  /// spec: AD = sender_device_id || recipient_device_id || msgNum || prevChainLen
+  /// spec §10.3: AD = sender_identity_key || sender_device_id || recipient_device_id || msgNum || prevChainLen
+  /// Identity key binds ciphertext to specific sender — tampering detected by GCM tag.
   static List<int> _computeAad({
+    required List<int> senderIdentityKey,
     required String senderDeviceId,
     required String recipientDeviceId,
     required int messageNumber,
@@ -591,6 +801,7 @@ class V2Ratchet {
     numBytes.setUint32(4, previousChainLength, Endian.big);
 
     return [
+      ...senderIdentityKey,
       ...utf8.encode(senderDeviceId),
       ...utf8.encode(recipientDeviceId),
       ...numBytes.buffer.asUint8List(),
