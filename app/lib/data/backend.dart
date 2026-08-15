@@ -13,7 +13,6 @@ import 'offline_queue_service.dart';
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
 import 'e2e_service.dart';
-import 'e2e_v2_service.dart';
 import 'v2_outgoing.dart';
 part 'profile_backend.dart';
 part 'media_backend.dart';
@@ -1269,54 +1268,21 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   }
 
   /// Resolve recipient's V2 device ID from devices table.
+  /// Resolve recipient's V2 device ID from devices table.
+  ///
+  /// Returns the first device ID for the given user, or null.
   Future<String?> _resolveRecipientDeviceId(String peerId) async {
     try {
       final devices = await _client
           .from('devices')
-          .select('device_id')
+          .select('id')
           .eq('user_id', peerId)
           .limit(1);
       if (devices.isNotEmpty) {
-        return devices[0]['device_id'] as String;
+        return devices[0]['id'] as String;
       }
     } catch (_) {}
     return null;
-  }
-
-  /// Find active V2 session ID for a peer.
-  ///
-  /// Checks if a V2 session exists with this peer's device.
-  /// Returns the session ID if found, null otherwise.
-  Future<String?> _findV2SessionId(
-    String peerId,
-    String recipientDeviceId,
-  ) async {
-    try {
-      final e2e = E2eV2Service.instance;
-      final myDeviceId = await e2e.getDeviceId();
-      if (myDeviceId == null) return null;
-
-      // Session ID is derived from device IDs + ephemeral key
-      // Try to load session by constructing the expected session ID pattern
-      // For now, check if any session exists for this peer
-      final sessionData = await _client
-          .from('devices')
-          .select('device_id')
-          .eq('user_id', peerId)
-          .maybeSingle();
-      if (sessionData == null) return null;
-
-      // Try common session ID patterns
-      // In production, session IDs are stored after X3DH
-      // For this phase, we check if a session was established
-      final deviceId = sessionData['device_id'] as String;
-      final sessionId = '${myDeviceId}_$deviceId';
-
-      final session = await e2e.loadSession(sessionId);
-      return session?.sessionId;
-    } catch (_) {
-      return null;
-    }
   }
 
   /// Тип чата: `pm` | `group` | '' (кеш 2 мин — для гейтинга уведомлений).
@@ -1747,11 +1713,11 @@ peerName: peer?.displayName,
           throw const V2OutgoingException('Recipient V2 device not found');
         }
 
-        // Find active V2 session for this peer
-        final sessionId = await _findV2SessionId(peerId, recipientDeviceId);
-        if (sessionId == null) {
-          throw const V2OutgoingException('No V2 session with peer');
-        }
+        // Bootstrap session (X3DH if needed, or find existing)
+        final sessionId = await V2Outgoing.instance.bootstrapSession(
+          peerId: peerId,
+          recipientDeviceId: recipientDeviceId,
+        );
 
         // Encrypt with V2 (serialized per session)
         final v2Result = await V2Outgoing.instance.encryptSerialized(
