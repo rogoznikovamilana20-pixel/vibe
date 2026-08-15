@@ -21,6 +21,20 @@ class WebRtcService {
   WebRtcService._();
   static final instance = WebRtcService._();
 
+  /// TURN/ICE server configuration. Can be overridden for testing or
+  /// when a production TURN server is available.
+  static List<Map<String, dynamic>> iceServers = [
+    {'urls': 'stun:stun.l.google.com:19302'},
+    {'urls': 'stun:stun1.l.google.com:19302'},
+    // TODO: Replace with production TURN server before release.
+    // OpenRelay free TURN is NOT suitable for production.
+    {
+      'urls': 'turn:openrelay.metered.ca:443',
+      'username': 'openrelayproject',
+      'credential': 'openrelayproject',
+    },
+  ];
+
   final _client = Supabase.instance.client;
   RealtimeChannel? _channel;
   RTCPeerConnection? _peerConnection;
@@ -36,6 +50,10 @@ class WebRtcService {
   String? _currentCallId;
 
   Timer? _callTimeout;
+  Timer? _noAnswerTimer;
+  bool _answerReceived = false;
+  bool _iceRestartAttempted = false;
+  Map<String, bool>? _knownParticipants;
 
   // ── Public API ──────────────────────────────────────────────
 
@@ -93,6 +111,15 @@ class WebRtcService {
     });
 
     _startCallTimer();
+
+    _answerReceived = false;
+    _noAnswerTimer?.cancel();
+    _noAnswerTimer = Timer(const Duration(seconds: 30), () {
+      if (!_answerReceived && _inCall) {
+        debugPrint('WebRTC: no answer within 30s, hanging up');
+        hangUp();
+      }
+    });
   }
 
   Future<void> answerCall({
@@ -149,21 +176,7 @@ class WebRtcService {
 
   Future<void> _createPeerConnection() async {
     _peerConnection = await createPeerConnection({
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-        {'urls': 'stun:stun1.l.google.com:19302'},
-        // Free TURN server for NAT traversal (metered.ca)
-        {
-          'urls': 'turn:openrelay.metered.ca:80',
-          'username': 'openrelayproject',
-          'credential': 'openrelayproject',
-        },
-        {
-          'urls': 'turn:openrelay.metered.ca:443',
-          'username': 'openrelayproject',
-          'credential': 'openrelayproject',
-        },
-      ],
+      'iceServers': WebRtcService.iceServers,
     });
 
     _localStream?.getTracks().forEach((track) {
@@ -192,8 +205,15 @@ class WebRtcService {
 
     _peerConnection!.onConnectionState = (state) {
       debugPrint('WebRTC connection: $state');
-      final s = state.name;
-      if (s.contains('failed') || s.contains('closed')) {
+      if (state.name.contains('failed')) {
+        // Attempt ICE restart once
+        if (!_iceRestartAttempted) {
+          _iceRestartAttempted = true;
+          _attemptIceRestart();
+        } else {
+          hangUp();
+        }
+      } else if (state.name.contains('closed')) {
         hangUp();
       }
     };
@@ -212,11 +232,23 @@ class WebRtcService {
 
         if (senderId == myId) return;
 
+        // Track participants — only accept signals from chat members
+        _knownParticipants ??= {};
+        final type = CallMessageType.values[data['type'] as int];
+        if (type == CallMessageType.offer || type == CallMessageType.answer) {
+          _knownParticipants![senderId] = true;
+        }
+        // For non-initial signals, verify sender was a participant
+        if (type != CallMessageType.offer && type != CallMessageType.answer) {
+          if (_knownParticipants![senderId] != true) {
+            debugPrint('WebRTC: rejected signal from unknown participant $senderId');
+            return;
+          }
+        }
+
         // Защита от устаревших событий
         final ts = data['ts'] as int?;
         if (ts != null && _isStale(ts)) return;
-
-        final type = CallMessageType.values[data['type'] as int];
 
         switch (type) {
           case CallMessageType.offer:
@@ -238,6 +270,8 @@ class WebRtcService {
             break;
 
           case CallMessageType.answer:
+            _answerReceived = true;
+            _noAnswerTimer?.cancel();
             if (_peerConnection != null) {
               await _peerConnection!.setRemoteDescription(
                 RTCSessionDescription(data['sdp'] as String, data['sdpType'] as String),
@@ -295,6 +329,11 @@ class WebRtcService {
   Future<void> _cleanup() async {
     _callTimeout?.cancel();
     _callTimeout = null;
+    _noAnswerTimer?.cancel();
+    _noAnswerTimer = null;
+    _answerReceived = false;
+    _iceRestartAttempted = false;
+    _knownParticipants = null;
     _inCall = false;
     _currentCallId = null;
 
@@ -313,5 +352,30 @@ class WebRtcService {
 
     await _channel?.unsubscribe();
     _channel = null;
+  }
+
+  Future<void> _attemptIceRestart() async {
+    try {
+      if (_peerConnection == null) return;
+      final offer = await _peerConnection!.createOffer({
+        'iceRestart': true,
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': true,
+      });
+      await _peerConnection!.setLocalDescription(offer);
+      if (_currentCallId != null) {
+        _sendSignal(_currentCallId!, {
+          'type': CallMessageType.offer.index,
+          'sdp': offer.sdp,
+          'sdpType': offer.type,
+          'callerId': _client.auth.currentUser!.id,
+          'video': true,
+          'ts': DateTime.now().millisecondsSinceEpoch,
+          'iceRestart': true,
+        });
+      }
+    } catch (_) {
+      hangUp();
+    }
   }
 }

@@ -89,13 +89,39 @@ serve(async (req) => {
     // Authenticate
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient(
+
+    // User-scoped client (enforces RLS)
+    const userSupabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+
+    // Service-role client (admin operations only)
+    const serviceSupabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get chat members (excluding caller)
-    const { data: chat } = await supabase
+    // Verify authenticated user
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify caller_id matches authenticated user
+    if (caller_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "caller_id must match authenticated user" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get chat members (using user client to enforce RLS)
+    const { data: chat } = await userSupabase
       .from("chats")
       .select("members")
       .eq("id", chat_id)
@@ -108,7 +134,16 @@ serve(async (req) => {
       );
     }
 
-    const members = (chat.members as string[]).filter((id) => id !== caller_id);
+    // Verify caller is a member of the chat
+    const allMembers = chat.members as string[];
+    if (!allMembers.includes(user.id)) {
+      return new Response(
+        JSON.stringify({ error: "Not a chat member" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const members = allMembers.filter((id) => id !== caller_id);
     if (members.length === 0) {
       return new Response(
         JSON.stringify({ ok: true, sent: 0 }),
@@ -117,7 +152,7 @@ serve(async (req) => {
     }
 
     // Get FCM tokens for recipients
-    const { data: profiles } = await supabase
+    const { data: profiles } = await userSupabase
       .from("profiles")
       .select("id, fcm_token")
       .in("id", members);
@@ -180,7 +215,7 @@ serve(async (req) => {
         if (data.error) {
           if (data.error.code === 404 || data.error.code === 400) {
             // Token invalid — clean up
-            await supabase
+            await serviceSupabase
               .from("profiles")
               .update({ fcm_token: null })
               .eq("fcm_token", token);
