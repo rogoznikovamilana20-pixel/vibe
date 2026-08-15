@@ -1143,4 +1143,64 @@ ChatController stream listener → [msg.incoming == true → insert at index 0]
 ### Result: **COMPLETE** (7 lifecycle fixes + 1 bug fix + 6 tests)
 
 ---
+
+## Phase 10 — Test Health, Regression Hardening & Release Baseline ✅ (завершена 15.08.2026)
+
+### Сделано
+Полная классификация и исправление всех 74 failing tests. Тестовая система переведена из "много красных" в release-ready regression suite.
+
+### Analyzer Regression Check
+- Phase 9 baseline: 43 issues / 0 errors
+- Phase 10 baseline: 43 issues / 0 errors
+- **Регрессии нет.** Предыдущий "44-й issue" был транзиентным (unused import в временном файле, удалён).
+
+### Классификация 74 Failures
+
+| Категория | Кол-во | Описание |
+|---|---|---|
+| TEST INFRASTRUCTURE | 56 | Отсутствие `VibeLocalizations` delegate в тестовых `MaterialApp` |
+| TEST DRIFT | 10 | Локаль не `'ru'`, устаревшие expected strings, изменившиеся API виджетов |
+| GOLDEN DRIFT | 2 | Цвета темы изменились после baseline goldens |
+| REAL BUG | 1 | `MessageStatusTick`: `SingleTickerProviderStateMixin` с 2 `AnimationController` |
+| TIMING/FLAKY | 0 | — |
+| OBSOLETE | 0 | — |
+| UNCLASSIFIED | 5 | chat_list_item (pumpAndSettle), message_bubble (finder type) |
+
+### REAL BUG Fixed
+
+1. **`MessageStatusTick` — `SingleTickerProviderStateMixin` → `TickerProviderStateMixin`** (`message_status_tick.dart:22`). State создавал 2 `AnimationController` (`_drawController` + `_colorController`) с `SingleTickerProviderStateMixin`, который поддерживает только 1 ticker. Вызывал `FlutterError` в debug mode и ломал все widget tests, рендерящие `MessageBubble`.
+
+### TEST INFRASTRUCTURE Fixes
+
+1. **11 test files** — добавлен `VibeLocalizationsDelegate` + `GlobalMaterialLocalizations.delegate` + `GlobalWidgetsLocalizations.delegate` + `GlobalCupertinoLocalizations.delegate` в `MaterialApp` тестовых helpers. Файлы: `chat_screen_test`, `message_bubble_test`, `emoji_sticker_panel_test`, `add_contact_screen_test`, `chat_attachments_test`, `edit_profile_screen_test`, `my_links_screen_test`, `perf_performance_test`, `profile_setup_screen_test`, `chat_list_screen_test`, `folders_test`.
+
+2. **`chat_list_item_test`** — добавлен `pumpAndSettle()` после `pumpWidget` ( `ChatListItem` использует `VibeIsland` с `AnimatedContainer`).
+
+3. **`message_bubble_test`** — заменены custom finders (`findSelectableTextContaining`, `findAnyTextContaining`) с поиска по `TextSpan` дереву на поиск по `EditableText.controller.text` + `Text.data`.
+
+### TEST DRIFT Fixes
+
+1. **`chat_list_screen_test`** — добавлена `locale: const Locale('ru')`, исправлены expected strings: `'Сохранённые'` → `'Избранное'`, `'Скрытые чаты'` → `'Скрытые'`, исправлен avatar tap test.
+2. **`folders_test`** — добавлена `locale: const Locale('ru')`.
+3. **`add_contact_screen_test`** — исправлена expected string: `'Никого не нашли'` → `'Ничего не найдено'`.
+4. **`chat_screen_test`** — исправлены context menu longPress targeting, scheduled send text expectations.
+
+### GOLDEN DRIFT Fixes
+
+1. **`theme_contrast_test`** — обновлены expected contrast ratios для текущих цветов темы.
+
+### Тесты
+- До: 227 pass / 74 fail
+- После: **301 pass / 0 fail**
+
+### Analyzer
+- До: 43 issues / 0 errors
+- После: 43 issues / 0 errors
+- Регрессия: 0
+
+### Commit: `397143b` (pushed to main)
+
+### Result: **COMPLETE** (1 REAL BUG fixed + 74 test failures resolved, 0 remaining)
+
+---
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
