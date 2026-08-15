@@ -70,13 +70,13 @@ class ChatListItem extends StatelessWidget {
           onDismissed: onDismissed,
           secondaryBackground: _swipeBackground(
             context: context,
-            color: pinned ? context.vibeSurfaceElevated : const Color(0xFF3390EC),
+            color: pinned ? context.vibeSurfaceElevated : context.vibePrimary,
             icon: pinned ? VibeIcons.pin : VibeIcons.archive,
             label: pinned ? l.chatSwipeUnpin : l.chatSwipeArchive,
           ),
           background: _swipeBackground(
             context: context,
-            color: isArchived ? const Color(0xFF3390EC) : VibeColors.warning,
+            color: isArchived ? context.vibePrimary : VibeColors.warning,
             icon: isArchived ? VibeIcons.archive : Icons.notifications_off_rounded,
             label: isArchived ? l.chatSwipeFromArchive : l.chatSwipeDnd,
           ),
@@ -103,32 +103,10 @@ class ChatListItem extends StatelessWidget {
 
   Widget _tile(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    final id = chat.id;
     final name = chat.title;
     final vPad = 1.0 + density * 2.0;
 
-    return Dismissible(
-      key: ValueKey('chat_$id'),
-      direction: selectionMode
-          ? DismissDirection.none
-          : DismissDirection.horizontal,
-      confirmDismiss: (_) async => !selectionMode,
-      onDismissed: onDismissed,
-      secondaryBackground: _swipeBackground(
-        context: context,
-        color: VibeColors.warning,
-        icon: isDnd
-            ? Icons.notifications_active_rounded
-            : Icons.notifications_off_rounded,
-        label: isDnd ? l.chatSwipeEnableNotifications : l.chatSwipeDnd,
-      ),
-      background: _swipeBackground(
-        context: context,
-        color: VibeColors.surfaceElevatedDark,
-        icon: isArchived ? Icons.unarchive_rounded : VibeIcons.archive,
-        label: isArchived ? l.chatSwipeFromArchive : l.chatSwipeArchive,
-      ),
-      child: Padding(
+    return Padding(
         padding: EdgeInsets.symmetric(vertical: vPad),
         child: ListTile(
           onTap: onTap,
@@ -217,14 +195,6 @@ class ChatListItem extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (pinned) ...[
-                    const Icon(
-                      VibeIcons.pin,
-                      size: 12,
-                      color: VibeColors.vivid,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
                   if (chat.kind != 'pm') ...[
                     Icon(
                       _typeIcon(chat.kind),
@@ -250,12 +220,12 @@ class ChatListItem extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: context.isDarkMode
                             ? context.vibeSurfaceElevated
-                            : const Color(0xFFEFEDF8),
+                            : context.vibeSurfaceVariant,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: context.isDarkMode
                               ? context.vibeBorder.withValues(alpha: 0.6)
-                              : const Color(0x291C1B22),
+                              : context.vibeBorder,
                         ),
                       ),
                       child: Text(
@@ -298,7 +268,6 @@ class ChatListItem extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 

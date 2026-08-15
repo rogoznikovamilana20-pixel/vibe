@@ -114,6 +114,16 @@ class VibeColors {
   // Онлайн-индикатор
   static const onlineGreen = Color(0xFF4DCD5E);
 
+  // Цвет ссылок в исходящих пузырях
+  static const outgoingLink = Color(0xFF8FC8FF);
+
+  // Приглушённый текст (light theme)
+  static const mutedTextLight = Color(0xFF5A5766);
+
+  // Статус сообщений
+  static const statusRead = Color(0xFF8AB4F8);
+  static const statusFailed = Color(0xFFFF6B6B);
+
   // Мягкие ambient-свечения
   static const glowPrimary = Color(0x1A8B4DFF);
   static const glowVivid = Color(0x148B4DFF);

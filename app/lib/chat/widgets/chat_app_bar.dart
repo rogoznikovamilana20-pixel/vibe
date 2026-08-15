@@ -250,7 +250,7 @@ class ChatAppBar extends StatelessWidget {
                         endIndent: 4,
                         color: context.isDarkMode
                             ? Colors.white24
-                            : const Color(0x1F1C1B22),
+                            : context.vibeBorder,
                       ),
                       VibeIconButton(
                         icon: Icons.call_outlined,
@@ -264,7 +264,7 @@ class ChatAppBar extends StatelessWidget {
                         endIndent: 4,
                         color: context.isDarkMode
                             ? Colors.white24
-                            : const Color(0x1F1C1B22),
+                            : context.vibeBorder,
                       ),
                       VibeIconButton(
                         icon: VibeIcons.moreVertical,

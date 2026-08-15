@@ -14,11 +14,12 @@ class VibeSpacing {
   static const xxxl = 48.0;
 }
 
-/// Единая радиус-система: 4 / 8 / 12 / 16 / 20.
+/// Единая радиус-система: 2 / 4 / 6 / 8 / 10 / 12 / 14 / 16 / 20.
 /// 20+ — только avatar, pill, FAB, hero.
 class VibeRadius {
   VibeRadius._();
 
+  static const xxs = 2.0;
   static const xs = 4.0;
   static const sm = 8.0;
   static const md = 12.0;
@@ -33,6 +34,8 @@ class VibeRadius {
   static const bubbleTail = 6.0;
   static const pill = 20.0;
   static const avatar = 20.0;
+  static const timestamp = 10.0;
+  static const thumbnail = 14.0;
 }
 
 /// Размеры компонентов.

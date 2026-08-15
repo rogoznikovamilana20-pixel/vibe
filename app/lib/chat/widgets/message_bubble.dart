@@ -270,7 +270,7 @@ class _MessageBubbleState extends State<MessageBubble>
                                     : bubbleColor,
                             border: (!context.isDarkMode && isIncoming)
                                 ? Border.all(
-                                    color: const Color(0x1F1C1B22),
+                                    color: context.vibeBorder,
                                   )
                                 : null,
                             boxShadow: context.isDarkMode
@@ -411,7 +411,7 @@ class _MessageBubbleState extends State<MessageBubble>
                   size: 13,
                   color: isIncoming
                       ? context.vibePrimary
-                      : const Color(0xFF8FC8FF),
+                      : VibeColors.outgoingLink,
                 ),
                 const SizedBox(width: 4),
                 Flexible(
@@ -421,7 +421,7 @@ class _MessageBubbleState extends State<MessageBubble>
                     style: VibeTypography.caption.copyWith(
                       color: isIncoming
                           ? context.vibePrimary
-                          : const Color(0xFF8FC8FF),
+                          : VibeColors.outgoingLink,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -436,7 +436,7 @@ class _MessageBubbleState extends State<MessageBubble>
               msg.text,
               isIncoming
                   ? context.vibePrimary
-                  : const Color(0xFF8FC8FF),
+                  : VibeColors.outgoingLink,
               widget.onOpenUrl,
             ),
             style: VibeTypography.body.copyWith(
@@ -465,7 +465,7 @@ class _MessageBubbleState extends State<MessageBubble>
                   color: isIncoming
                       ? (context.isDarkMode
                           ? context.vibeTextTertiary
-                          : const Color(0xFF5A5766))
+                          : VibeColors.mutedTextLight)
                       : Colors.white54,
                   fontSize: 9,
                 ),
@@ -477,9 +477,9 @@ class _MessageBubbleState extends State<MessageBubble>
                 color: isIncoming
                     ? (context.isDarkMode
                         ? context.vibeTextTertiary
-                        : const Color(0xFF5A5766))
+                        : VibeColors.mutedTextLight)
                     : Colors.white70,
-                fontSize: 10,
+                fontSize: 11,
               ),
             ),
             if (!isIncoming) ...[
@@ -586,7 +586,7 @@ class _PhotoBubble extends StatelessWidget {
     final l = VibeLocalizations.of(context);
     final url = msg.photoUrl;
     if (url != null && url.isNotEmpty) {
-      return _NetworkPhotoBubble(url: url, time: msg.time, incoming: incoming);
+      return _NetworkPhotoBubble(url: url, time: msg.time, incoming: incoming, status: msg.status);
     }
     const palette = [
       VibeColors.primary,
@@ -675,11 +675,7 @@ class _PhotoBubble extends StatelessWidget {
             ),
             if (!incoming) ...[
               const SizedBox(width: 3),
-              const Icon(
-                VibeIcons.checkAll,
-                size: 13,
-                color: Colors.white70,
-              ),
+              MessageStatusTick(status: msg.status, size: 13),
             ],
           ],
         ),
@@ -693,11 +689,13 @@ class _NetworkPhotoBubble extends StatelessWidget {
     required this.url,
     required this.time,
     required this.incoming,
+    required this.status,
   });
 
   final String url;
   final String time;
   final bool incoming;
+  final MsgStatus status;
 
   @override
   Widget build(BuildContext context) {
@@ -747,11 +745,7 @@ class _NetworkPhotoBubble extends StatelessWidget {
             ),
             if (!incoming) ...[
               const SizedBox(width: 3),
-              const Icon(
-                VibeIcons.checkAll,
-                size: 13,
-                color: Colors.white70,
-              ),
+              MessageStatusTick(status: status, size: 13),
             ],
           ],
         ),
@@ -987,11 +981,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
             ),
             if (!isIncoming) ...[
               const SizedBox(width: 3),
-              const Icon(
-                VibeIcons.checkAll,
-                size: 13,
-                color: Colors.white70,
-              ),
+              MessageStatusTick(status: widget.msg.status, size: 13),
             ],
           ],
         ),
@@ -1407,7 +1397,7 @@ class _GifBubble extends StatelessWidget {
                     child: Text(
                       time,
                       style: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         color: Colors.white,
                       ),
                     ),
@@ -1484,7 +1474,7 @@ class _FileBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final primary = incoming ? context.vibePrimary : VibeColors.outgoingLink;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1590,7 +1580,7 @@ class _LocationBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final primary = incoming ? context.vibePrimary : VibeColors.outgoingLink;
     final lat = attach.lat.toStringAsFixed(6);
     final lng = attach.lng.toStringAsFixed(6);
     return Column(
@@ -1665,7 +1655,7 @@ class _ContactBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final primary = incoming ? context.vibePrimary : VibeColors.outgoingLink;
     final name = attach.contactName ?? l.messageContactDefault;
     final initial = name.isEmpty ? '?' : name.characters.first;
     return Row(
@@ -1764,7 +1754,7 @@ class _PollBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final primary = incoming ? context.vibePrimary : VibeColors.outgoingLink;
     final options = attach.options;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1846,7 +1836,7 @@ class _PollOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = incoming ? context.vibePrimary : const Color(0xFF8FC8FF);
+    final primary = incoming ? context.vibePrimary : VibeColors.outgoingLink;
     final textColor = incoming ? context.vibeTextPrimary : Colors.white;
     final pct = total == 0
         ? 0.0
