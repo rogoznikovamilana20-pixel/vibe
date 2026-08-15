@@ -1136,6 +1136,104 @@ void main() {
       }
     });
   });
+
+  // ===========================================================================
+  // 20. Spec Verification: kdfRatchet symmetry
+  // ===========================================================================
+
+  group('Spec Verification: kdfRatchet', () {
+    test('kdfRatchet is symmetric: same inputs → same outputs', () async {
+      final rootKey = List<int>.generate(32, (i) => i + 10);
+      final dhOutput = List<int>.generate(32, (i) => i + 20);
+
+      final r1 = await V2Ratchet.kdfRatchet(rootKey, dhOutput);
+      final r2 = await V2Ratchet.kdfRatchet(rootKey, dhOutput);
+
+      expect(r1.rootKey, r2.rootKey);
+      expect(r1.chainKey, r2.chainKey);
+    });
+
+    test('kdfRatchet: different DH → different outputs', () async {
+      final rootKey = List<int>.generate(32, (i) => i + 10);
+      final dh1 = List<int>.generate(32, (i) => i + 20);
+      final dh2 = List<int>.generate(32, (i) => i + 30);
+
+      final r1 = await V2Ratchet.kdfRatchet(rootKey, dh1);
+      final r2 = await V2Ratchet.kdfRatchet(rootKey, dh2);
+
+      expect(r1.rootKey, isNot(r2.rootKey));
+      expect(r1.chainKey, isNot(r2.chainKey));
+    });
+
+    test('kdfRatchet: different root key → different outputs', () async {
+      final dhOutput = List<int>.generate(32, (i) => i + 20);
+      final rk1 = List<int>.generate(32, (i) => i + 10);
+      final rk2 = List<int>.generate(32, (i) => i + 40);
+
+      final r1 = await V2Ratchet.kdfRatchet(rk1, dhOutput);
+      final r2 = await V2Ratchet.kdfRatchet(rk2, dhOutput);
+
+      expect(r1.rootKey, isNot(r2.rootKey));
+      expect(r1.chainKey, isNot(r2.chainKey));
+    });
+
+    test('kdfRatchet: X25519 symmetry produces matching chain keys', () async {
+      final x25519 = Cryptography.instance.x25519();
+
+      final aliceKeyPair = await x25519.newKeyPair();
+      final bobKeyPair = await x25519.newKeyPair();
+
+      final alicePub = await aliceKeyPair.extractPublicKey();
+      final bobPub = await bobKeyPair.extractPublicKey();
+
+      // Alice computes DH with Bob's public key
+      final dhAlice = await x25519.sharedSecretKey(
+        keyPair: aliceKeyPair,
+        remotePublicKey: SimplePublicKey(bobPub.bytes, type: KeyPairType.x25519),
+      );
+      final dhAliceBytes = await dhAlice.extractBytes();
+
+      // Bob computes DH with Alice's public key
+      final dhBob = await x25519.sharedSecretKey(
+        keyPair: bobKeyPair,
+        remotePublicKey: SimplePublicKey(alicePub.bytes, type: KeyPairType.x25519),
+      );
+      final dhBobBytes = await dhBob.extractBytes();
+
+      // X25519 symmetry: DH outputs must be identical
+      expect(dhAliceBytes, dhBobBytes, reason: 'X25519 symmetry violated');
+
+      // kdfRatchet must produce identical results
+      final rootKey = List<int>.generate(32, (i) => i + 10);
+      final rAlice = await V2Ratchet.kdfRatchet(rootKey, dhAliceBytes);
+      final rBob = await V2Ratchet.kdfRatchet(rootKey, dhBobBytes);
+
+      expect(rAlice.rootKey, rBob.rootKey, reason: 'Root key mismatch after kdfRatchet');
+      expect(rAlice.chainKey, rBob.chainKey, reason: 'Chain key mismatch after kdfRatchet');
+    });
+
+    test('kdfRatchet output is 64 bytes (32+32)', () async {
+      final rootKey = List<int>.generate(32, (i) => i + 10);
+      final dhOutput = List<int>.generate(32, (i) => i + 20);
+
+      final r = await V2Ratchet.kdfRatchet(rootKey, dhOutput);
+
+      expect(r.rootKey.length, 32);
+      expect(r.chainKey.length, 32);
+    });
+
+    test('kdfRatchet: chained calls produce different keys', () async {
+      final rootKey = List<int>.generate(32, (i) => i + 10);
+      final dh1 = List<int>.generate(32, (i) => i + 20);
+      final dh2 = List<int>.generate(32, (i) => i + 30);
+
+      final r1 = await V2Ratchet.kdfRatchet(rootKey, dh1);
+      final r2 = await V2Ratchet.kdfRatchet(r1.rootKey, dh2);
+
+      expect(r1.rootKey, isNot(r2.rootKey));
+      expect(r1.chainKey, isNot(r2.chainKey));
+    });
+  });
 }
 
 // =============================================================================

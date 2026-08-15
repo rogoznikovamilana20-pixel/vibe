@@ -351,12 +351,24 @@ The protocol works asynchronously because:
 
 ### 9.1 HKDF Parameters
 
+#### X3DH Initial Derivation
+
 | Parameter | Value |
 |-----------|-------|
 | **Algorithm** | HKDF-SHA256 (RFC 5869) |
 | **Input keying material** | X3DH shared secret (96 bytes) |
 | **Salt** | `"VibeE2EE_v2_session"` (domain separation) |
 | **Info** | `IKa_public \|\| IKb_public` (binding to participants) |
+| **Output length** | 64 bytes |
+
+#### DH Ratchet Step
+
+| Parameter | Value |
+|-----------|-------|
+| **Algorithm** | HKDF-SHA256 (RFC 5869) |
+| **Input keying material** | X25519 DH output (32 bytes) |
+| **Salt** | Current root_key (32 bytes) |
+| **Info** | empty (see §11.4.1 for rationale) |
 | **Output length** | 64 bytes |
 
 ### 9.2 Derived Keys
@@ -378,11 +390,11 @@ chain_key → HMAC-SHA256(chain_key, 0x02) → next_chain_key (32 bytes)
 
 Each derivation context uses a unique `info` string:
 
-| Context | Info String |
-|---------|-------------|
-| X3DH → root key | `IKa \|\| IKb` |
-| DH ratchet step | `ratchet_public_sender \|\| ratchet_public_receiver` |
-| Message key | `chain_key \|\| message_number` |
+| Context | Info String | Rationale |
+|---------|-------------|-----------|
+| X3DH → root key | `IKa \|\| IKb` | Bind to participant identity keys (computed once, symmetric) |
+| DH ratchet step | empty | DH output + root_key salt provide sufficient binding; asymmetric `info` would break key agreement |
+| Message key | `chain_key \|\| message_number` | Bind to chain position |
 
 ---
 
@@ -519,6 +531,29 @@ When a new ratchet public key is received:
    sending_message_number = 0
    previous_sending_chain_length = 0
 ```
+
+#### 11.4.1 KDF DH Ratchet Formula
+
+```
+KDF(root_key, DH):
+
+  HKDF-SHA256(
+    ikm   = DH (32 bytes),
+    salt  = root_key (32 bytes),
+    info  = empty,
+    length = 64
+  )
+
+  → root_key' (32 bytes)   — updated root key
+  → chain_key (32 bytes)   — new sending or receiving chain key
+```
+
+**Why empty `info`:** The DH output `DH(PR_A, PUB_B) == DH(PR_B, PUB_A)` (X25519 symmetry) already binds
+both parties symmetrically. The root key (used as HKDF salt) provides session context and changes each
+ratchet step. Adding public key bytes to `info` creates an asymmetry: the initiator and responder
+would use different `info` values (`[localPub, remotePub]` vs `[remotePub, localPub]`), producing
+different derived keys. Empty `info` eliminates this asymmetry while maintaining security through
+DH binding and salt-based session context.
 
 ### 11.5 Skipped Message Keys
 
