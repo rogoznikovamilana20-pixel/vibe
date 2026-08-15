@@ -32,6 +32,7 @@ class ChatListController extends ChangeNotifier {
   late List<VibeChat> chats = [];
   bool _loading = false;
   bool get loading => _loading;
+  bool _firstLoadDone = false;
 
   // ─── Статусы ───
   final Set<String> selected = {};
@@ -68,11 +69,13 @@ class ChatListController extends ChangeNotifier {
   /// изменениях (новый/выбывший чат, сдвиг порядка, смена превью/статусов).
   /// Идентичная копия (одинаковые id, превью, онлайн-статусы) не вызывает
   /// пересборку списка.
-  void _mergeChats(List<VibeChat> fresh) {
+  /// Returns true if data changed and listeners were notified.
+  bool _mergeChats(List<VibeChat> fresh) {
     fresh.removeWhere((c) => deleted.contains(c.id));
-    if (_sameChats(chats, fresh)) return;
+    if (_sameChats(chats, fresh)) return false;
     chats = fresh;
     notifyListeners();
+    return true;
   }
 
   static bool _sameChats(List<VibeChat> a, List<VibeChat> b) {
@@ -99,6 +102,20 @@ class ChatListController extends ChangeNotifier {
 
   /// Старт: локальные статусы + слушатели + realtime + первая загрузка.
   Future<void> load() async {
+    // Guard: cancel existing subscriptions/timers/listeners if load() called again.
+    _streamSub?.cancel();
+    _chatSub?.cancel();
+    _reloadTimer?.cancel();
+    _ticker?.cancel();
+    _presenceTimer?.cancel();
+    SettingsService.instance.mutedVersion.removeListener(syncMuted);
+    SettingsService.instance.blockedVersion.removeListener(syncBlocked);
+    SettingsService.instance.hiddenVersion.removeListener(syncHidden);
+    SettingsService.instance.deletedVersion.removeListener(syncDeleted);
+    backend.archivedNotifier.removeListener(syncCloudArchive);
+    backend.mutedNotifier.removeListener(syncCloudMuted);
+    backend.presenceVersion.removeListener(onPresenceChanged);
+
     pinned.addAll(SettingsService.instance.pinnedChats);
     dnd
       ..addAll(SettingsService.instance.mutedChats)
@@ -246,7 +263,6 @@ class ChatListController extends ChangeNotifier {
 
   Future<void> loadChats() async {
     _loading = true;
-    notifyListeners();
     // 1. Сначала кэш (мгновенно, как в Telegram) — при первом входе,
     //    чтобы не было пустого экрана при плохой сети.
     if (chats.isEmpty) {
@@ -254,20 +270,23 @@ class ChatListController extends ChangeNotifier {
       cached.removeWhere((c) => deleted.contains(c.id));
       if (cached.isNotEmpty && !_disposed) {
         chats = cached;
-        notifyListeners();
       }
     }
 
     // 2. Затем свежие данные с сервера.
+    var merged = false;
     try {
       final fresh = await backend.listChats();
       if (_disposed) return;
-      _mergeChats(fresh);
+      merged = _mergeChats(fresh);
     } catch (_) {
       // Сеть недоступна — остаёмся на кэше.
     } finally {
       _loading = false;
-      notifyListeners();
+      // _mergeChats already notified if data changed.
+      // On first load, also notify to clear loading indicator.
+      if (!merged && !_firstLoadDone) notifyListeners();
+      _firstLoadDone = true;
     }
   }
 

@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vibe_app/chats/widgets/chat_list_item.dart';
-import 'package:vibe_app/core/theme/vibe_theme.dart';
 import 'package:vibe_app/data/backend.dart';
 import 'package:vibe_app/data/settings_service.dart';
-import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+
+import 'test_helper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -37,13 +37,8 @@ void main() {
   }
 
   Widget wrap(Widget child) {
-    return MaterialApp(
-      theme: VibeTheme.light(),
-      home: Scaffold(
-        body: Center(
-          child: SizedBox(width: 400, child: child),
-        ),
-      ),
+    return wrapWithApp(
+      SizedBox(width: 400, child: child),
     );
   }
 

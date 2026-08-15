@@ -242,7 +242,7 @@ void main() {
       expect(controller.atBottom, isTrue);
     });
 
-    test('typing: peerTyping загорается и гаснет через 4 секунды', () {
+    test('typing: peerTyping загорается и гаснет через 6 секунд', () {
       FakeAsync().run((async) {
         var loaded = false;
         controller.load().then((_) => loaded = true);
@@ -253,7 +253,7 @@ void main() {
         async.flushMicrotasks();
         expect(controller.peerTyping, isTrue);
 
-        async.elapse(const Duration(seconds: 4));
+        async.elapse(const Duration(seconds: 6));
         expect(controller.peerTyping, isFalse);
       });
     });

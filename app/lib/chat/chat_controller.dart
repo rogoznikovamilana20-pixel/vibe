@@ -245,7 +245,7 @@ class ChatController extends ChangeNotifier {
       if (id != chatId || _disposed) return;
       peerTyping = true;
       _typingReset?.cancel();
-      _typingReset = Timer(const Duration(seconds: 4), () {
+      _typingReset = Timer(const Duration(seconds: 6), () {
         if (_disposed) return;
         peerTyping = false;
         notifyListeners();
