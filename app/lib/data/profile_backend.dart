@@ -215,6 +215,9 @@ Future<void> setMyProfile(VibeProfile p) async {
     }
     VibeBackend.instance._dmChannel = null;
 
+    // Clear E2E keys (private from SecureStorage, public from DB).
+    await E2eService.instance.deleteKeys();
+
     // Clear auth state.
     VibeBackend.instance._myProfile = null;
     VibeBackend.instance.myProfileId = null;

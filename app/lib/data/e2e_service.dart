@@ -200,6 +200,7 @@ class E2eService {
   /// Удаляет ключи (при выходе из аккаунта).
   Future<void> deleteKeys() async {
     await _secureStorage.delete(key: 'e2e_private_key');
+    await _secureStorage.delete(key: 'e2e_public_key');
     _keyPair = null;
     _publicKey = null;
 
