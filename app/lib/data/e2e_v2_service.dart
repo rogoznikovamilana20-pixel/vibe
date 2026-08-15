@@ -449,12 +449,7 @@ class E2eV2Service {
       ephemeralPubBytes: ephemeralPub.bytes,
     );
 
-    // 9. Помечаем OTK как использованный (если был)
-    if (bundle.oneTimePrekeyId != null) {
-      await _markPrekeyConsumed(bundle.oneTimePrekeyId!);
-    }
-
-    // 10. Создаём результат
+    // 9. Создаём результат
     final result = X3dhResult(
       sessionId: sessionId,
       rootKey: rootKey,
@@ -475,6 +470,7 @@ class E2eV2Service {
       responderDeviceId: targetDeviceId,
       ephemeralKeyPublic: base64Encode(ephemeralPub.bytes),
       protocolVersion: 2,
+      oneTimePrekeyId: bundle.oneTimePrekeyId,
     );
   }
 
@@ -506,20 +502,40 @@ class E2eV2Service {
     final signedPrekeyPair = SimpleKeyPairData(
       signedPrekeyPrivBytes,
       publicKey: SimplePublicKey(
-        List<int>.filled(32, 0), // placeholder, not needed for DH
+        List<int>.filled(32, 0),
         type: KeyPairType.x25519,
       ),
       type: KeyPairType.x25519,
     );
 
-    // 4. Загружаем OTK (если используется — для простоты пока не извлекаем из message)
-    // В полной реализации OTK ID передаётся в message
+    // 4. Загружаем OTK (если передан в message)
     SimpleKeyPair? otkPair;
+    if (message.oneTimePrekeyId != null) {
+      final otkPrivB64 = await _secureStorage.read(
+        key: 'e2e_v2_otk_${message.oneTimePrekeyId}',
+      );
+      if (otkPrivB64 != null) {
+        final otkPrivBytes = base64Decode(otkPrivB64);
+        otkPair = SimpleKeyPairData(
+          otkPrivBytes,
+          publicKey: SimplePublicKey(
+            List<int>.filled(32, 0),
+            type: KeyPairType.x25519,
+          ),
+          type: KeyPairType.x25519,
+        );
+        // Помечаем OTK как использованный
+        await _secureStorage.delete(
+          key: 'e2e_v2_otk_${message.oneTimePrekeyId}',
+        );
+        await _markPrekeyConsumed(message.oneTimePrekeyId!);
+      }
+    }
 
     // 5. Парсим identity key инициатора (X25519 DH key)
     final initiatorIdentityPubBytes = base64Decode(message.initiatorIdentityKeyPublic);
 
-    // 7. Вычисляем DH операции (зеркальные относительно initiator)
+    // 6. Вычисляем DH операции (зеркальные относительно initiator)
     final dhResults = await _computeX3dhDhResponder(
       myIdentityKey: _xdhIdentityKeyPair!,
       mySignedPrekey: signedPrekeyPair,
@@ -528,13 +544,13 @@ class E2eV2Service {
       initiatorEphemeralKeyPublic: message.ephemeralKeyPublic,
     );
 
-    // 8. Конкатенируем DH результаты
+    // 7. Конкатенируем DH результаты
     final masterSecret = <int>[];
     for (final dh in dhResults) {
       masterSecret.addAll(dh);
     }
 
-    // 9. HKDF → root_key + chain_key (те же параметры что у initiator)
+    // 8. HKDF → root_key + chain_key (те же параметры что у initiator)
     final hkdf = Hkdf(
       hmac: Hmac.sha256(),
       outputLength: _hkdfOutputLength,
@@ -554,7 +570,7 @@ class E2eV2Service {
     final rootKey = derivedBytes.sublist(0, 32);
     final chainKey = derivedBytes.sublist(32, 64);
 
-    // 10. Создаём результат
+    // 9. Создаём результат
     final result = X3dhResult(
       sessionId: message.sessionId,
       rootKey: rootKey,
@@ -832,6 +848,10 @@ class X3dhMessage {
   final String ephemeralKeyPublic;
   final int protocolVersion;
 
+  /// ID одноразового пре-ключа (если использовался при X3DH).
+  /// Responder загружает приватный ключ по этому ID для вычисления DH4.
+  final String? oneTimePrekeyId;
+
   const X3dhMessage({
     required this.sessionId,
     required this.initiatorDeviceId,
@@ -840,6 +860,7 @@ class X3dhMessage {
     required this.responderDeviceId,
     required this.ephemeralKeyPublic,
     required this.protocolVersion,
+    this.oneTimePrekeyId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -850,6 +871,7 @@ class X3dhMessage {
         'responder_device_id': responderDeviceId,
         'ephemeral_key': ephemeralKeyPublic,
         'protocol_version': protocolVersion,
+        if (oneTimePrekeyId != null) 'one_time_prekey_id': oneTimePrekeyId,
       };
 
   factory X3dhMessage.fromJson(Map<String, dynamic> json) => X3dhMessage(
@@ -860,6 +882,7 @@ class X3dhMessage {
         responderDeviceId: json['responder_device_id'] as String,
         ephemeralKeyPublic: json['ephemeral_key'] as String,
         protocolVersion: json['protocol_version'] as int,
+        oneTimePrekeyId: json['one_time_prekey_id'] as String?,
       );
 }
 
