@@ -536,9 +536,10 @@ class V2Ratchet {
       currentState.ratchetStep,
     );
 
-    // 3. Compute AAD
+    // 3. Compute AAD (includes ratchet pub key for step binding)
     final aad = _computeAad(
       senderIdentityKey: identityKeyPublic,
+      senderRatchetPublicKey: ratchetPubBytes,
       senderDeviceId: senderDeviceId,
       recipientDeviceId: recipientDeviceId,
       messageNumber: currentState.sendingMessageNumber,
@@ -723,6 +724,7 @@ class V2Ratchet {
   }) async {
     final aad = _computeAad(
       senderIdentityKey: senderIdentityKey,
+      senderRatchetPublicKey: header.senderRatchetPublicKey,
       senderDeviceId: senderDeviceId,
       recipientDeviceId: recipientDeviceId,
       messageNumber: header.messageNumber,
@@ -823,10 +825,13 @@ class V2Ratchet {
 
   /// Вычисляет AAD.
   ///
-  /// spec §10.3: AD = sender_identity_key || sender_device_id || recipient_device_id || msgNum || prevChainLen
-  /// Identity key binds ciphertext to specific sender — tampering detected by GCM tag.
+  /// spec §10.3: AD = sender_identity_key || sender_ratchet_pub(32)
+  ///     || sender_device_id || recipient_device_id || msgNum || prevChainLen
+  /// sender_ratchet_pub binds ciphertext to specific ratchet step — prevents
+  /// cross-step key reuse if ratchet key is tampered in transit.
   static List<int> _computeAad({
     required List<int> senderIdentityKey,
+    required List<int> senderRatchetPublicKey,
     required String senderDeviceId,
     required String recipientDeviceId,
     required int messageNumber,
@@ -838,6 +843,7 @@ class V2Ratchet {
 
     return [
       ...senderIdentityKey,
+      ...senderRatchetPublicKey,
       ...utf8.encode(senderDeviceId),
       ...utf8.encode(recipientDeviceId),
       ...numBytes.buffer.asUint8List(),
