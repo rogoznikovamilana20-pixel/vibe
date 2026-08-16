@@ -222,6 +222,45 @@ class E2eV2IdentityVerification {
     await storeIdentityKey(peerId, identityKey);
   }
 
+  /// Returns all peer IDs that have trust state stored locally.
+  Future<List<String>> getAllPeerIds() async {
+    final all = await _storage.readAll();
+    final peerIds = <String>{};
+    for (final key in all.keys) {
+      if (key.startsWith(_trustKeyPrefix)) {
+        final peerId = key.substring(_trustKeyPrefix.length);
+        if (peerId.isNotEmpty) {
+          peerIds.add(peerId);
+        }
+      }
+    }
+    return peerIds.toList();
+  }
+
+  /// Transitions all VERIFIED peers to CHANGED after local identity rotation.
+  ///
+  /// Called by rotateIdentity() to ensure that peers who trusted the old
+  /// identity do not silently trust the new one without re-verification.
+  ///
+  /// ## Security Policy
+  ///
+  /// - VERIFIED → CHANGED (requires explicit re-verification)
+  /// - UNKNOWN → UNKNOWN (no change)
+  /// - CHANGED → CHANGED (no change)
+  /// - Server CANNOT trigger this operation.
+  Future<int> transitionAllVerifiedAfterRotation() async {
+    final peerIds = await getAllPeerIds();
+    var changedCount = 0;
+    for (final peerId in peerIds) {
+      final state = await getTrustState(peerId);
+      if (state == IdentityTrustState.verified) {
+        await setTrustState(peerId, IdentityTrustState.changed);
+        changedCount++;
+      }
+    }
+    return changedCount;
+  }
+
   /// Resets trust state for a peer.
   Future<void> resetTrustState(String peerId) async {
     await _storage.delete('$_trustKeyPrefix$peerId');

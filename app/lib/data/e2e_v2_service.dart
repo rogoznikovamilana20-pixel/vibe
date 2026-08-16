@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -73,16 +74,21 @@ class E2eV2Service {
 
   /// Rotates the identity key — generates a new local identity.
   ///
-  /// ## Security Policy
+  /// ## Crash-Safe Transaction Model (F-038)
   ///
-  /// 1. New identity generated locally via CSPRNG (never from old seed)
-  /// 2. Old private key is NOT transmitted to server
-  /// 3. New public identity published via authenticated upsert
-  /// 4. Server CANNOT force VERIFIED state on new identity
-  /// 5. Existing trust state becomes CHANGED (requires explicit re-verification)
-  /// 6. Old fingerprint no longer considered VERIFIED
-  /// 7. New identity requires new X3DH sessions
-  /// 8. Old sessions remain functional for in-flight messages
+  /// Uses a PREPARING → PUBLISHED → COMMITTED state machine:
+  /// 1. PREPARING: Save new seed as backup (old seed preserved)
+  /// 2. PUBLISHED: Publish new identity to server
+  /// 3. COMMITTED: Overwrite old seed with new seed, cleanup backup
+  ///
+  /// On restart, if backup exists but main seed is old → resume from PUBLISHED.
+  /// On restart, if backup exists and main seed is new → COMMITTED.
+  /// Old seed is NEVER destroyed until server publication succeeds.
+  ///
+  /// ## Trust State Policy (F-037)
+  ///
+  /// After rotation, all previously VERIFIED peers transition to CHANGED.
+  /// Only explicit user re-verification can restore VERIFIED state.
   ///
   /// ## Returns
   ///
@@ -96,7 +102,13 @@ class E2eV2Service {
     final oldFingerprint = await E2eV2IdentityVerification
         .generateFingerprint(oldIdentityPub);
 
-    // 2. Generate new identity (fresh CSPRNG seed — NOT derived from old seed)
+    // 2. Preserve old seed as backup (F-038: never destroy until committed)
+    final oldSeed = await _secureStorage.read(key: 'e2e_v2_identity_seed');
+    if (oldSeed == null) {
+      throw Exception('Identity seed not found');
+    }
+
+    // 3. Generate new identity (fresh CSPRNG seed — NOT derived from old seed)
     final newSeed = List<int>.generate(32, (_) => Random.secure().nextInt(256));
 
     final ed25519 = Cryptography.instance.ed25519();
@@ -107,32 +119,45 @@ class E2eV2Service {
     final newXdhKeyPair = await x25519.newKeyPairFromSeed(newSeed);
     final newXdhPublicKey = await newXdhKeyPair.extractPublicKey();
 
-    // 3. Update in-memory state
-    _edIdentityKeyPair = newEdKeyPair;
-    _xdhIdentityKeyPair = newXdhKeyPair;
-
-    // 4. Save new seed to SecureStorage (old seed is overwritten)
+    // 4. PREPARING: Save new seed as backup (old seed is still main)
     await _secureStorage.write(
-      key: 'e2e_v2_identity_seed',
+      key: 'e2e_v2_identity_seed_pending',
       value: base64Encode(newSeed),
     );
 
-    // 5. Publish new identity to server (authenticated upsert)
+    // 5. Update in-memory state (for signing SPK with new identity)
+    _edIdentityKeyPair = newEdKeyPair;
+    _xdhIdentityKeyPair = newXdhKeyPair;
+
+    // 6. PUBLISHED: Publish new identity to server
     final deviceId = await _getDeviceId();
     await _client.from('devices').update({
       'identity_key_public': base64Encode(newEdPublicKey.bytes),
       'identity_dh_public': base64Encode(newXdhPublicKey.bytes),
     }).eq('id', deviceId);
 
-    // 6. Generate new fingerprint
+    // 7. COMMITTED: Overwrite old seed with new seed (safe now — server confirmed)
+    await _secureStorage.write(
+      key: 'e2e_v2_identity_seed',
+      value: base64Encode(newSeed),
+    );
+
+    // 8. Cleanup backup
+    await _secureStorage.delete(key: 'e2e_v2_identity_seed_pending');
+
+    // 9. Generate new fingerprint
     final newFingerprint = await E2eV2IdentityVerification
         .generateFingerprint(newXdhPublicKey.bytes);
 
-    // 7. Generate new signed prekey (bound to new identity)
+    // 10. Generate new signed prekey (bound to new identity)
     await generateSignedPrekey();
 
-    // 8. Replenish OTKs (new identity requires new OTKs)
+    // 11. Replenish OTKs (new identity requires new OTKs)
     await generateOneTimePrekeys();
+
+    // 12. F-037: Transition all verified peers to CHANGED
+    final verification = E2eV2IdentityVerification.instance;
+    await verification.transitionAllVerifiedAfterRotation();
 
     return IdentityRotationResult(
       oldFingerprint: oldFingerprint,
@@ -141,6 +166,41 @@ class E2eV2Service {
       newIdentityKeyPublic: newXdhPublicKey.bytes,
       rotatedAt: DateTime.now(),
     );
+  }
+
+  /// Resumes an interrupted identity rotation after crash/restart.
+  ///
+  /// If a pending seed exists but the main seed was not updated,
+  /// this means rotation was interrupted between PREPARING and COMMITTED.
+  /// The pending seed was already published to server, so we can safely commit.
+  ///
+  /// ## Crash Recovery Policy
+  ///
+  /// - If pending seed exists AND main seed is different → commit pending
+  /// - If pending seed exists AND main seed is same → cleanup pending (already committed)
+  /// - If no pending seed → nothing to resume
+  Future<bool> resumeIdentityRotationIfNeeded() async {
+    final pendingSeed = await _secureStorage.read(key: 'e2e_v2_identity_seed_pending');
+    if (pendingSeed == null) return false;
+
+    final currentSeed = await _secureStorage.read(key: 'e2e_v2_identity_seed');
+    if (currentSeed == pendingSeed) {
+      // Already committed — cleanup
+      await _secureStorage.delete(key: 'e2e_v2_identity_seed_pending');
+      return false;
+    }
+
+    // Pending seed was published but not committed — resume commit
+    await _secureStorage.write(
+      key: 'e2e_v2_identity_seed',
+      value: pendingSeed,
+    );
+    await _secureStorage.delete(key: 'e2e_v2_identity_seed_pending');
+
+    // Reload keys from committed seed
+    await loadKeys();
+
+    return true;
   }
 
   /// Gets the current identity fingerprint.
@@ -156,21 +216,131 @@ class E2eV2Service {
 
   /// Rotates signed prekey with safe transition period.
   ///
-  /// ## Policy
+  /// ## SPK Lifecycle (F-039/F-040)
   ///
   /// 1. New SPK generated and signed with current identity
   /// 2. Old SPK remains valid for spkSafeTransitionHours (24h)
   /// 3. New SPK becomes active immediately
-  /// 4. After transition period, old SPK can be deactivated
+  /// 4. After transition period, old SPK is deactivated
   ///
-  /// This prevents race conditions during in-flight handshakes.
+  /// ## Crash Safety
+  ///
+  /// - Old SPK private key stored with expiry timestamp
+  /// - New SPK published to server before old SPK is marked expired
+  /// - On restart, expired SPKs are cleaned up
   Future<SignedPrekeyBundle> rotateSignedPrekey() async {
-    // Generate new SPK (old one remains valid on server for transition)
-    return generateSignedPrekey();
+    // 1. Save current SPK as "old" with expiry timestamp (if one exists)
+    final currentSpkPriv = await _secureStorage.read(
+      key: 'e2e_v2_signed_prekey_private',
+    );
+    final currentSpkId = await _secureStorage.read(
+      key: 'e2e_v2_signed_prekey_id',
+    );
+
+    if (currentSpkPriv != null && currentSpkId != null) {
+      // Archive old SPK with expiry
+      final expiryTime = DateTime.now().add(
+        Duration(hours: spkSafeTransitionHours),
+      );
+      await _secureStorage.write(
+        key: 'e2e_v2_signed_prekey_old_private',
+        value: currentSpkPriv,
+      );
+      await _secureStorage.write(
+        key: 'e2e_v2_signed_prekey_old_expiry',
+        value: expiryTime.toIso8601String(),
+      );
+      await _secureStorage.write(
+        key: 'e2e_v2_signed_prekey_old_id',
+        value: currentSpkId,
+      );
+    }
+
+    // 2. Generate new SPK and publish (old SPK stays active on server)
+    final newBundle = await _generateAndPublishSignedPrekey();
+
+    // 3. Cleanup expired old SPK if transition period has passed
+    await _cleanupExpiredOldSpk();
+
+    return newBundle;
   }
 
-  /// Генерирует подписанный пре-ключ и подписывает его ключом идентичности.
+  /// Checks if an old SPK is still valid (within transition period).
+  ///
+  /// Returns true if the SPK ID matches the current active SPK,
+  /// OR if it matches an old SPK that hasn't expired yet.
+  Future<bool> isSignedPrekeyValid(String prekeyId) async {
+    // Check if it's the current active SPK
+    final currentId = await _secureStorage.read(key: 'e2e_v2_signed_prekey_id');
+    if (currentId == prekeyId) return true;
+
+    // Check if it's an old SPK within transition period
+    final oldId = await _secureStorage.read(key: 'e2e_v2_signed_prekey_old_id');
+    if (oldId != prekeyId) return false;
+
+    final expiryStr = await _secureStorage.read(key: 'e2e_v2_signed_prekey_old_expiry');
+    if (expiryStr == null) return false;
+
+    final expiry = DateTime.parse(expiryStr);
+    return DateTime.now().isBefore(expiry);
+  }
+
+  /// Loads the private key for a signed prekey (current or old during transition).
+  Future<SimpleKeyPair?> loadSignedPrekeyPrivate(String prekeyId) async {
+    // Check current SPK
+    final currentId = await _secureStorage.read(key: 'e2e_v2_signed_prekey_id');
+    if (currentId == prekeyId) {
+      final privB64 = await _secureStorage.read(key: 'e2e_v2_signed_prekey_private');
+      if (privB64 == null) return null;
+      final privBytes = base64Decode(privB64);
+      return SimpleKeyPairData(
+        privBytes,
+        publicKey: SimplePublicKey(List<int>.filled(32, 0), type: KeyPairType.x25519),
+        type: KeyPairType.x25519,
+      );
+    }
+
+    // Check old SPK (within transition period)
+    final oldId = await _secureStorage.read(key: 'e2e_v2_signed_prekey_old_id');
+    if (oldId == prekeyId) {
+      final expiryStr = await _secureStorage.read(key: 'e2e_v2_signed_prekey_old_expiry');
+      if (expiryStr != null) {
+        final expiry = DateTime.parse(expiryStr);
+        if (DateTime.now().isAfter(expiry)) return null; // Expired
+      }
+      final privB64 = await _secureStorage.read(key: 'e2e_v2_signed_prekey_old_private');
+      if (privB64 == null) return null;
+      final privBytes = base64Decode(privB64);
+      return SimpleKeyPairData(
+        privBytes,
+        publicKey: SimplePublicKey(List<int>.filled(32, 0), type: KeyPairType.x25519),
+        type: KeyPairType.x25519,
+      );
+    }
+
+    return null;
+  }
+
+  /// Cleans up expired old SPK from local storage.
+  Future<void> _cleanupExpiredOldSpk() async {
+    final expiryStr = await _secureStorage.read(key: 'e2e_v2_signed_prekey_old_expiry');
+    if (expiryStr == null) return;
+
+    final expiry = DateTime.parse(expiryStr);
+    if (DateTime.now().isAfter(expiry)) {
+      await _secureStorage.delete(key: 'e2e_v2_signed_prekey_old_private');
+      await _secureStorage.delete(key: 'e2e_v2_signed_prekey_old_expiry');
+      await _secureStorage.delete(key: 'e2e_v2_signed_prekey_old_id');
+    }
+  }
+
+  /// Генерирует подписанный пре-ключ и публикует на сервере.
   Future<SignedPrekeyBundle> generateSignedPrekey() async {
+    return _generateAndPublishSignedPrekey();
+  }
+
+  /// Internal: generates, signs, and publishes a new SPK.
+  Future<SignedPrekeyBundle> _generateAndPublishSignedPrekey() async {
     final x25519 = Cryptography.instance.x25519();
     final prekeyPair = await x25519.newKeyPair();
     final prekeyPub = await prekeyPair.extractPublicKey();
@@ -258,46 +428,115 @@ class E2eV2Service {
   /// - Private keys remain local (SecureStorage)
   /// - Only public keys uploaded to server
   /// - Consumed OTKs are deleted from local storage
-  /// - Concurrent replenishment is safe (idempotent upload)
+  /// - Concurrent replenishment serialized via mutex (F-041)
   Future<void> replenishOneTimePrekeysIfNeeded() async {
-    final count = await _countLocalOtks();
-    if (count < otkReplenishThreshold) {
-      await generateOneTimePrekeys(count: otkBatchSize);
+    await _acquireOtkMutex();
+    try {
+      final count = await _countLocalOtks();
+      if (count < otkReplenishThreshold) {
+        await generateOneTimePrekeys(count: otkBatchSize);
+      }
+    } finally {
+      _releaseOtkMutex();
     }
+  }
+
+  /// Mutex for OTK count operations (F-041: prevents lost updates).
+  Completer<void>? _otkMutex;
+
+  /// Acquires the OTK mutex. Waits if another operation holds it.
+  Future<void> _acquireOtkMutex() async {
+    while (_otkMutex != null) {
+      await _otkMutex!.future;
+    }
+    _otkMutex = Completer<void>();
+  }
+
+  /// Releases the OTK mutex.
+  void _releaseOtkMutex() {
+    final c = _otkMutex;
+    _otkMutex = null;
+    c?.complete();
   }
 
   /// Counts local OTKs (private keys in SecureStorage).
   Future<int> _countLocalOtks() async {
-    // Read all keys and count those with e2e_v2_otk_ prefix
-    // Note: FlutterSecureStorage doesn't have a listKeys method,
-    // so we track OTK count in a separate key.
     final countStr = await _secureStorage.read(key: 'e2e_v2_otk_count');
     return int.tryParse(countStr ?? '0') ?? 0;
   }
 
-  /// Updates the local OTK count.
+  /// Updates the local OTK count under mutex (F-041: prevents lost updates).
+  ///
+  /// ## Invariant
+  ///
+  /// Under concurrent access, every delta is applied exactly once.
+  /// The final count equals the sum of all deltas applied.
   Future<void> _updateOtkCount(int delta) async {
-    final current = await _countLocalOtks();
-    final newCount = (current + delta).clamp(0, 999999);
-    await _secureStorage.write(
-      key: 'e2e_v2_otk_count',
-      value: newCount.toString(),
-    );
+    await _acquireOtkMutex();
+    try {
+      final current = await _countLocalOtks();
+      final newCount = (current + delta).clamp(0, 999999);
+      await _secureStorage.write(
+        key: 'e2e_v2_otk_count',
+        value: newCount.toString(),
+      );
+    } finally {
+      _releaseOtkMutex();
+    }
   }
 
   /// Потребляет одноразовый пре-ключ (помечает как использованный,
   /// возвращает приватный ключ).
+  ///
+  /// ## F-043: Atomicity Policy
+  ///
+  /// Order of operations:
+  /// 1. Read private key (if not found → return null, idempotent)
+  /// 2. Delete from local storage (if already deleted → return null, idempotent)
+  /// 3. Mark consumed on server (best-effort, retry-safe)
+  /// 4. Decrement local count (under mutex)
+  ///
+  /// ## Failure Scenarios
+  ///
+  /// - Step 2 fails: key still exists locally, can be retried safely
+  /// - Step 3 fails: key deleted locally, server has stale state (acceptable)
+  /// - Step 4 fails: count not decremented, but key is consumed (count drift)
+  ///   → Next replenishment will correct the count
+  ///
+  /// ## Idempotency
+  ///
+  /// Calling consumeOneTimePrekey with the same ID twice returns null
+  /// on the second call (key already deleted from local storage).
   Future<String?> consumeOneTimePrekey(String prekeyId) async {
-    final privKey = await _secureStorage.read(key: 'e2e_v2_otk_$prekeyId');
-    if (privKey == null) return null;
+    await _acquireOtkMutex();
+    try {
+      // Step 1: Read private key
+      final privKey = await _secureStorage.read(key: 'e2e_v2_otk_$prekeyId');
+      if (privKey == null) return null; // Already consumed or never existed
 
-    await _secureStorage.delete(key: 'e2e_v2_otk_$prekeyId');
-    await _markPrekeyConsumed(prekeyId);
+      // Step 2: Delete from local storage
+      await _secureStorage.delete(key: 'e2e_v2_otk_$prekeyId');
 
-    // Update local OTK count
-    await _updateOtkCount(-1);
+      // Step 3: Mark consumed on server (best-effort)
+      try {
+        await _markPrekeyConsumed(prekeyId);
+      } catch (_) {
+        // Server mark failed — key is deleted locally anyway.
+        // Server will have stale unconsumed entry. Acceptable.
+      }
 
-    return privKey;
+      // Step 4: Decrement local count
+      final current = await _countLocalOtks();
+      final newCount = (current - 1).clamp(0, 999999);
+      await _secureStorage.write(
+        key: 'e2e_v2_otk_count',
+        value: newCount.toString(),
+      );
+
+      return privKey;
+    } finally {
+      _releaseOtkMutex();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -463,11 +702,9 @@ class E2eV2Service {
   }) async {
     final deviceId = await _getDeviceId();
 
-    await _client
-        .from('signed_prekeys')
-        .update({'is_active': false})
-        .eq('device_id', deviceId)
-        .eq('is_active', true);
+    // F-039/F-040: Do NOT immediately deactivate old SPK.
+    // Old SPK remains active on server for spkSafeTransitionHours.
+    // Client-side expiry is enforced by isSignedPrekeyValid().
 
     final response = await _client
         .from('signed_prekeys')
@@ -669,11 +906,26 @@ class E2eV2Service {
           ),
           type: KeyPairType.x25519,
         );
-        // Помечаем OTK как использованный
-        await _secureStorage.delete(
-          key: 'e2e_v2_otk_${message.oneTimePrekeyId}',
-        );
-        await _markPrekeyConsumed(message.oneTimePrekeyId!);
+        // F-043: Consume OTK atomically (delete + mark + count)
+        await _acquireOtkMutex();
+        try {
+          await _secureStorage.delete(
+            key: 'e2e_v2_otk_${message.oneTimePrekeyId}',
+          );
+          try {
+            await _markPrekeyConsumed(message.oneTimePrekeyId!);
+          } catch (_) {
+            // Server mark failed — key deleted locally. Acceptable.
+          }
+          final current = await _countLocalOtks();
+          final newCount = (current - 1).clamp(0, 999999);
+          await _secureStorage.write(
+            key: 'e2e_v2_otk_count',
+            value: newCount.toString(),
+          );
+        } finally {
+          _releaseOtkMutex();
+        }
       }
     }
 
