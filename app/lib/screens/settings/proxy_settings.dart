@@ -35,8 +35,14 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
     _host = s.proxyHost;
     _port = s.proxyPort;
     _username = s.proxyUsername;
-    _password = s.proxyPassword;
+    _password = '';
     _socks5 = s.proxySocks5;
+    _loadPassword();
+  }
+
+  Future<void> _loadPassword() async {
+    final pw = await SettingsService.instance.proxyPassword();
+    if (mounted) setState(() => _password = pw);
   }
 
   @override

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'backend.dart';
@@ -13,6 +14,7 @@ class SettingsService {
   static final instance = SettingsService._();
 
   late SharedPreferences _prefs;
+  final _secureStorage = const FlutterSecureStorage();
 
   // 3.7: зеркало приватности — локальный кеш остаётся главным,
   // облако — best-effort (как закрепы): при изменении пишем целиком,
@@ -92,6 +94,17 @@ class SettingsService {
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     bio.value = _prefs.getString(_keyBio) ?? '';
+    await _migrateProxyPassword();
+  }
+
+  /// One-time migration: move proxy password from SharedPreferences to SecureStorage.
+  /// F-049: proxy password must not be stored in plaintext SharedPreferences.
+  Future<void> _migrateProxyPassword() async {
+    final legacyValue = _prefs.getString(_keyProxyPassword);
+    if (legacyValue != null && legacyValue.isNotEmpty) {
+      await _secureStorage.write(key: _keyProxyPassword, value: legacyValue);
+      await _prefs.remove(_keyProxyPassword);
+    }
   }
 
   // Тема
@@ -603,14 +616,17 @@ class SettingsService {
   String get proxyHost => _prefs.getString(_keyProxyHost) ?? '';
   int get proxyPort => _prefs.getInt(_keyProxyPort) ?? 0;
   String get proxyUsername => _prefs.getString(_keyProxyUsername) ?? '';
-  String get proxyPassword => _prefs.getString(_keyProxyPassword) ?? '';
   bool get proxySocks5 => _prefs.getBool(_keyProxySocks5) ?? true;
+
+  Future<String> proxyPassword() async =>
+      await _secureStorage.read(key: _keyProxyPassword) ?? '';
 
   Future<void> setProxyEnabled(bool v) async => _prefs.setBool(_keyProxyEnabled, v);
   Future<void> setProxyHost(String v) async => _prefs.setString(_keyProxyHost, v);
   Future<void> setProxyPort(int v) async => _prefs.setInt(_keyProxyPort, v);
   Future<void> setProxyUsername(String v) async => _prefs.setString(_keyProxyUsername, v);
-  Future<void> setProxyPassword(String v) async => _prefs.setString(_keyProxyPassword, v);
+  Future<void> setProxyPassword(String v) async =>
+      await _secureStorage.write(key: _keyProxyPassword, value: v);
   Future<void> setProxySocks5(bool v) async => _prefs.setBool(_keyProxySocks5, v);
 
   // ── Сброс всех настроек ──
