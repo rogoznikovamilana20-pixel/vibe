@@ -3,7 +3,7 @@
 // Умеет принимать:
 //   1) Запрос самого приложения: POST /send-push { recipientId, title, body, data? }
 //   2) Payload pg_net/http-вебхука: { record: <строка из messages|stories> }
-//      - messages: record.chat_id, sender_id, text | photo_url | voice_url
+//      - messages: record.chat_id, sender_id, text | photo_url | voice_url, e2ee_version
 //      - stories : record.profile_id, photo_url
 //
 // Деплой:  supabase functions deploy send-push
@@ -22,6 +22,7 @@ type VibeRecord = {
   text?: string;
   photo_url?: string;
   voice_url?: string;
+  e2ee_version?: number | null;
 };
 
 interface Payload {
@@ -40,10 +41,30 @@ const supabase = createClient(
 const BRAND_COLOR = "#8B5CF6";
 const SMALL_ICON = "ic_stat_vibe";
 
-function previews(body?: string, photo?: string, voice?: string): string {
+/**
+ * Builds notification preview text.
+ *
+ * SECURITY: For E2EE V2 (e2ee_version >= 2), NEVER use `body` (plaintext).
+ * V2 plaintext must never appear in push notifications, even if present
+ * in the database due to a bug. This is fail-closed defense-in-depth.
+ */
+function previews(
+  body: string | undefined,
+  photo: string | undefined,
+  voice: string | undefined,
+  e2eeVersion?: number | null,
+): string {
+  // V2 fail-closed: never use plaintext for notification content
+  if (e2eeVersion != null && e2eeVersion >= 2) {
+    if (photo) return "[Фото]";
+    if (voice) return "[Голосовое]";
+    return "Новое сообщение";
+  }
+
+  // V1 / plaintext: existing behavior
   if (body && body.trim().length > 0) return body.trim().slice(0, 80);
-  if (photo) return "📷 Фото";
-  if (voice) return "🎤 Голосовое";
+  if (photo) return "[Фото]";
+  if (voice) return "[Голосовое]";
   return "Новое сообщение";
 }
 
@@ -215,7 +236,7 @@ serve(async (req) => {
         .eq("id", rec.sender_id ?? "")
         .maybeSingle();
       const title = sender?.display_name || sender?.username || "Vibe";
-      const body = previews(rec.text, rec.photo_url, rec.voice_url);
+      const body = previews(rec.text, rec.photo_url, rec.voice_url, rec.e2ee_version);
 
       const token = (await tokensOf([recipientId])).get(recipientId);
       if (!token) return new Response("no token", { status: 200 });
