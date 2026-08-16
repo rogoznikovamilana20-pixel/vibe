@@ -50,6 +50,9 @@ class V2MediaCrypto {
   /// GCM tag size: 16 bytes.
   static const int tagSize = 16;
 
+  /// HMAC-SHA256 size: 32 bytes.
+  static const int hmacSize = 32;
+
   /// Maximum total chunks per media object (F-026).
   static const int maxTotalChunks = 100000;
 
@@ -382,6 +385,9 @@ class V2MediaCrypto {
     required List<int> aad,
     required List<int> nonce,
   }) async {
+    if (ciphertext.length < tagSize) {
+      throw const V2MediaException('Ciphertext too short — missing GCM tag');
+    }
     final aesGcm = AesGcm.with256bits(nonceLength: nonceSize);
     final secretBox = SecretBox(
       ciphertext.sublist(0, ciphertext.length - tagSize),

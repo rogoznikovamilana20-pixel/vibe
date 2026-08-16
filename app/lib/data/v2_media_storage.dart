@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cryptography/cryptography.dart';
-
 import 'package:vibe_app/data/v2_media_crypto.dart';
 
 /// V2 encrypted media manifest.
@@ -154,18 +152,12 @@ class V2MediaManifest {
     );
   }
 
-  /// Serializes manifest to bytes for hashing.
+  /// Serializes manifest to bytes for hashing (excludes hmac field).
+  ///
+  /// WARNING: This method must NOT be called on a manifest that already
+  /// has manifestHmac set — it would include the hmac in its own input.
+  /// Use V2MediaCrypto.computeManifestHmac() instead.
   List<int> toBytes() => utf8.encode(jsonEncode(toJson()));
-
-  /// Computes HMAC-SHA256 of manifest for authentication.
-  Future<List<int>> computeHash(List<int> authKey) async {
-    final hmac = Hmac.sha256();
-    final mac = await hmac.calculateMac(
-      toBytes(),
-      secretKey: SecretKey(authKey),
-    );
-    return mac.bytes;
-  }
 
   /// Serializes manifest to JSON string for storage.
   String encode() => jsonEncode(toJson());

@@ -121,38 +121,43 @@ class V2MediaIncoming {
       throw const V2MediaException('Sender device ID not found in session');
     }
 
-    // 5a. Verify manifest HMAC (F-025)
-    if (manifest.manifestHmac.isNotEmpty) {
-      // Re-serialize manifest without HMAC for verification
-      final manifestForVerification = V2MediaManifest(
-        version: manifest.version,
-        mediaId: manifest.mediaId,
-        mediaType: manifest.mediaType,
-        mimeType: manifest.mimeType,
-        originalSize: manifest.originalSize,
-        encryptedSize: manifest.encryptedSize,
-        totalChunks: manifest.totalChunks,
-        chunkSize: manifest.chunkSize,
-        wrappedKey: manifest.wrappedKey,
-        wrappedKeyNonce: manifest.wrappedKeyNonce,
-        encryptedFilename: manifest.encryptedFilename,
-        filenameNonce: manifest.filenameNonce,
-        encryptedCaption: manifest.encryptedCaption,
-        captionNonce: manifest.captionNonce,
-        thumbnailMediaId: manifest.thumbnailMediaId,
-        width: manifest.width,
-        height: manifest.height,
-        duration: manifest.duration,
-      );
-      final manifestBytes = manifestForVerification.toBytes();
-      final valid = await V2MediaCrypto.verifyManifestHmac(
-        manifestBytes: manifestBytes,
-        senderIdentityKey: identityKeyPublic,
-        expectedHmac: manifest.manifestHmac,
-      );
-      if (!valid) {
-        throw const V2MediaException('Manifest HMAC verification failed');
-      }
+    // 5a. Verify manifest HMAC (MANDATORY for V2 — F-025, F-033)
+    // V2 media is new; there is no legacy unsigned V2 media.
+    // An attacker who strips the HMAC field must be rejected.
+    if (manifest.manifestHmac.isEmpty ||
+        manifest.manifestHmac.length != V2MediaCrypto.hmacSize) {
+      throw const V2MediaException(
+          'V2 manifest HMAC missing or malformed — rejecting');
+    }
+    // Re-serialize manifest without HMAC for verification
+    final manifestForVerification = V2MediaManifest(
+      version: manifest.version,
+      mediaId: manifest.mediaId,
+      mediaType: manifest.mediaType,
+      mimeType: manifest.mimeType,
+      originalSize: manifest.originalSize,
+      encryptedSize: manifest.encryptedSize,
+      totalChunks: manifest.totalChunks,
+      chunkSize: manifest.chunkSize,
+      wrappedKey: manifest.wrappedKey,
+      wrappedKeyNonce: manifest.wrappedKeyNonce,
+      encryptedFilename: manifest.encryptedFilename,
+      filenameNonce: manifest.filenameNonce,
+      encryptedCaption: manifest.encryptedCaption,
+      captionNonce: manifest.captionNonce,
+      thumbnailMediaId: manifest.thumbnailMediaId,
+      width: manifest.width,
+      height: manifest.height,
+      duration: manifest.duration,
+    );
+    final manifestBytes = manifestForVerification.toBytes();
+    final valid = await V2MediaCrypto.verifyManifestHmac(
+      manifestBytes: manifestBytes,
+      senderIdentityKey: identityKeyPublic,
+      expectedHmac: manifest.manifestHmac,
+    );
+    if (!valid) {
+      throw const V2MediaException('Manifest HMAC verification failed');
     }
 
     // 6. Download and decrypt chunks
@@ -243,7 +248,7 @@ class V2MediaIncoming {
         aad: fnAad,
         nonce: manifest.filenameNonce,
       );
-      filename = String.fromCharCodes(fnBytes);
+      filename = utf8.decode(fnBytes);
     }
 
     // 10. Decrypt caption if present
@@ -265,7 +270,7 @@ class V2MediaIncoming {
         aad: capAad,
         nonce: manifest.captionNonce,
       );
-      caption = String.fromCharCodes(capBytes);
+      caption = utf8.decode(capBytes);
     }
 
     return V2MediaDecryptResult(
