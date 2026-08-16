@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -173,7 +174,7 @@ class V2MediaOutgoing {
         mimeType: mimeType,
       );
       final fnResult = await V2MediaCrypto.encryptChunk(
-        plaintext: filename.codeUnits,
+        plaintext: utf8.encode(filename),
         mediaKey: mediaKey,
         aad: fnAad,
         nonce: fnNonce,
@@ -198,7 +199,7 @@ class V2MediaOutgoing {
         mimeType: mimeType,
       );
       final capResult = await V2MediaCrypto.encryptChunk(
-        plaintext: caption.codeUnits,
+        plaintext: utf8.encode(caption),
         mediaKey: mediaKey,
         aad: capAad,
         nonce: capNonce,
@@ -218,8 +219,8 @@ class V2MediaOutgoing {
     final encryptedSize = encryptedChunks.fold(
         0, (sum, c) => sum + 4 + V2MediaCrypto.nonceSize + c.ciphertext.length);
 
-    // 13. Build manifest
-    final manifest = V2MediaManifest(
+    // 13. Build manifest (without HMAC first)
+    final manifestWithoutHmac = V2MediaManifest(
       version: 2,
       mediaId: mediaId,
       mediaType: mediaType,
@@ -240,7 +241,37 @@ class V2MediaOutgoing {
       duration: duration,
     );
 
-    // 14. Upload manifest + chunks to storage
+    // 14. Compute manifest HMAC
+    final manifestBytes = manifestWithoutHmac.toBytes();
+    final manifestHmac = await V2MediaCrypto.computeManifestHmac(
+      manifestBytes: manifestBytes,
+      senderIdentityKey: identityKeyPublic,
+    );
+
+    // 15. Build final manifest with HMAC
+    final manifest = V2MediaManifest(
+      version: manifestWithoutHmac.version,
+      mediaId: manifestWithoutHmac.mediaId,
+      mediaType: manifestWithoutHmac.mediaType,
+      mimeType: manifestWithoutHmac.mimeType,
+      originalSize: manifestWithoutHmac.originalSize,
+      encryptedSize: manifestWithoutHmac.encryptedSize,
+      totalChunks: manifestWithoutHmac.totalChunks,
+      chunkSize: manifestWithoutHmac.chunkSize,
+      wrappedKey: manifestWithoutHmac.wrappedKey,
+      wrappedKeyNonce: manifestWithoutHmac.wrappedKeyNonce,
+      encryptedFilename: manifestWithoutHmac.encryptedFilename,
+      filenameNonce: manifestWithoutHmac.filenameNonce,
+      encryptedCaption: manifestWithoutHmac.encryptedCaption,
+      captionNonce: manifestWithoutHmac.captionNonce,
+      thumbnailMediaId: manifestWithoutHmac.thumbnailMediaId,
+      width: manifestWithoutHmac.width,
+      height: manifestWithoutHmac.height,
+      duration: manifestWithoutHmac.duration,
+      manifestHmac: manifestHmac,
+    );
+
+    // 16. Upload manifest + chunks to storage
     final mediaIdHex = V2MediaCrypto.mediaIdToHex(mediaId);
     final basePath = 'media-v2/$mediaIdHex';
     final manifestPath = '$basePath/manifest.json';

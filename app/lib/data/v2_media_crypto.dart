@@ -50,6 +50,21 @@ class V2MediaCrypto {
   /// GCM tag size: 16 bytes.
   static const int tagSize = 16;
 
+  /// Maximum total chunks per media object (F-026).
+  static const int maxTotalChunks = 100000;
+
+  /// Maximum original file size: 10 GiB (F-030).
+  static const int maxOriginalSize = 10 * 1024 * 1024 * 1024;
+
+  /// Maximum encrypted file size: 10 GiB + 10% overhead (F-030).
+  static const int maxEncryptedSize = 11811160064;
+
+  /// Maximum manifest JSON size: 1 MiB (F-027).
+  static const int maxManifestSize = 1024 * 1024;
+
+  /// Domain label for manifest HMAC.
+  static const String _manifestHmacDomain = 'VIBE-MEDIA-MANIFEST-HMAC-V1';
+
   // ==========================================================================
   // Key Generation
   // ==========================================================================
@@ -472,6 +487,57 @@ class V2MediaCrypto {
       (value >> 8) & 0xFF,
       value & 0xFF,
     ];
+  }
+
+  // ==========================================================================
+  // Manifest HMAC
+  // ==========================================================================
+
+  /// Computes HMAC-SHA256 of manifest for authentication.
+  ///
+  /// Uses sender's identity key as HMAC key with domain separation.
+  /// This binds the manifest to the sender and prevents server-side tampering.
+  ///
+  /// [manifestBytes] — serialized manifest JSON bytes.
+  /// [senderIdentityKey] — sender's 32-byte public identity key.
+  ///
+  /// Returns 32-byte HMAC.
+  static Future<List<int>> computeManifestHmac({
+    required List<int> manifestBytes,
+    required List<int> senderIdentityKey,
+  }) async {
+    final hmac = Hmac.sha256();
+    final key = SecretKey([
+      ...senderIdentityKey,
+      ...utf8.encode(_manifestHmacDomain),
+    ]);
+    final mac = await hmac.calculateMac(manifestBytes, secretKey: key);
+    return mac.bytes;
+  }
+
+  /// Verifies HMAC of manifest.
+  ///
+  /// [manifestBytes] — serialized manifest JSON bytes.
+  /// [senderIdentityKey] — sender's 32-byte public identity key.
+  /// [expectedHmac] — expected HMAC value (32 bytes).
+  ///
+  /// Returns true if HMAC is valid.
+  static Future<bool> verifyManifestHmac({
+    required List<int> manifestBytes,
+    required List<int> senderIdentityKey,
+    required List<int> expectedHmac,
+  }) async {
+    final computed = await computeManifestHmac(
+      manifestBytes: manifestBytes,
+      senderIdentityKey: senderIdentityKey,
+    );
+    if (computed.length != expectedHmac.length) return false;
+    // Constant-time comparison
+    var diff = 0;
+    for (var i = 0; i < computed.length; i++) {
+      diff |= computed[i] ^ expectedHmac[i];
+    }
+    return diff == 0;
   }
 }
 

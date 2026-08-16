@@ -59,8 +59,28 @@ class V2MediaIncoming {
     // 1. Download manifest
     final manifestData =
         await client.storage.from('avatars').download(manifestPath);
+
+    // 1a. Validate manifest size (F-027)
+    if (manifestData.length > V2MediaCrypto.maxManifestSize) {
+      throw const V2MediaException('Manifest too large');
+    }
+
     final manifestJson = utf8.decode(manifestData);
     final manifest = V2MediaManifest.decode(manifestJson);
+
+    // 1b. Validate manifest fields (F-026, F-030)
+    if (manifest.totalChunks < 1 || manifest.totalChunks > V2MediaCrypto.maxTotalChunks) {
+      throw V2MediaException(
+          'Invalid chunk count: ${manifest.totalChunks}');
+    }
+    if (manifest.originalSize < 1 || manifest.originalSize > V2MediaCrypto.maxOriginalSize) {
+      throw V2MediaException(
+          'Invalid original size: ${manifest.originalSize}');
+    }
+    if (manifest.encryptedSize < 1 || manifest.encryptedSize > V2MediaCrypto.maxEncryptedSize) {
+      throw V2MediaException(
+          'Invalid encrypted size: ${manifest.encryptedSize}');
+    }
 
     // 2. Resolve session
     final resolved = await _resolveSession(senderId: senderId);
@@ -99,6 +119,40 @@ class V2MediaIncoming {
     final senderDeviceId = await _resolveSenderDeviceId(sessionId);
     if (senderDeviceId == null) {
       throw const V2MediaException('Sender device ID not found in session');
+    }
+
+    // 5a. Verify manifest HMAC (F-025)
+    if (manifest.manifestHmac.isNotEmpty) {
+      // Re-serialize manifest without HMAC for verification
+      final manifestForVerification = V2MediaManifest(
+        version: manifest.version,
+        mediaId: manifest.mediaId,
+        mediaType: manifest.mediaType,
+        mimeType: manifest.mimeType,
+        originalSize: manifest.originalSize,
+        encryptedSize: manifest.encryptedSize,
+        totalChunks: manifest.totalChunks,
+        chunkSize: manifest.chunkSize,
+        wrappedKey: manifest.wrappedKey,
+        wrappedKeyNonce: manifest.wrappedKeyNonce,
+        encryptedFilename: manifest.encryptedFilename,
+        filenameNonce: manifest.filenameNonce,
+        encryptedCaption: manifest.encryptedCaption,
+        captionNonce: manifest.captionNonce,
+        thumbnailMediaId: manifest.thumbnailMediaId,
+        width: manifest.width,
+        height: manifest.height,
+        duration: manifest.duration,
+      );
+      final manifestBytes = manifestForVerification.toBytes();
+      final valid = await V2MediaCrypto.verifyManifestHmac(
+        manifestBytes: manifestBytes,
+        senderIdentityKey: identityKeyPublic,
+        expectedHmac: manifest.manifestHmac,
+      );
+      if (!valid) {
+        throw const V2MediaException('Manifest HMAC verification failed');
+      }
     }
 
     // 6. Download and decrypt chunks

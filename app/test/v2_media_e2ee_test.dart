@@ -977,4 +977,272 @@ void main() {
       expect(chunk.serializedSize, 4 + 12 + 100);
     });
   });
+
+  // ===========================================================================
+  // 11. MANIFEST HMAC (Phase 12E.4)
+  // ===========================================================================
+
+  group('11. Manifest HMAC', () {
+    test('H1: computeManifestHmac returns 32 bytes', () async {
+      final key = await V2MediaCrypto.generateMediaKey();
+      final manifest = V2MediaManifest(
+        version: 2,
+        mediaId: List<int>.filled(16, 0x01),
+        mediaType: V2MediaType.photo,
+        mimeType: 'image/jpeg',
+        originalSize: 1024,
+        encryptedSize: 1040,
+        totalChunks: 1,
+        chunkSize: V2MediaCrypto.chunkSize,
+        wrappedKey: List<int>.filled(48, 0x02),
+        wrappedKeyNonce: List<int>.filled(12, 0x03),
+      );
+      final hmac = await V2MediaCrypto.computeManifestHmac(
+        manifestBytes: manifest.toBytes(),
+        senderIdentityKey: key,
+      );
+      expect(hmac.length, 32);
+    });
+
+    test('H2: verifyManifestHmac returns true for valid HMAC', () async {
+      final key = await V2MediaCrypto.generateMediaKey();
+      final manifest = V2MediaManifest(
+        version: 2,
+        mediaId: List<int>.filled(16, 0x01),
+        mediaType: V2MediaType.photo,
+        mimeType: 'image/jpeg',
+        originalSize: 1024,
+        encryptedSize: 1040,
+        totalChunks: 1,
+        chunkSize: V2MediaCrypto.chunkSize,
+        wrappedKey: List<int>.filled(48, 0x02),
+        wrappedKeyNonce: List<int>.filled(12, 0x03),
+      );
+      final hmac = await V2MediaCrypto.computeManifestHmac(
+        manifestBytes: manifest.toBytes(),
+        senderIdentityKey: key,
+      );
+      final valid = await V2MediaCrypto.verifyManifestHmac(
+        manifestBytes: manifest.toBytes(),
+        senderIdentityKey: key,
+        expectedHmac: hmac,
+      );
+      expect(valid, isTrue);
+    });
+
+    test('H3: verifyManifestHmac returns false for wrong key', () async {
+      final key1 = await V2MediaCrypto.generateMediaKey();
+      final key2 = await V2MediaCrypto.generateMediaKey();
+      final manifest = V2MediaManifest(
+        version: 2,
+        mediaId: List<int>.filled(16, 0x01),
+        mediaType: V2MediaType.photo,
+        mimeType: 'image/jpeg',
+        originalSize: 1024,
+        encryptedSize: 1040,
+        totalChunks: 1,
+        chunkSize: V2MediaCrypto.chunkSize,
+        wrappedKey: List<int>.filled(48, 0x02),
+        wrappedKeyNonce: List<int>.filled(12, 0x03),
+      );
+      final hmac = await V2MediaCrypto.computeManifestHmac(
+        manifestBytes: manifest.toBytes(),
+        senderIdentityKey: key1,
+      );
+      final valid = await V2MediaCrypto.verifyManifestHmac(
+        manifestBytes: manifest.toBytes(),
+        senderIdentityKey: key2,
+        expectedHmac: hmac,
+      );
+      expect(valid, isFalse);
+    });
+
+    test('H4: verifyManifestHmac returns false for tampered manifest', () async {
+      final key = await V2MediaCrypto.generateMediaKey();
+      final manifest1 = V2MediaManifest(
+        version: 2,
+        mediaId: List<int>.filled(16, 0x01),
+        mediaType: V2MediaType.photo,
+        mimeType: 'image/jpeg',
+        originalSize: 1024,
+        encryptedSize: 1040,
+        totalChunks: 1,
+        chunkSize: V2MediaCrypto.chunkSize,
+        wrappedKey: List<int>.filled(48, 0x02),
+        wrappedKeyNonce: List<int>.filled(12, 0x03),
+      );
+      final manifest2 = V2MediaManifest(
+        version: 2,
+        mediaId: List<int>.filled(16, 0x01),
+        mediaType: V2MediaType.photo,
+        mimeType: 'image/jpeg',
+        originalSize: 9999, // Tampered
+        encryptedSize: 1040,
+        totalChunks: 1,
+        chunkSize: V2MediaCrypto.chunkSize,
+        wrappedKey: List<int>.filled(48, 0x02),
+        wrappedKeyNonce: List<int>.filled(12, 0x03),
+      );
+      final hmac = await V2MediaCrypto.computeManifestHmac(
+        manifestBytes: manifest1.toBytes(),
+        senderIdentityKey: key,
+      );
+      final valid = await V2MediaCrypto.verifyManifestHmac(
+        manifestBytes: manifest2.toBytes(),
+        senderIdentityKey: key,
+        expectedHmac: hmac,
+      );
+      expect(valid, isFalse);
+    });
+
+    test('H5: Manifest JSON includes hmac field', () {
+      final manifest = V2MediaManifest(
+        version: 2,
+        mediaId: List<int>.filled(16, 0x01),
+        mediaType: V2MediaType.photo,
+        mimeType: 'image/jpeg',
+        originalSize: 1024,
+        encryptedSize: 1040,
+        totalChunks: 1,
+        chunkSize: V2MediaCrypto.chunkSize,
+        wrappedKey: List<int>.filled(48, 0x02),
+        wrappedKeyNonce: List<int>.filled(12, 0x03),
+        manifestHmac: List<int>.filled(32, 0xFF),
+      );
+      final json = manifest.toJson();
+      expect(json.containsKey('hmac'), isTrue);
+      final restored = V2MediaManifest.fromJson(json);
+      expect(restored.manifestHmac, equals(manifest.manifestHmac));
+    });
+  });
+
+  // ===========================================================================
+  // 12. VALIDATION BOUNDS (Phase 12E.4)
+  // ===========================================================================
+
+  group('12. Validation Bounds', () {
+    test('V1: maxTotalChunks constant is defined', () {
+      expect(V2MediaCrypto.maxTotalChunks, 100000);
+    });
+
+    test('V2: maxOriginalSize constant is defined', () {
+      expect(V2MediaCrypto.maxOriginalSize, 10 * 1024 * 1024 * 1024);
+    });
+
+    test('V3: maxEncryptedSize constant is defined', () {
+      expect(V2MediaCrypto.maxEncryptedSize, greaterThan(V2MediaCrypto.maxOriginalSize));
+    });
+
+    test('V4: maxManifestSize constant is defined', () {
+      expect(V2MediaCrypto.maxManifestSize, 1024 * 1024);
+    });
+  });
+
+  // ===========================================================================
+  // 13. UTF-8 ENCODING (Phase 12E.4)
+  // ===========================================================================
+
+  group('13. UTF-8 Encoding', () {
+    test('U1: UTF-8 encoding handles Cyrillic characters', () async {
+      final key = await V2MediaCrypto.generateMediaKey();
+      final mediaId = await V2MediaCrypto.generateMediaId();
+      final text = 'Привет мир';
+      final plaintext = utf8.encode(text);
+      final aad = V2MediaCrypto.buildChunkAad(
+        senderIdentityKey: List<int>.filled(32, 0xAA),
+        senderDeviceId: 'd1',
+        recipientDeviceId: 'd2',
+        mediaId: mediaId,
+        chunkIndex: 0,
+        totalChunks: 1,
+        mediaType: V2MediaType.file,
+        mimeType: 'text/plain',
+      );
+      final nonce = V2MediaCrypto.deriveChunkNonce(mediaId, 0);
+
+      final encrypted = await V2MediaCrypto.encryptChunk(
+        plaintext: plaintext,
+        mediaKey: key,
+        aad: aad,
+        nonce: nonce,
+      );
+
+      final decrypted = await V2MediaCrypto.decryptChunk(
+        ciphertext: encrypted.ciphertext,
+        mediaKey: key,
+        aad: aad,
+        nonce: nonce,
+      );
+
+      expect(utf8.decode(decrypted), text);
+    });
+
+    test('U2: UTF-8 encoding handles emoji', () async {
+      final key = await V2MediaCrypto.generateMediaKey();
+      final mediaId = await V2MediaCrypto.generateMediaId();
+      final text = 'Hello 🌍🎉';
+      final plaintext = utf8.encode(text);
+      final aad = V2MediaCrypto.buildChunkAad(
+        senderIdentityKey: List<int>.filled(32, 0xAA),
+        senderDeviceId: 'd1',
+        recipientDeviceId: 'd2',
+        mediaId: mediaId,
+        chunkIndex: 0,
+        totalChunks: 1,
+        mediaType: V2MediaType.file,
+        mimeType: 'text/plain',
+      );
+      final nonce = V2MediaCrypto.deriveChunkNonce(mediaId, 0);
+
+      final encrypted = await V2MediaCrypto.encryptChunk(
+        plaintext: plaintext,
+        mediaKey: key,
+        aad: aad,
+        nonce: nonce,
+      );
+
+      final decrypted = await V2MediaCrypto.decryptChunk(
+        ciphertext: encrypted.ciphertext,
+        mediaKey: key,
+        aad: aad,
+        nonce: nonce,
+      );
+
+      expect(utf8.decode(decrypted), text);
+    });
+
+    test('U3: UTF-8 encoding handles Chinese characters', () async {
+      final key = await V2MediaCrypto.generateMediaKey();
+      final mediaId = await V2MediaCrypto.generateMediaId();
+      final text = '你好世界';
+      final plaintext = utf8.encode(text);
+      final aad = V2MediaCrypto.buildChunkAad(
+        senderIdentityKey: List<int>.filled(32, 0xAA),
+        senderDeviceId: 'd1',
+        recipientDeviceId: 'd2',
+        mediaId: mediaId,
+        chunkIndex: 0,
+        totalChunks: 1,
+        mediaType: V2MediaType.file,
+        mimeType: 'text/plain',
+      );
+      final nonce = V2MediaCrypto.deriveChunkNonce(mediaId, 0);
+
+      final encrypted = await V2MediaCrypto.encryptChunk(
+        plaintext: plaintext,
+        mediaKey: key,
+        aad: aad,
+        nonce: nonce,
+      );
+
+      final decrypted = await V2MediaCrypto.decryptChunk(
+        ciphertext: encrypted.ciphertext,
+        mediaKey: key,
+        aad: aad,
+        nonce: nonce,
+      );
+
+      expect(utf8.decode(decrypted), text);
+    });
+  });
 }

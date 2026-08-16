@@ -67,6 +67,10 @@ class V2MediaManifest {
   /// Duration in seconds (for audio/video, 0 if unknown).
   final int duration;
 
+  /// HMAC-SHA256 of manifest (signed by sender's identity key).
+  /// Empty if not yet computed.
+  final List<int> manifestHmac;
+
   const V2MediaManifest({
     required this.version,
     required this.mediaId,
@@ -86,6 +90,7 @@ class V2MediaManifest {
     this.width = 0,
     this.height = 0,
     this.duration = 0,
+    this.manifestHmac = const [],
   });
 
   /// Serializes manifest to JSON.
@@ -109,6 +114,7 @@ class V2MediaManifest {
         if (width > 0) 'w': width,
         if (height > 0) 'h': height,
         if (duration > 0) 'dur': duration,
+        if (manifestHmac.isNotEmpty) 'hmac': base64Encode(manifestHmac),
       };
 
   /// Deserializes manifest from JSON.
@@ -142,6 +148,9 @@ class V2MediaManifest {
       width: json['w'] as int? ?? 0,
       height: json['h'] as int? ?? 0,
       duration: json['dur'] as int? ?? 0,
+      manifestHmac: json['hmac'] != null
+          ? base64Decode(json['hmac'] as String)
+          : const [],
     );
   }
 
