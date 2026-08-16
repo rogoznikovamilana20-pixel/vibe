@@ -1,5 +1,5 @@
 name: vibe_app
-description: "Vibe — мессенджер нового поколения с постквантовым шифрованием"
+description: "Vibe — мессенджер с end-to-end шифрованием (X25519 + AES-256-GCM)"
 publish_to: 'none'
 version: 1.6.3+1
 
