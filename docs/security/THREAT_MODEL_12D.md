@@ -205,7 +205,7 @@
 7. **Out-of-order messages**: Supported via skipped keys ✓
 8. **Replay detection**: messageNumber < receivingMessageNumber + not in skippedKeys → rejected ✓
 9. **State persistence**: FlutterSecureStorage with full key serialization ✓
-10. **State rollback**: Protected by message number tracking ✓
+10. **State rollback**: Android — митигировано hardware-binding Keystore (ключи не восстанавливаются из бэкапов); iOS — residual risk backup restore, митигировано ThisDeviceOnly-доступностью; явного backup/restore в app нет.
 
 ### Issues Found
 

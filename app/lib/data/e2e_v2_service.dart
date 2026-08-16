@@ -16,7 +16,9 @@ class E2eV2Service {
   E2eV2Service._();
   static final instance = E2eV2Service._();
 
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
   SupabaseClient get _client => Supabase.instance.client;
 
   SimpleKeyPair? _edIdentityKeyPair;

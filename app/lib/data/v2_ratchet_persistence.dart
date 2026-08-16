@@ -26,7 +26,9 @@ class V2RatchetPersistence {
   V2RatchetPersistence._();
   static final instance = V2RatchetPersistence._();
 
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
 
   /// Storage key prefix.
   static const _keyPrefix = 'e2e_v2_ratchet_';

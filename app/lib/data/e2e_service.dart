@@ -17,7 +17,9 @@ class E2eService {
   static final instance = E2eService._();
 
   final _client = Supabase.instance.client;
-  final _secureStorage = const FlutterSecureStorage();
+  final _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
   final _keyExchange = Cryptography.instance.x25519();
   final _aesGcm = Cryptography.instance.aesGcm();
 

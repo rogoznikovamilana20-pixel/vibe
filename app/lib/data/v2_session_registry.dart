@@ -10,7 +10,9 @@ class V2SessionRegistry {
   V2SessionRegistry._();
   static final instance = V2SessionRegistry._();
 
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
   static const _storageKey = 'e2e_v2_session_registry';
 
   /// In-memory cache of the registry.
