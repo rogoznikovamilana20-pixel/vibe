@@ -631,6 +631,22 @@ class VibeLocalizations {
       'error_save_failed': 'Не удалось сохранить',
       'msg_original_from': 'Оригинал',
       'unread_count': 'Непрочитанные',
+      'e2ee_verification': 'Проверка E2EE',
+      'e2ee_safety_code': 'Код безопасности',
+      'e2ee_not_verified': 'Не подтверждено',
+      'e2ee_verified': 'Проверено',
+      'e2ee_changed': 'Ключ безопасности изменился',
+      'e2ee_verify_description': 'Сравните этот код с кодом на устройстве собеседника.',
+      'e2ee_verified_description': 'Ключ безопасности подтверждён вами.',
+      'e2ee_changed_description': 'Это может произойти после переустановки приложения или смены устройства. Перед продолжением общения проверьте новый код.',
+      'e2ee_confirm_verify': 'Вы сравнили код с собеседником?',
+      'e2ee_confirm_yes': 'Да, код совпадает',
+      'e2ee_confirm_cancel': 'Отмена',
+      'e2ee_verify_action': 'Подтвердить',
+      'e2ee_reverify_action': 'Проверить заново',
+      'e2ee_reverify_new_key': 'Проверить новый код',
+      'e2ee_copy_code': 'Скопировать код',
+      'e2ee_copied': 'Код скопирован',
     },
     'en': {
       'settings': 'Settings',
@@ -1253,6 +1269,22 @@ class VibeLocalizations {
       'error_save_failed': 'Failed to save',
       'msg_original_from': 'Original',
       'unread_count': 'Unread',
+      'e2ee_verification': 'E2EE Verification',
+      'e2ee_safety_code': 'Safety code',
+      'e2ee_not_verified': 'Not verified',
+      'e2ee_verified': 'Verified',
+      'e2ee_changed': 'Security key changed',
+      'e2ee_verify_description': 'Compare this code with the code on your contact\'s device.',
+      'e2ee_verified_description': 'You have confirmed this security key.',
+      'e2ee_changed_description': 'This may happen after reinstalling the app or changing devices. Verify the new code before continuing to communicate.',
+      'e2ee_confirm_verify': 'Did you compare the code with your contact?',
+      'e2ee_confirm_yes': 'Yes, the codes match',
+      'e2ee_confirm_cancel': 'Cancel',
+      'e2ee_verify_action': 'Verify',
+      'e2ee_reverify_action': 'Verify again',
+      'e2ee_reverify_new_key': 'Verify new code',
+      'e2ee_copy_code': 'Copy code',
+      'e2ee_copied': 'Code copied',
     },
   };
 
@@ -1878,6 +1910,22 @@ class VibeLocalizations {
   String get errorSaveFailed => _get('error_save_failed');
   String get msgOriginalFrom => _get('msg_original_from');
   String get unreadCount => _get('unread_count');
+  String get e2eeVerification => _get('e2ee_verification');
+  String get e2eeSafetyCode => _get('e2ee_safety_code');
+  String get e2eeNotVerified => _get('e2ee_not_verified');
+  String get e2eeVerified => _get('e2ee_verified');
+  String get e2eeChanged => _get('e2ee_changed');
+  String get e2eeVerifyDescription => _get('e2ee_verify_description');
+  String get e2eeVerifiedDescription => _get('e2ee_verified_description');
+  String get e2eeChangedDescription => _get('e2ee_changed_description');
+  String get e2eeConfirmVerify => _get('e2ee_confirm_verify');
+  String get e2eeConfirmYes => _get('e2ee_confirm_yes');
+  String get e2eeConfirmCancel => _get('e2ee_confirm_cancel');
+  String get e2eeVerifyAction => _get('e2ee_verify_action');
+  String get e2eeReverifyAction => _get('e2ee_reverify_action');
+  String get e2eeReverifyNewKey => _get('e2ee_reverify_new_key');
+  String get e2eeCopyCode => _get('e2ee_copy_code');
+  String get e2eeCopied => _get('e2ee_copied');
 }
 
 class VibeLocalizationsDelegate extends LocalizationsDelegate<VibeLocalizations> {

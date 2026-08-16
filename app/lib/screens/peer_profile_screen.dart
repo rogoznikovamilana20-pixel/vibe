@@ -1,7 +1,9 @@
-﻿import 'dart:io';
+﻿import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
@@ -14,6 +16,7 @@ import '../core/widgets/vibe_collapsible_screen.dart';
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/backend.dart';
 import '../data/settings_service.dart';
+import 'settings/privacy/e2ee_verification_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
@@ -259,6 +262,79 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
             ),
           ),
           if (chat.peerId != null) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  VibeSpacing.xl,
+                  VibeSpacing.xs,
+                  VibeSpacing.xl,
+                  VibeSpacing.sm,
+                ),
+                child: Material(
+                  color: context.vibeSurfaceElevated.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(VibeRadius.xl),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.verified_user_rounded,
+                      color: context.vibePrimary,
+                    ),
+                    title: Text(
+                      'Проверка E2EE',
+                      style: VibeTypography.body.copyWith(
+                        color: context.vibeTextPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Ключ безопасности',
+                      style: VibeTypography.caption.copyWith(
+                        color: context.vibeTextSecondary,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: context.vibeTextTertiary,
+                    ),
+                    onTap: () async {
+                      final peerId = chat.peerId;
+                      if (peerId == null) return;
+
+                      // Fetch peer's identity key from devices table
+                      try {
+                        final deviceResponse = await Supabase.instance.client
+                            .from('devices')
+                            .select('identity_dh_public')
+                            .eq('user_id', peerId)
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (deviceResponse == null || !mounted) return;
+
+                        final identityKeyB64 = deviceResponse['identity_dh_public'] as String;
+                        final identityKey = base64Decode(identityKeyB64);
+
+                        if (!mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => E2eeVerificationScreen(
+                              peerId: peerId,
+                              peerName: chat.title,
+                              peerIdentityKey: identityKey,
+                            ),
+                          ),
+                        );
+                      } catch (_) {
+                        if (mounted) {
+                          VibeToast.show(context, 'Не удалось загрузить ключ');
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(

@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'offline_queue_service.dart';
 import 'message_encryption_state.dart';
 import 'v2_message_storage.dart';
+import 'v2_media_outgoing.dart';
 
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
@@ -1895,6 +1896,7 @@ peerName: peer?.displayName,
   }
 
   /// Отправить фото: файл в storage, ссылка — в сообщении.
+  /// V2 path: encrypts photo with E2EE before upload (media-v2/UUID/...).
   Future<VibeMessage> sendPhoto(
     String chatId,
     Uint8List bytes, {
@@ -1910,6 +1912,55 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     try {
+      // V2 media encryption path
+      if (V2Outgoing.instance.enabled) {
+        final peerId = await _chatPeerId(chatId);
+        if (peerId != null) {
+          try {
+            final v2Media = await V2MediaOutgoing.encryptAndUpload(
+              bytes: bytes,
+              chatId: chatId,
+              peerId: peerId,
+              mediaType: 0, // photo
+              mimeType: 'image/jpeg',
+              width: 0,
+              height: 0,
+            );
+
+            // Store manifest in text column as JSON metadata
+            final manifestData = {
+              'v2_media': true,
+              'manifest_path': v2Media.manifestPath,
+              'chunks': v2Media.chunkPaths.length,
+            };
+            final row = await _client.from('messages').insert({
+              'chat_id': chatId,
+              'sender_id': myProfileId,
+              'text': jsonEncode(manifestData),
+              'is_encrypted': true,
+              'e2ee_version': 2,
+            }).select().single();
+            _broadcastMessageRow(row);
+            _chatsController.add(null);
+            final sent = _ownMessage(row).copyWith(
+              localId: lId,
+              status: MsgStatus.sent,
+            );
+            final rowId = '${row['id']}';
+            _sentById[rowId] = sent;
+            _sentByIdTime[rowId] = DateTime.now();
+            _cleanupSentById();
+            streamController.add(sent);
+            return sent;
+          } catch (_) {
+            // V2 encryption failed — fail-closed, no fallback to plaintext
+            streamController.add(local.copyWith(status: MsgStatus.failed));
+            rethrow;
+          }
+        }
+      }
+
+      // Plaintext path (V1 or no E2E)
       final path =
           'media/$chatId/photo_$myProfileId/${DateTime.now().millisecondsSinceEpoch}.jpg';
       await _client.storage.from('avatars').uploadBinary(
@@ -1944,8 +1995,7 @@ peerName: peer?.displayName,
   }
 
   /// Отправить файл-вложение: загрузка в storage + JSON-метаданные в text.
-  /// Один бакет (`avatars`), путь `media/<chatId>/file_*` — media-sign уже
-  /// разрешает префикс участникам чата.
+  /// V2 path: encrypts file with E2EE before upload (media-v2/UUID/...).
   Future<VibeMessage> sendFile(
     String chatId,
     File file, {
@@ -1976,6 +2026,59 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     try {
+      // V2 media encryption path
+      if (V2Outgoing.instance.enabled) {
+        final peerId = await _chatPeerId(chatId);
+        if (peerId != null) {
+          try {
+            final fileBytes = await file.readAsBytes();
+            final v2Media = await V2MediaOutgoing.encryptAndUpload(
+              bytes: fileBytes,
+              chatId: chatId,
+              peerId: peerId,
+              mediaType: 3, // file
+              mimeType: mimeType,
+              filename: name,
+            );
+
+            // Store manifest in text column as JSON metadata
+            final manifestData = {
+              'v2_media': true,
+              'manifest_path': v2Media.manifestPath,
+              'chunks': v2Media.chunkPaths.length,
+              'kind': kind.toString().split('.').last,
+              'name': name,
+              'size': file.lengthSync(),
+              'mime': mimeType,
+            };
+            final row = await _client.from('messages').insert({
+              'chat_id': chatId,
+              'sender_id': myProfileId,
+              'text': jsonEncode(manifestData),
+              'is_encrypted': true,
+              'e2ee_version': 2,
+            }).select().single();
+            _broadcastMessageRow(row);
+            _chatsController.add(null);
+            final sent = _ownMessage(row).copyWith(
+              localId: lId,
+              status: MsgStatus.sent,
+            );
+            final rowId = '${row['id']}';
+            _sentById[rowId] = sent;
+            _sentByIdTime[rowId] = DateTime.now();
+            _cleanupSentById();
+            streamController.add(sent);
+            return sent;
+          } catch (_) {
+            // V2 encryption failed — fail-closed, no fallback to plaintext
+            streamController.add(local.copyWith(status: MsgStatus.failed));
+            rethrow;
+          }
+        }
+      }
+
+      // Plaintext path (V1 or no E2E)
       final safeName = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
       final path =
           'media/$chatId/file_$myProfileId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
@@ -2041,6 +2144,7 @@ peerName: peer?.displayName,
   }
 
   /// Отправить голосовое сообщение (файл m4a).
+  /// V2 path: encrypts voice with E2EE before upload (media-v2/UUID/...).
   Future<VibeMessage> sendVoice(
     String chatId,
     File voiceFile, {
@@ -2058,7 +2162,57 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     try {
-      // 5.5: стриминг файла в storage — без readAsBytes всего файла.
+      // V2 media encryption path
+      if (V2Outgoing.instance.enabled) {
+        final peerId = await _chatPeerId(chatId);
+        if (peerId != null) {
+          try {
+            final voiceBytes = await voiceFile.readAsBytes();
+            final v2Media = await V2MediaOutgoing.encryptAndUpload(
+              bytes: voiceBytes,
+              chatId: chatId,
+              peerId: peerId,
+              mediaType: 1, // voice
+              mimeType: 'audio/mp4',
+              duration: voiceSeconds ?? 0,
+            );
+
+            // Store manifest in text column as JSON metadata
+            final manifestData = {
+              'v2_media': true,
+              'manifest_path': v2Media.manifestPath,
+              'chunks': v2Media.chunkPaths.length,
+              'duration': voiceSeconds ?? 0,
+            };
+            final row = await _client.from('messages').insert({
+              'chat_id': chatId,
+              'sender_id': myProfileId,
+              'text': jsonEncode(manifestData),
+              'is_encrypted': true,
+              'e2ee_version': 2,
+            }).select().single();
+            _broadcastMessageRow(row);
+            _chatsController.add(null);
+            final sent = _ownMessage(row).copyWith(
+              localId: lId,
+              voicePath: localPath ?? voiceFile.path,
+              status: MsgStatus.sent,
+            );
+            final rowId = '${row['id']}';
+            _sentById[rowId] = sent;
+            _sentByIdTime[rowId] = DateTime.now();
+            _cleanupSentById();
+            streamController.add(sent);
+            return sent;
+          } catch (_) {
+            // V2 encryption failed — fail-closed, no fallback to plaintext
+            streamController.add(local.copyWith(status: MsgStatus.failed));
+            rethrow;
+          }
+        }
+      }
+
+      // Plaintext path (V1 or no E2E)
       final path =
           'media/$chatId/voice_$myProfileId/${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _client.storage.from('avatars').upload(
@@ -2094,6 +2248,7 @@ peerName: peer?.displayName,
   }
 
   /// Отправить видеокружок (файл mp4).
+  /// V2 path: encrypts video with E2EE before upload (media-v2/UUID/...).
   Future<VibeMessage> sendVideo(
     String chatId,
     File videoFile, {
@@ -2109,7 +2264,55 @@ peerName: peer?.displayName,
     );
     streamController.add(local);
     try {
-      // 5.5: стриминг файла в storage — без readAsBytes всего файла.
+      // V2 media encryption path
+      if (V2Outgoing.instance.enabled) {
+        final peerId = await _chatPeerId(chatId);
+        if (peerId != null) {
+          try {
+            final videoBytes = await videoFile.readAsBytes();
+            final v2Media = await V2MediaOutgoing.encryptAndUpload(
+              bytes: videoBytes,
+              chatId: chatId,
+              peerId: peerId,
+              mediaType: 2, // video
+              mimeType: 'video/mp4',
+            );
+
+            // Store manifest in text column as JSON metadata
+            final manifestData = {
+              'v2_media': true,
+              'manifest_path': v2Media.manifestPath,
+              'chunks': v2Media.chunkPaths.length,
+            };
+            final row = await _client.from('messages').insert({
+              'chat_id': chatId,
+              'sender_id': myProfileId,
+              'text': jsonEncode(manifestData),
+              'is_encrypted': true,
+              'e2ee_version': 2,
+            }).select().single();
+            _broadcastMessageRow(row);
+            _chatsController.add(null);
+            final sent = _ownMessage(row).copyWith(
+              localId: lId,
+              videoPath: localPath ?? videoFile.path,
+              status: MsgStatus.sent,
+            );
+            final rowId = '${row['id']}';
+            _sentById[rowId] = sent;
+            _sentByIdTime[rowId] = DateTime.now();
+            _cleanupSentById();
+            streamController.add(sent);
+            return sent;
+          } catch (_) {
+            // V2 encryption failed — fail-closed, no fallback to plaintext
+            streamController.add(local.copyWith(status: MsgStatus.failed));
+            rethrow;
+          }
+        }
+      }
+
+      // Plaintext path (V1 or no E2E)
       final path =
           'media/$chatId/video_$myProfileId/${DateTime.now().millisecondsSinceEpoch}.mp4';
       await _client.storage.from('avatars').upload(
