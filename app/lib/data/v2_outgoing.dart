@@ -19,7 +19,9 @@ class V2Outgoing {
   bool enabled = false;
 
   /// In-memory ratchet state cache, keyed by sessionId.
+  /// Bounded to 100 entries; evicts oldest when full (F-053).
   final Map<String, V2RatchetState> _ratchetStates = {};
+  static const int _maxCacheSize = 100;
 
   /// Per-session send queue to prevent concurrent ratchet access.
   final Map<String, Completer<void>> _sendQueues = {};
@@ -64,7 +66,12 @@ class V2Outgoing {
   ///
   /// Policy: save BEFORE DB insert (pre-commit).
   /// If DB insert fails, message key is lost but ratchet state is consistent.
+  /// Evicts oldest cache entry if cache exceeds 100 sessions (F-053).
   Future<void> _saveRatchetState(V2RatchetState state) async {
+    // Evict oldest entry if cache is full (F-053)
+    if (_ratchetStates.length >= _maxCacheSize && !_ratchetStates.containsKey(state.sessionId)) {
+      _ratchetStates.remove(_ratchetStates.keys.first);
+    }
     _ratchetStates[state.sessionId] = state;
     await V2RatchetPersistence.instance.save(state);
   }

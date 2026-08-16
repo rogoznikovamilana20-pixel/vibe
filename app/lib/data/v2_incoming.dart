@@ -173,27 +173,6 @@ class V2Incoming {
     return null;
   }
 
-  /// Checks if a message has already been decrypted (replay detection).
-  ///
-  /// Uses the ratchet state's receivingMessageNumber to detect replays.
-  /// If the message number is less than the current receiving message number
-  /// and not in skipped keys, it's a replay.
-  Future<bool> isReplay({
-    required String sessionId,
-    required int messageNumber,
-  }) async {
-    final state = await V2RatchetPersistence.instance.load(sessionId);
-    if (state == null) return false;
-
-    // If message number is less than current receiving message number,
-    // check if it's in skipped keys
-    if (messageNumber < state.receivingMessageNumber) {
-      return !state.skippedKeys.containsKey(messageNumber);
-    }
-
-    return false;
-  }
-
   /// Acquires a per-session lock. Blocks until the previous holder releases.
   Future<void> _acquireSessionLock(String sessionId) async {
     final existing = _sessionLocks[sessionId];
