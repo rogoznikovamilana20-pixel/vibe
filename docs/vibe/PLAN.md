@@ -1494,6 +1494,47 @@ V1 E2EE (`e2e_service.dart`) **НЕ ИЗМЕНЁН** — продолжает р
 ### Result: **PASS** — X3DH key agreement реализован, протокол verified через security tests, session persistence работает
 
 ### X3DH Status: **COMPLETE** — Ready for Phase 12B.3 (Double Ratchet)
+---
+
+## Phase 12F Deep Audit — Bug Investigation ✅ (завершена 17.08.2026)
+
+### Сделано
+
+**Исследовано 12 багов, найденных при независимом adversarial аудите (Phase 12F).**
+
+| # | Баг | Severity | Вердикт | Фикс |
+|---|-----|----------|---------|------|
+| 1 | Skipped keys очищаются при DH ratchet step | HIGH | **FIXED** | `skippedKeys: state.skippedKeys` |
+| 2 | Ratchet public key не в AAD | HIGH | **FIXED** | Добавлен в `_computeAad` |
+| 3 | Nonce reuse в offline mode | HIGH | FALSE POSITIVE | messageNumber инкрементируется |
+| 4 | Post-quantum claims без обоснования | MEDIUM | FALSE POSITIVE | Доки корректно говорят "no PQ" |
+| 5 | Проблемы архитектуры | MEDIUM | FALSE POSITIVE | Следует Signal Protocol |
+| 6 | Мёртвый код (isReplay) | LOW | **FIXED** | Удалён неиспользуемый метод |
+| 7 | Offline-first gaps | MEDIUM | FALSE POSITIVE | X3DH требует сервер — ограничение |
+| 8 | Unbounded ratchet cache | MEDIUM | **FIXED** | LRU eviction на 100 записей |
+| 9 | Caching issues | MEDIUM | Same as #8 | Исправлено в #8 |
+| 10 | FCM plaintext (F-048) | MEDIUM | ALREADY DOCUMENTED | См. F-048 |
+| 11 | Testing gaps | MEDIUM | NOTED | Нет критических пропусков |
+| 12 | Stale "DESIGN" статус | LOW | **FIXED** | Обновлён на "IMPLEMENTED" |
+
+### Файлы
+- `v2_ratchet.dart` — фиксы #1 и #2
+- `v2_outgoing.dart` — фикс #8 (LRU cache)
+- `v2_incoming.dart` — фикс #6 (удалён isReplay)
+- `docs/security/E2EE_PROTOCOL_V2.md` — фикс #12 (обновлён статус)
+- `docs/security/PHASE_12F_DEEP_AUDIT.md` — полный отчёт
+- `test/v2_bug1_skipped_keys_test.dart` — 2 теста для бага #1
+- `test/v2_bug2_aad_ratchet_key_test.dart` — 3 теста для бага #2
+
+### Проверка
+
+- **Tests**: **1768 pass / 0 fail**
+- **Analyzer**: 0 errors (76 pre-existing warnings/infos)
+- **Commits**: `8a74899`, `4e10ce7`, `0fce92c`, `207df0a`, `12171fe`
+- **Push**: `main → origin/main`
+
+### Result: **PASS** — 2 HIGH + 1 MEDIUM + 1 LOW бага исправлены, 8 подтверждены как false positive
 
 ---
+
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*
