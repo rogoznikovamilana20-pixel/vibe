@@ -443,7 +443,9 @@ class V2Ratchet {
       dh2Bytes,
     );
 
-    // 4. Reset counters, clear skipped keys, increment ratchet step
+    // 4. Reset counters, PRESERVE skipped keys from old chain, increment ratchet step
+    // Signal Protocol spec §3.3: "Skipped message keys from the previous
+    // receiving chain MUST be preserved to allow out-of-order delivery."
     return state.copyWith(
       rootKey: ratchet2.rootKey,
       sendingChainKey: ratchet2.chainKey,
@@ -454,7 +456,7 @@ class V2Ratchet {
       sendingMessageNumber: 0,
       receivingMessageNumber: 0,
       previousSendingChainLength: state.sendingMessageNumber,
-      skippedKeys: {},
+      skippedKeys: state.skippedKeys,
       ratchetStep: state.ratchetStep + 1,
     );
   }
