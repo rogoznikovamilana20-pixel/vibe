@@ -1352,27 +1352,6 @@ void main() {
       expect(result.protocolVersion, 2);
     });
 
-    test('V2Session.fromX3dhResult copies all fields', () {
-      final x3dhResult = X3dhResult(
-        sessionId: 'session-789',
-        rootKey: List<int>.generate(32, (i) => i),
-        chainKey: List<int>.generate(32, (i) => i + 32),
-        remoteIdentityKeyPublic: 'remote-ik',
-        remoteDeviceId: 'remote-dev',
-        protocolVersion: 2,
-      );
-
-      final session = V2Session.fromX3dhResult(x3dhResult);
-
-      expect(session.sessionId, x3dhResult.sessionId);
-      expect(session.rootKey, x3dhResult.rootKey);
-      expect(session.chainKey, x3dhResult.chainKey);
-      expect(session.remoteIdentityKeyPublic, x3dhResult.remoteIdentityKeyPublic);
-      expect(session.remoteDeviceId, x3dhResult.remoteDeviceId);
-      expect(session.protocolVersion, x3dhResult.protocolVersion);
-      expect(session.createdAt, isA<DateTime>());
-    });
-
     test('device isolation — different Bob devices have different keys, different sessions', () async {
       final bobDev1Identity = await x25519.newKeyPair();
       final bobDev1Spk = await x25519.newKeyPair();

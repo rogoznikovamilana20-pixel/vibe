@@ -1323,38 +1323,3 @@ class IdentityRotationResult {
     required this.rotatedAt,
   });
 }
-
-/// Состояние сессии V2 (после X3DH, до Double Ratchet).
-///
-/// Хранит material необходимый для начала обмена сообщениями.
-/// Double Ratchet будет добавлен в Phase 12B.3.
-class V2Session {
-  final String sessionId;
-  final List<int> rootKey;
-  final List<int> chainKey;
-  final String remoteIdentityKeyPublic;
-  final String remoteDeviceId;
-  final int protocolVersion;
-  final DateTime createdAt;
-
-  const V2Session({
-    required this.sessionId,
-    required this.rootKey,
-    required this.chainKey,
-    required this.remoteIdentityKeyPublic,
-    required this.remoteDeviceId,
-    required this.protocolVersion,
-    required this.createdAt,
-  });
-
-  /// Создаёт из [X3dhResult].
-  factory V2Session.fromX3dhResult(X3dhResult result) => V2Session(
-        sessionId: result.sessionId,
-        rootKey: result.rootKey,
-        chainKey: result.chainKey,
-        remoteIdentityKeyPublic: result.remoteIdentityKeyPublic,
-        remoteDeviceId: result.remoteDeviceId,
-        protocolVersion: result.protocolVersion,
-        createdAt: DateTime.now(),
-      );
-}
