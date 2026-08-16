@@ -9,6 +9,19 @@ const int v2MaxSkippedKeys = 1000;
 /// Длина вывода HKDF для DH ratchet: 64 bytes = root_key(32) + chain_key(32).
 const int _dhRatchetOutputLength = 64;
 
+/// DoS protection: maximum allowed message number jump.
+///
+/// A malicious message with huge messageNumber must NOT trigger billions of
+/// KDF iterations. This limit caps the number of chain steps in one decrypt.
+/// Messages exceeding this are rejected with V2RatchetException.
+const int v2MaxMessageNumberJump = 2000;
+
+/// DoS protection: maximum allowed previousChainLength.
+///
+/// Prevents oversized previous chain claims from consuming excessive memory
+/// in skippedKeys. Messages exceeding this are rejected.
+const int v2MaxPreviousChainLength = 10000;
+
 // =============================================================================
 // Data Classes
 // =============================================================================
@@ -613,6 +626,21 @@ class V2Ratchet {
   }) async {
     if (state.receivingChainKey == null) {
       throw const V2RatchetException('No receiving chain key');
+    }
+
+    // DoS protection: reject excessive message number jump
+    final messageNumberJump = header.messageNumber - state.receivingMessageNumber;
+    if (messageNumberJump > v2MaxMessageNumberJump) {
+      throw V2RatchetException(
+        'Message number jump too large: $messageNumberJump > $v2MaxMessageNumberJump',
+      );
+    }
+
+    // DoS protection: reject excessive previousChainLength
+    if (header.previousChainLength > v2MaxPreviousChainLength) {
+      throw V2RatchetException(
+        'Previous chain length too large: ${header.previousChainLength} > $v2MaxPreviousChainLength',
+      );
     }
 
     // Case 1: Old message (messageNumber < receivingMessageNumber)

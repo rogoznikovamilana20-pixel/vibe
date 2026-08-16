@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:vibe_app/data/e2e_v2_service.dart';
 import 'package:vibe_app/data/v2_message_storage.dart';
 import 'package:vibe_app/data/v2_ratchet.dart';
 import 'package:vibe_app/data/v2_ratchet_persistence.dart';
@@ -73,16 +74,19 @@ class V2Incoming {
     }
 
     // 4. Resolve session from envelope header
-    //    The envelope contains sender_ik and sender_rk which identify the sender's device
-    //    We need to find the session that corresponds to this sender
-    final sessionId = await _resolveSessionId(
+    //    The envelope contains sender_ik and sender_rk which identify the sender's device.
+    //    We need to find the session and the sender's device ID (stored during X3DH).
+    final resolved = await _resolveSession(
       senderId: senderId,
       envelope: envelope,
     );
 
-    if (sessionId == null) {
+    if (resolved == null) {
       throw const V2IncomingException('No session found for V2 message');
     }
+
+    final sessionId = resolved.sessionId;
+    final senderDeviceId = resolved.remoteDeviceId;
 
     // 5. Acquire per-session lock
     //    Serializes concurrent decrypts for the same session to prevent
@@ -100,8 +104,13 @@ class V2Incoming {
       }
 
       // 7. Decrypt
-      final senderDeviceId = _extractDeviceIdFromEnvelope(envelope);
-      final recipientDeviceId = await _getDeviceId();
+      //    recipientDeviceId = this device's real UUID from SecureStorage.
+      //    senderDeviceId = remote peer's device UUID from X3DH session.
+      //    Both are used in AAD for AES-256-GCM authentication.
+      final recipientDeviceId = await E2eV2Service.instance.getDeviceId();
+      if (recipientDeviceId == null) {
+        throw const V2IncomingException('Device not registered');
+      }
 
       final result = await V2Ratchet.decryptFromEnvelope(
         state: state,
@@ -134,10 +143,11 @@ class V2Incoming {
     }
   }
 
-  /// Resolves session ID from envelope and sender info.
+  /// Resolves session ID and sender device ID from envelope and sender info.
   ///
   /// Uses the session registry to find the session for this sender.
-  Future<String?> _resolveSessionId({
+  /// Returns the session ID and the remote device ID (from X3DH session).
+  Future<_ResolvedSession?> _resolveSession({
     required String senderId,
     required V2MessageEnvelope envelope,
   }) async {
@@ -148,30 +158,19 @@ class V2Incoming {
     for (final sessionId in sessions) {
       final state = await V2RatchetPersistence.instance.load(sessionId);
       if (state != null) {
-        return sessionId;
+        // Load the X3DH session to get the remote device ID
+        final x3dhSession = await E2eV2Service.instance.loadSession(sessionId);
+        final remoteDeviceId = x3dhSession?.remoteDeviceId;
+        if (remoteDeviceId != null) {
+          return _ResolvedSession(
+            sessionId: sessionId,
+            remoteDeviceId: remoteDeviceId,
+          );
+        }
       }
     }
 
     return null;
-  }
-
-  /// Extracts sender device ID from envelope header.
-  ///
-  /// The envelope contains sender_ik (identity key) which can be used
-  /// to identify the device. For simplicity, we use the session's
-  /// remote identity key to match.
-  String _extractDeviceIdFromEnvelope(V2MessageEnvelope envelope) {
-    // In a full implementation, we'd extract the device ID from the envelope
-    // or look it up from the sender's identity key.
-    // For now, we return a placeholder that will be resolved by the session lookup.
-    return 'unknown';
-  }
-
-  /// Gets the current device ID.
-  Future<String> _getDeviceId() async {
-    // This should be the same device ID used in X3DH
-    // For now, we'll use a placeholder
-    return 'current-device';
   }
 
   /// Checks if a message has already been decrypted (replay detection).
@@ -233,4 +232,11 @@ class V2IncomingException implements Exception {
 
   @override
   String toString() => 'V2IncomingException: $message';
+}
+
+/// Resolved session with sender device ID for AAD computation.
+class _ResolvedSession {
+  final String sessionId;
+  final String remoteDeviceId;
+  const _ResolvedSession({required this.sessionId, required this.remoteDeviceId});
 }

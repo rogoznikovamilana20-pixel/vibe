@@ -1,3 +1,4 @@
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibe_app/data/v2_ratchet.dart';
 import 'package:vibe_app/data/v2_ratchet_persistence.dart';
@@ -5,7 +6,7 @@ import 'package:vibe_app/data/v2_ratchet_persistence.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   group('V2RatchetPersistence — serialize/deserialize roundtrip', () {
-    test('full state roundtrip', () {
+    test('full state roundtrip', () async {
       final original = V2RatchetState(
         sessionId: 'test-session-abc',
         rootKey: List<int>.filled(32, 0x01),
@@ -24,7 +25,7 @@ void main() {
         ratchetStep: 3,
       );
 
-      final json = V2RatchetPersistence.serialize(original);
+      final json = await V2RatchetPersistence.serialize(original);
       final restored = V2RatchetPersistence.deserialize(json);
 
       expect(restored.sessionId, equals('test-session-abc'));
@@ -45,13 +46,13 @@ void main() {
       expect(restored.ratchetStep, equals(3));
     });
 
-    test('minimal state (nulls) roundtrip', () {
+    test('minimal state (nulls) roundtrip', () async {
       final original = V2RatchetState(
         sessionId: 'minimal',
         rootKey: List<int>.filled(32, 0x01),
       );
 
-      final json = V2RatchetPersistence.serialize(original);
+      final json = await V2RatchetPersistence.serialize(original);
       final restored = V2RatchetPersistence.deserialize(json);
 
       expect(restored.sessionId, equals('minimal'));
@@ -66,7 +67,7 @@ void main() {
       expect(restored.ratchetStep, equals(0));
     });
 
-    test('empty skippedKeys roundtrip', () {
+    test('empty skippedKeys roundtrip', () async {
       final original = V2RatchetState(
         sessionId: 'no-skipped',
         rootKey: List<int>.filled(32, 0x01),
@@ -74,13 +75,13 @@ void main() {
         skippedKeys: {},
       );
 
-      final json = V2RatchetPersistence.serialize(original);
+      final json = await V2RatchetPersistence.serialize(original);
       final restored = V2RatchetPersistence.deserialize(json);
 
       expect(restored.skippedKeys, isEmpty);
     });
 
-    test('large skippedKeys roundtrip', () {
+    test('large skippedKeys roundtrip', () async {
       final skippedKeys = <int, List<int>>{};
       for (var i = 0; i < 100; i++) {
         skippedKeys[i] = List<int>.filled(32, i);
@@ -92,13 +93,41 @@ void main() {
         skippedKeys: skippedKeys,
       );
 
-      final json = V2RatchetPersistence.serialize(original);
+      final json = await V2RatchetPersistence.serialize(original);
       final restored = V2RatchetPersistence.deserialize(json);
 
       expect(restored.skippedKeys.length, equals(100));
       for (var i = 0; i < 100; i++) {
         expect(restored.skippedKeys[i], equals(skippedKeys[i]));
       }
+    });
+
+    test('sendingRatchetKeyPair roundtrip preserves private key', () async {
+      final x25519 = Cryptography.instance.x25519();
+      final keyPair = await x25519.newKeyPair();
+      final pubKey = await keyPair.extractPublicKey();
+
+      final original = V2RatchetState(
+        sessionId: 'keypair-test',
+        rootKey: List<int>.filled(32, 0x01),
+        sendingChainKey: List<int>.filled(32, 0x02),
+        sendingRatchetKeyPair: keyPair,
+        sendingRatchetPubBytes: pubKey.bytes,
+        sendingMessageNumber: 5,
+      );
+
+      final json = await V2RatchetPersistence.serialize(original);
+      final restored = V2RatchetPersistence.deserialize(json);
+
+      // Private key is restored
+      expect(restored.sendingRatchetKeyPair, isNotNull);
+      final restoredPrivBytes =
+          await restored.sendingRatchetKeyPair!.extractPrivateKeyBytes();
+      final originalPrivBytes = await keyPair.extractPrivateKeyBytes();
+      expect(restoredPrivBytes, equals(originalPrivBytes));
+
+      // Public key is restored
+      expect(restored.sendingRatchetPubBytes, equals(pubKey.bytes));
     });
   });
 
@@ -120,7 +149,7 @@ void main() {
   });
 
   group('Ratchet state — restart scenario', () {
-    test('encrypt → persist → reload → encrypt produces different ciphertext', () {
+    test('encrypt → persist → reload → encrypt produces different ciphertext', () async {
       // Simulate restart: create state, serialize, deserialize, advance
       final state1 = V2RatchetState(
         sessionId: 'restart-test',
@@ -136,7 +165,7 @@ void main() {
       );
 
       // Persist state2
-      final json = V2RatchetPersistence.serialize(state2);
+      final json = await V2RatchetPersistence.serialize(state2);
       final restored = V2RatchetPersistence.deserialize(json);
 
       // Verify restored state matches advanced state
@@ -154,7 +183,7 @@ void main() {
       expect(state3.sendingChainKey, isNot(equals(state2.sendingChainKey)));
     });
 
-    test('ratchet state is immutable across serialize/deserialize', () {
+    test('ratchet state is immutable across serialize/deserialize', () async {
       final state = V2RatchetState(
         sessionId: 'immutable-test',
         rootKey: List<int>.filled(32, 0x01),
@@ -162,7 +191,7 @@ void main() {
         sendingMessageNumber: 5,
       );
 
-      final json = V2RatchetPersistence.serialize(state);
+      final json = await V2RatchetPersistence.serialize(state);
       final restored = V2RatchetPersistence.deserialize(json);
 
       // Original unchanged
@@ -176,7 +205,7 @@ void main() {
   });
 
   group('Ratchet state — atomicity', () {
-    test('state advance before DB insert (pre-commit policy)', () {
+    test('state advance before DB insert (pre-commit policy)', () async {
       // Scenario: encrypt succeeds, state saved, DB insert fails
       // Expected: message key lost, but ratchet state consistent
 
@@ -194,7 +223,7 @@ void main() {
       );
 
       // State saved (pre-commit)
-      final json = V2RatchetPersistence.serialize(advancedState);
+      final json = await V2RatchetPersistence.serialize(advancedState);
       final restored = V2RatchetPersistence.deserialize(json);
 
       // DB insert "fails" — but state is already advanced
@@ -208,7 +237,7 @@ void main() {
       expect(nextAdvanced.sendingMessageNumber, equals(2));
     });
 
-    test('cannot rollback ratchet state', () {
+    test('cannot rollback ratchet state', () async {
       final state = V2RatchetState(
         sessionId: 'rollback-test',
         rootKey: List<int>.filled(32, 0x01),
@@ -216,7 +245,7 @@ void main() {
         sendingMessageNumber: 10,
       );
 
-      final json = V2RatchetPersistence.serialize(state);
+      final json = await V2RatchetPersistence.serialize(state);
       final restored = V2RatchetPersistence.deserialize(json);
 
       // Sending message number cannot go backwards
@@ -267,7 +296,7 @@ void main() {
   });
 
   group('Ratchet state — device isolation', () {
-    test('different sessions have independent state', () {
+    test('different sessions have independent state', () async {
       final stateA = V2RatchetState(
         sessionId: 'session-a',
         rootKey: List<int>.filled(32, 0x01),
@@ -282,8 +311,8 @@ void main() {
         sendingMessageNumber: 10,
       );
 
-      final jsonA = V2RatchetPersistence.serialize(stateA);
-      final jsonB = V2RatchetPersistence.serialize(stateB);
+      final jsonA = await V2RatchetPersistence.serialize(stateA);
+      final jsonB = await V2RatchetPersistence.serialize(stateB);
 
       final restoredA = V2RatchetPersistence.deserialize(jsonA);
       final restoredB = V2RatchetPersistence.deserialize(jsonB);
@@ -337,7 +366,7 @@ void main() {
       expect(state.sendingMessageNumber, equals(5));
     });
 
-    test('skippedKeys are independent of send counter', () {
+    test('skippedKeys are independent of send counter', () async {
       final state = V2RatchetState(
         sessionId: 'skipped-test',
         rootKey: List<int>.filled(32, 0x01),
@@ -349,7 +378,7 @@ void main() {
         },
       );
 
-      final json = V2RatchetPersistence.serialize(state);
+      final json = await V2RatchetPersistence.serialize(state);
       final restored = V2RatchetPersistence.deserialize(json);
 
       expect(restored.sendingMessageNumber, equals(10));

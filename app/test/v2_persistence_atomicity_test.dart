@@ -97,7 +97,7 @@ void main() {
   // ===========================================================================
 
   group('Persistence Success', () {
-    test('State is durably consistent after successful persist', () {
+    test('State is durably consistent after successful persist', () async {
       final state = V2RatchetState(
         sessionId: 'session-persist-ok',
         rootKey: List<int>.generate(32, (i) => i),
@@ -106,7 +106,7 @@ void main() {
         sendingMessageNumber: 5,
       );
 
-      final serialized = V2RatchetPersistence.serialize(state);
+      final serialized = await V2RatchetPersistence.serialize(state);
       final restored = V2RatchetPersistence.deserialize(serialized);
 
       expect(restored.sessionId, state.sessionId);
@@ -115,7 +115,7 @@ void main() {
       expect(restored.sendingMessageNumber, state.sendingMessageNumber);
     });
 
-    test('Serialize preserves skipped keys', () {
+    test('Serialize preserves skipped keys', () async {
       final state = V2RatchetState(
         sessionId: 'session-skipped',
         rootKey: List<int>.generate(32, (i) => i),
@@ -125,7 +125,7 @@ void main() {
         },
       );
 
-      final serialized = V2RatchetPersistence.serialize(state);
+      final serialized = await V2RatchetPersistence.serialize(state);
       final restored = V2RatchetPersistence.deserialize(serialized);
 
       expect(restored.skippedKeys.length, 2);
@@ -191,7 +191,7 @@ void main() {
       expect(true, true); // Structural proof documented above
     });
 
-    test('Old state is preserved on disk after persist failure', () {
+    test('Old state is preserved on disk after persist failure', () async {
       final oldState = V2RatchetState(
         sessionId: 'session-old-state',
         rootKey: List<int>.generate(32, (i) => i),
@@ -201,7 +201,7 @@ void main() {
 
       // Simulate: decrypt succeeds, persist fails
       // The old state is still on disk (not overwritten)
-      final serialized = V2RatchetPersistence.serialize(oldState);
+      final serialized = await V2RatchetPersistence.serialize(oldState);
       final restored = V2RatchetPersistence.deserialize(serialized);
 
       expect(restored.receivingMessageNumber, 0);
@@ -1142,7 +1142,7 @@ void main() {
       expect(identical(originalState, dec.state), false);
     });
 
-    test('Failed persist does not corrupt old state', () {
+    test('Failed persist does not corrupt old state', () async {
       final state = V2RatchetState(
         sessionId: 'session-no-corrupt',
         rootKey: List<int>.generate(32, (i) => i),
@@ -1151,7 +1151,7 @@ void main() {
       );
 
       // Serialize (simulating disk state)
-      final serialized = V2RatchetPersistence.serialize(state);
+      final serialized = await V2RatchetPersistence.serialize(state);
 
       // Simulate: decrypt succeeds, new state NOT persisted
       // Old state on disk is unchanged

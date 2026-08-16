@@ -383,7 +383,7 @@ void main() {
   // ===========================================================================
 
   group('Ratchet Persistence', () {
-    test('serialize preserves all fields', () {
+    test('serialize preserves all fields', () async {
       final state = V2RatchetState(
         sessionId: 'session-abc',
         rootKey: List<int>.generate(32, (i) => i & 0xFF),
@@ -402,7 +402,7 @@ void main() {
         ratchetStep: 3,
       );
 
-      final serialized = V2RatchetPersistence.serialize(state);
+      final serialized = await V2RatchetPersistence.serialize(state);
 
       expect(serialized['session_id'], 'session-abc');
       expect(serialized['sending_message_number'], 42);
@@ -412,7 +412,7 @@ void main() {
       expect(serialized['skipped_keys'], isA<Map>());
     });
 
-    test('deserialize preserves all fields', () {
+    test('deserialize preserves all fields', () async {
       final original = V2RatchetState(
         sessionId: 'session-xyz',
         rootKey: List<int>.generate(32, (i) => i & 0xFF),
@@ -428,7 +428,7 @@ void main() {
         ratchetStep: 5,
       );
 
-      final serialized = V2RatchetPersistence.serialize(original);
+      final serialized = await V2RatchetPersistence.serialize(original);
       final restored = V2RatchetPersistence.deserialize(serialized);
 
       expect(restored.sessionId, original.sessionId);

@@ -802,7 +802,7 @@ void main() {
       bobState = dec1.state;
 
       // Step 3: Persist Bob's state (simulating process restart)
-      final persistedState = V2RatchetPersistence.serialize(bobState);
+      final persistedState = await V2RatchetPersistence.serialize(bobState);
 
       // Step 4: Simulate restart — reload state
       final reloadedState = V2RatchetPersistence.deserialize(persistedState);
@@ -845,7 +845,7 @@ void main() {
       bobState = r.bobState;
 
       // Bob restarts — persist and reload
-      final bobPersisted = V2RatchetPersistence.serialize(bobState);
+      final bobPersisted = await V2RatchetPersistence.serialize(bobState);
       bobState = V2RatchetPersistence.deserialize(bobPersisted);
 
       // A2: Alice → Bob (still same chain, no DH ratchet — same ratchet pub)
@@ -886,14 +886,14 @@ void main() {
   // ===========================================================================
 
   group('Corrupted State', () {
-    test('Corrupted rootKey fails gracefully', () {
+    test('Corrupted rootKey fails gracefully', () async {
       final state = V2RatchetState(
         sessionId: 'session-corrupt',
         rootKey: List<int>.generate(32, (i) => i),
         sendingChainKey: List<int>.generate(32, (i) => i),
       );
 
-      final serialized = V2RatchetPersistence.serialize(state);
+      final serialized = await V2RatchetPersistence.serialize(state);
 
       // Corrupt rootKey
       serialized['root_key'] = base64Encode(List<int>.filled(32, 0xFF));
@@ -905,14 +905,14 @@ void main() {
       // The session still loads, but decrypt will fail due to wrong root key
     });
 
-    test('Corrupted receivingChainKey fails gracefully', () {
+    test('Corrupted receivingChainKey fails gracefully', () async {
       final state = V2RatchetState(
         sessionId: 'session-corrupt-chain',
         rootKey: List<int>.generate(32, (i) => i),
         receivingChainKey: List<int>.generate(32, (i) => i),
       );
 
-      final serialized = V2RatchetPersistence.serialize(state);
+      final serialized = await V2RatchetPersistence.serialize(state);
 
       // Corrupt receivingChainKey
       serialized['receiving_chain_key'] = base64Encode(List<int>.filled(32, 0xFF));

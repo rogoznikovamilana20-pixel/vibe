@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'offline_queue_service.dart';
+import 'message_encryption_state.dart';
+import 'v2_message_storage.dart';
 
 import '../core/services/notification_service.dart';
 import '../chat/attachments.dart';
@@ -151,6 +153,13 @@ class VibeMessage {
   final String? localId;
 
   /// Ответ-цитата (только для локального отображения, на сервер не идёт).
+  ///
+  /// SECURITY POLICY (Phase 12C.4):
+  /// `replyText` and `replyAuthor` are NEVER stored on the server or
+  /// transmitted over the network. They exist only in client-local
+  /// memory and local disk cache. For V2 encrypted messages, reply
+  /// previews are reconstructed locally after decrypt — no plaintext
+  /// leaves the device. Reply context is lost on other devices (no sync).
   final String? replyText;
   final String? replyAuthor;
 
@@ -1567,28 +1576,26 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
                 displayName: '',
               );
 
-        // E2E: decrypt if encrypted — version routing
+        // E2E: decrypt if encrypted — central routing
         var text = m['text'] as String?;
-        if (m['is_encrypted'] == true && m['encrypted_content'] != null) {
-          final e2eeVersion = m['e2ee_version'];
+        final encState = resolveMessageEncryptionState(
+          Map<String, dynamic>.from(m),
+        );
 
-          if (e2eeVersion == 2) {
-            // --- V2 decrypt path ---
+        switch (encState) {
+          case MessageEncryptionState.encryptedV2:
             try {
               final plaintext = await V2Incoming.instance.decryptIncomingMessage(
                 row: Map<String, dynamic>.from(m),
                 myUserId: myProfileId ?? '',
               );
-              if (plaintext != null) {
-                text = plaintext;
-              } else {
-                text = '[зашифровано]';
-              }
+              text = plaintext ?? encryptionStateToDisplayText(encState);
             } catch (_) {
-              text = '[зашифровано]';
+              text = encryptionStateToDisplayText(
+                MessageEncryptionState.encryptedV2Failed,
+              );
             }
-          } else {
-            // --- V1 decrypt path (existing) ---
+          case MessageEncryptionState.encryptedV1:
             try {
               final e2e = E2eService.instance;
               if (e2e.hasKeys && m['sender_id'] != myProfileId) {
@@ -1598,9 +1605,15 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
                 );
               }
             } catch (_) {
-              text = '[зашифровано]';
+              text = encryptionStateToDisplayText(encState);
             }
-          }
+          case MessageEncryptionState.plaintext:
+            // text already from row — no action
+            break;
+          case MessageEncryptionState.encryptedV2Unavailable:
+          case MessageEncryptionState.encryptedV2Failed:
+          case MessageEncryptionState.unsupportedVersion:
+            text = encryptionStateToDisplayText(encState);
         }
 
         return VibeMessage(
@@ -2704,28 +2717,26 @@ _personal = _client.channel('u_$myId')
     final senderName = data['sender_name'] as String? ?? 'Пользователь';
     final senderAvatar = data['sender_avatar'] as String?;
 
-    // E2E: decrypt if encrypted — version routing
+    // E2E: decrypt if encrypted — central routing
     var text = data['text'] as String?;
-    if (data['is_encrypted'] == true && data['encrypted_content'] != null) {
-      final e2eeVersion = data['e2ee_version'];
+    final encState = resolveMessageEncryptionState(
+      Map<String, dynamic>.from(data as Map),
+    );
 
-      if (e2eeVersion == 2) {
-        // --- V2 decrypt path ---
+    switch (encState) {
+      case MessageEncryptionState.encryptedV2:
         try {
           final plaintext = await V2Incoming.instance.decryptIncomingMessage(
             row: Map<String, dynamic>.from(data as Map),
             myUserId: myId,
           );
-          if (plaintext != null) {
-            text = plaintext;
-          } else {
-            text = '[зашифровано]';
-          }
+          text = plaintext ?? encryptionStateToDisplayText(encState);
         } catch (_) {
-          text = '[зашифровано]';
+          text = encryptionStateToDisplayText(
+            MessageEncryptionState.encryptedV2Failed,
+          );
         }
-      } else {
-        // --- V1 decrypt path (existing) ---
+      case MessageEncryptionState.encryptedV1:
         try {
           final e2e = E2eService.instance;
           if (e2e.hasKeys && senderId != myId) {
@@ -2735,9 +2746,15 @@ _personal = _client.channel('u_$myId')
             );
           }
         } catch (_) {
-          text = '[зашифровано]';
+          text = encryptionStateToDisplayText(encState);
         }
-      }
+      case MessageEncryptionState.plaintext:
+        // text already from row — no action
+        break;
+      case MessageEncryptionState.encryptedV2Unavailable:
+      case MessageEncryptionState.encryptedV2Failed:
+      case MessageEncryptionState.unsupportedVersion:
+        text = encryptionStateToDisplayText(encState);
     }
 
     if (!streamController.isClosed) {
@@ -3043,11 +3060,17 @@ _personal = _client.channel('u_$myId')
     if (myId == null) return null;
     final before = await _client
         .from('messages')
-        .select('text,chat_id')
+        .select('text,chat_id,is_encrypted,e2ee_version')
         .eq('id', messageId)
         .eq('sender_id', myId)
         .maybeSingle();
     if (before == null) return null;
+    // V2 edit is unsupported — never write plaintext for encrypted messages.
+    if (V2StoredMessage.isV2Message(before)) {
+      throw UnsupportedError(
+        'Операция не поддерживается для зашифрованных сообщений',
+      );
+    }
     // Снимок старого текста в историю правок (как в Telegram).
     final oldText = (before['text'] as String?) ?? '';
     if (oldText.isNotEmpty) {
@@ -3185,6 +3208,22 @@ _personal = _client.channel('u_$myId')
   ) async {
     final myId = myProfileId;
     if (myId == null || !await _isMyChat(targetChatId)) return null;
+    // V2 forward is unsupported — never copy decrypted plaintext to server.
+    try {
+      final msgRow = await _client
+          .from('messages')
+          .select('is_encrypted,e2ee_version')
+          .eq('id', original.id)
+          .maybeSingle();
+      if (msgRow != null && V2StoredMessage.isV2Message(msgRow)) {
+        throw UnsupportedError(
+          'Операция не поддерживается для зашифрованных сообщений',
+        );
+      }
+    } catch (e) {
+      if (e is UnsupportedError) rethrow;
+      // If lookup fails, proceed (V1/legacy path).
+    }
     final row = await _client.from('messages').insert({
       'chat_id': targetChatId,
       'sender_id': myId,
