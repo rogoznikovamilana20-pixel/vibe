@@ -632,7 +632,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   /// Период проверки доступности сервера (health-check).
-  static const _healthInterval = Duration(seconds: 12);
+  static const _healthInterval = Duration(seconds: 30);
 
   /// Остановить мониторинг сети (вызывать при logout).
   void stopNetworkMonitor() {

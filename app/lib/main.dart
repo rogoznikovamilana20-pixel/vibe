@@ -43,11 +43,13 @@ void main() async {
     publishableKey: EnvConfig.supabaseAnonKey,
   );
 
-  await SettingsService.instance.init();
-  await AccountService.instance.init();
-  await PasscodeService.instance.init();
-  await ProfileAvatar.load();
-  await ScheduledService.instance.init();
+  await Future.wait([
+    SettingsService.instance.init(),
+    AccountService.instance.init(),
+    PasscodeService.instance.init(),
+    ProfileAvatar.load(),
+    ScheduledService.instance.init(),
+  ]);
 
   // Временный E2E-хелпер: позволяет установить PIN без UI-навигации.
   const e2ePin = String.fromEnvironment('E2E_PIN');

@@ -66,5 +66,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Для видеозвонков и фото</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Для голосовых сообщений и звонков</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Для выбора фото из галереи</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Для поиска устройств в локальной сети (звонки)</string>
 </dict>
 </plist>
