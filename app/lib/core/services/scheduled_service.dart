@@ -4,27 +4,33 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/backend.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../data/backend_api.dart';
 
-/// Отложенное текстовое сообщение (3.9).
+/// Отложенное текстовое сообщение (3.9) + silent как в TG.
 class ScheduledMessage {
   const ScheduledMessage({
     required this.localId,
     required this.chatId,
     required this.text,
     required this.when,
+    this.silent = false,
   });
 
   final String localId;
   final String chatId;
   final String text;
   final DateTime when;
+  final bool silent;
 
   Map<String, dynamic> toJson() => {
         'localId': localId,
         'chatId': chatId,
         'text': text,
         'when': when.toIso8601String(),
+        'silent': silent,
       };
 
   factory ScheduledMessage.fromJson(Map<String, dynamic> json) =>
@@ -33,6 +39,7 @@ class ScheduledMessage {
         chatId: json['chatId'] as String,
         text: json['text'] as String,
         when: DateTime.parse(json['when'] as String),
+        silent: json['silent'] as bool? ?? false,
       );
 }
 
@@ -103,26 +110,57 @@ class ScheduledService {
     String text,
     DateTime when, {
     String? localId,
+    bool silent = false,
   }) async {
     final m = ScheduledMessage(
       localId: localId ?? 'sched_${DateTime.now().microsecondsSinceEpoch}',
       chatId: chatId,
       text: text,
       when: when,
+      silent: silent,
     );
     (_byChat[chatId] ??= []).add(m);
     _arm(m);
     await _persist(chatId);
     version.value++;
+    // Серверное зеркало как в TG (best-effort) — cron доставит даже если приложение убито.
+    try {
+      final uid = VibeBackend.instance.myProfileId;
+      if (uid != null) {
+        await Supabase.instance.client.from('scheduled_messages').insert({
+          'chat_id': chatId,
+          'sender_id': uid,
+          'text': text,
+          'schedule_at': when.toUtc().toIso8601String(),
+          'silent': silent,
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> cancel(String chatId, String localId) async {
     final list = _byChat[chatId];
+    final removed = list?.where((m) => m.localId == localId).toList() ?? const [];
     if (list == null) return;
     list.removeWhere((m) => m.localId == localId);
     _timers.remove(localId)?.cancel();
     await _persist(chatId);
     version.value++;
+    // Удалить серверное зеркало, чтобы pg_cron не доставил дубль
+    for (final m in removed) {
+      try {
+        final uid = VibeBackend.instance.myProfileId;
+        if (uid != null) {
+          await Supabase.instance.client
+              .from('scheduled_messages')
+              .delete()
+              .eq('chat_id', chatId)
+              .eq('sender_id', uid)
+              .eq('text', m.text)
+              .eq('schedule_at', m.when.toUtc().toIso8601String());
+        }
+      } catch (_) {}
+    }
   }
 
   Future<void> _persist(String chatId) async {
@@ -150,7 +188,7 @@ class ScheduledService {
   Future<void> _fire(ScheduledMessage m) async {
     _timers.remove(m.localId);
     try {
-      await backendProvider().sendText(m.chatId, m.text, localId: m.localId);
+      await backendProvider().sendText(m.chatId, m.text, localId: m.localId, silent: m.silent);
     } catch (_) {
       // Сетевой сбой — честная деградация: повторим через минуту.
       final retry = ScheduledMessage(

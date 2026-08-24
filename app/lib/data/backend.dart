@@ -1,3 +1,4 @@
+// ignore_for_file: unrelated_type_equality_checks
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -14,6 +15,7 @@ import 'v2_message_storage.dart';
 import 'v2_media_outgoing.dart';
 
 import '../core/services/notification_service.dart';
+import '../core/profile_avatar.dart';
 import '../chat/attachments.dart';
 import 'e2e_service.dart';
 import 'v2_incoming.dart';
@@ -83,7 +85,13 @@ class VibeStickerPack {
 ///  - delivered — две серые: собеседник получил (его устройство онлайн);
 ///  - read — две синие: собеседник открыл чат;
 ///  - failed — не ушло (сеть/сервер).
-enum MsgStatus { sending, sent, delivered, read, failed }
+enum MsgStatus { sending, sent, delivered, read, failed, queued, retrying, cancelled }
+
+/// Максимальные размеры файлов (байты) — клиентская проверка перед readAsBytes.
+const int _maxPhotoBytes = 100 * 1024 * 1024;   // 100 MB
+const int _maxVideoBytes = 200 * 1024 * 1024;   // 200 MB
+const int _maxFileBytes  = 100 * 1024 * 1024;   // 100 MB
+const int _maxVoiceBytes = 25  * 1024 * 1024;   // 25 MB
 
 /// Снимок правки сообщения (история правок): старый текст в момент правки.
 class MessageEdit {
@@ -96,6 +104,13 @@ class MessageEdit {
   final String messageId;
   final String text;
   final DateTime editedAt;
+}
+
+class TypingEvent {
+  const TypingEvent({required this.chatId, required this.userId, this.action = 'typing'});
+  final String chatId;
+  final String userId;
+  final String action;
 }
 
 /// Одна модель сообщения в чате.
@@ -114,12 +129,16 @@ class VibeMessage {
     required this.incoming,
     this.status = MsgStatus.sent,
     this.localId,
+    this.replyTo,
     this.replyText,
     this.replyAuthor,
     this.edited = false,
     this.forwardedFrom,
     this.stickerEmoji,
     this.reactions = const {},
+    this.transcript,
+    this.transcriptLanguage,
+    this.transcriptStatus = 'pending',
   });
 
   final String id;
@@ -133,6 +152,9 @@ class VibeMessage {
   final String? videoPath;
   final DateTime created;
   final bool incoming;
+  final String? replyTo;
+  final String? replyText;
+  final String? replyAuthor;
 
   /// Стикер-эмодзи: сообщение-стикер (текста нет).
   final String? stickerEmoji;
@@ -146,23 +168,18 @@ class VibeMessage {
   /// Реакции: эмодзи → количество поставивших (заполняется с сервера).
   final Map<String, int> reactions;
 
+  /// Whisper транскрипт голосового (null — нет/ещё не готов).
+  final String? transcript;
+  final String? transcriptLanguage;
+  /// pending | processing | completed | failed
+  final String transcriptStatus;
+
   /// Статус отправки (для своих сообщений).
   final MsgStatus status;
 
   /// Локальный ключ для «мгновенного» показа: отправляем с телом сообщения,
   /// потом заменяем тем же ключом из ответа сервера — пузырь не мигает.
   final String? localId;
-
-  /// Ответ-цитата (только для локального отображения, на сервер не идёт).
-  ///
-  /// SECURITY POLICY (Phase 12C.4):
-  /// `replyText` and `replyAuthor` are NEVER stored on the server or
-  /// transmitted over the network. They exist only in client-local
-  /// memory and local disk cache. For V2 encrypted messages, reply
-  /// previews are reconstructed locally after decrypt — no plaintext
-  /// leaves the device. Reply context is lost on other devices (no sync).
-  final String? replyText;
-  final String? replyAuthor;
 
   VibeMessage copyWith({
     String? id,
@@ -178,11 +195,15 @@ class VibeMessage {
     bool? incoming,
     MsgStatus? status,
     String? localId,
+    String? replyTo,
     String? replyText,
     String? replyAuthor,
     bool? edited,
     String? forwardedFrom,
     Map<String, int>? reactions,
+    String? transcript,
+    String? transcriptLanguage,
+    String? transcriptStatus,
   }) {
     return VibeMessage(
       id: id ?? this.id,
@@ -198,11 +219,15 @@ class VibeMessage {
       incoming: incoming ?? this.incoming,
       status: status ?? this.status,
       localId: localId ?? this.localId,
+      replyTo: replyTo ?? this.replyTo,
       replyText: replyText ?? this.replyText,
       replyAuthor: replyAuthor ?? this.replyAuthor,
       edited: edited ?? this.edited,
       forwardedFrom: forwardedFrom ?? this.forwardedFrom,
       reactions: reactions ?? this.reactions,
+      transcript: transcript ?? this.transcript,
+      transcriptLanguage: transcriptLanguage ?? this.transcriptLanguage,
+      transcriptStatus: transcriptStatus ?? this.transcriptStatus,
     );
   }
 }
@@ -257,6 +282,9 @@ class PrivacySettings {
     this.forward = 0,
     this.calls = 0,
     this.groups = 0,
+    this.voiceMessages = 0,
+    this.bio = 0,
+    this.birthday = 0,
   });
 
   final int lastSeen;
@@ -264,6 +292,9 @@ class PrivacySettings {
   final int forward;
   final int calls;
   final int groups;
+  final int voiceMessages;
+  final int bio;
+  final int birthday;
 
   factory PrivacySettings.fromMap(Map<String, dynamic> m) => PrivacySettings(
         lastSeen: (m['last_seen'] as num?)?.toInt() ?? 0,
@@ -271,6 +302,9 @@ class PrivacySettings {
         forward: (m['forward'] as num?)?.toInt() ?? 0,
         calls: (m['calls'] as num?)?.toInt() ?? 0,
         groups: (m['groups'] as num?)?.toInt() ?? 0,
+        voiceMessages: (m['voice_messages'] as num?)?.toInt() ?? 0,
+        bio: (m['bio'] as num?)?.toInt() ?? 0,
+        birthday: (m['birthday'] as num?)?.toInt() ?? 0,
       );
 
   Map<String, dynamic> toMap() => {
@@ -279,6 +313,9 @@ class PrivacySettings {
         'forward': forward,
         'calls': calls,
         'groups': groups,
+        'voice_messages': voiceMessages,
+        'bio': bio,
+        'birthday': birthday,
       };
 }
 
@@ -441,6 +478,12 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   /// фильтрация realtime не дёргают базу на каждое событие.
   final _peers = <String, _CachedPeer>{};
 
+  /// Удалить протухшие записи из _peers (раз в N минут).
+  void _prunePeers() {
+    final now = DateTime.now();
+    _peers.removeWhere((_, v) => v.expiresAt.isBefore(now));
+  }
+
   /// Проверка принадлежности чата мне (для postgres_changes-пути).
   Future<bool> _isMyChat(String chatId) {
     final hit = _peers[chatId];
@@ -597,6 +640,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     _connSub = null;
     _healthTimer?.cancel();
     _healthTimer = null;
+    _reconnectAttempts = 0;
   }
 
   /// Запускает мониторинг сети: подписка на изменение связности устройства
@@ -640,7 +684,8 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   /// не отвечает — оффлайн-режим входа НЕ включаем (см. [isOffline]), просто
   /// держим пометку для кеш-стратегии.
   Future<void> _healthCheck() async {
-    if (!_networkAvailable) return; // без сети сервер не проверить
+    if (!_networkAvailable) return;
+    _prunePeers();
     try {
       await _client
           .from('profiles')
@@ -650,39 +695,56 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       final was = _backendReachable;
       _backendReachable = true;
       if (!was) {
-        // Сервер вернулся — подскажем UI обновить ленту.
+        // Сервер вернулся — подскажем UI обновить ленту и переподключить realtime.
         if (!_chatsController.isClosed) _chatsController.add(null);
+        unawaited(_reconnectRealtime());
       }
     } catch (_) {
       _backendReachable = false;
     }
   }
 
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+
   /// Пересоздаёт realtime-каналы после потери/восстановления сети.
+  /// При неудаче повторяет с экспоненциальным backoff: 1s, 2s, 4s, 8s, 16s.
   Future<void> _reconnectRealtime() async {
-    try {
-      final personal = _personal;
-      if (personal != null) {
-        try {
-          await personal.unsubscribe();
-        } catch (_) {}
-        _personal = null;
-        _personalName = null;
+    while (_reconnectAttempts < _maxReconnectAttempts) {
+      try {
+        final personal = _personal;
+        if (personal != null) {
+          try {
+            await personal.unsubscribe();
+          } catch (_) {}
+          _personal = null;
+          _personalName = null;
+        }
+        final dm = _dmChannel;
+        if (dm != null) {
+          try {
+            _client.removeChannel(dm);
+          } catch (_) {}
+          _dmChannel = _client.channel(_dmChannelName)
+            ..onBroadcast(
+                event: 'new_story',
+                callback: (_) => _chatsController.add(null));
+          _dmChannel!.subscribe();
+        }
+        _ensurePersonalChannel();
+        _resubscribePostgresChanges();
+        _reconnectAttempts = 0;
+        return;
+      } catch (_) {
+        _reconnectAttempts++;
+        if (_reconnectAttempts >= _maxReconnectAttempts) {
+          _reconnectAttempts = 0;
+          return;
+        }
+        final delaySec = 1 << (_reconnectAttempts - 1);
+        await Future.delayed(Duration(seconds: delaySec));
       }
-      final dm = _dmChannel;
-      if (dm != null) {
-        try {
-          _client.removeChannel(dm);
-        } catch (_) {}
-        _dmChannel = _client.channel(_dmChannelName)
-          ..onBroadcast(
-              event: 'new_story', callback: (_) => _chatsController.add(null));
-        _dmChannel!.subscribe();
-      }
-      _ensurePersonalChannel();
-      // Пересоздать postgres_changes каналы после reconnect.
-      _resubscribePostgresChanges();
-    } catch (_) {}
+    }
   }
 
   /// Пересоздать postgres_changes каналы (вызывать при reconnect).
@@ -967,10 +1029,14 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
           orElse: () => MsgStatus.sent,
         ),
         localId: m['localId'],
+        replyTo: m['replyTo'],
         replyText: m['replyText'],
         replyAuthor: m['replyAuthor'],
         edited: m['edited'] == true,
         forwardedFrom: m['forwardedFrom'],
+        transcript: m['transcript'],
+        transcriptLanguage: m['transcriptLanguage'],
+        transcriptStatus: m['transcriptStatus'] ?? 'pending',
       );
     }).toList();
   }
@@ -987,12 +1053,16 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
         'videoPath': m.videoPath,
         'created': m.created.toIso8601String(),
         'incoming': m.incoming,
+        'replyTo': m.replyTo,
         'status': m.status.name,
         'localId': m.localId,
         'replyText': m.replyText,
         'replyAuthor': m.replyAuthor,
         'edited': m.edited,
         'forwardedFrom': m.forwardedFrom,
+        'transcript': m.transcript,
+        'transcriptLanguage': m.transcriptLanguage,
+        'transcriptStatus': m.transcriptStatus,
       };
 
   static Future<void> saveMyId(String id) async {
@@ -1403,7 +1473,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     try {
       final res = await _client
           .from('chats')
-          .select('*, messages(text, created_at)')
+          .select('*, messages!messages_chat_id_fkey(text, created_at)')
           .inFilter('kind', ['pm', 'group'])
           .contains('members', [myProfileId])
           .timeout(const Duration(seconds: 6));
@@ -1431,17 +1501,25 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
         try {
           final kind = '${c['kind'] ?? 'pm'}';
           final members = List<String>.from(c['members']);
-          final peerId = members.firstWhere(
-            (m) => m != myProfileId,
-            orElse: () => myProfileId!,
-          );
+
+          // «Избранное»: все участники — это я (как Saved Messages в TG).
+          final isSaved = kind == 'pm' && members.every((m) => m == myProfileId);
+
+          final peerId = isSaved
+              ? myProfileId
+              : members.firstWhere(
+                  (m) => m != myProfileId,
+                  orElse: () => myProfileId!,
+                );
           
           final peer = profilesMap[peerId];
           final peerName = peer?.displayName;
           final peerUsername = peer?.username ?? '';
 
           String title;
-          if (kind == 'group') {
+          if (isSaved) {
+            title = 'Избранное';
+          } else if (kind == 'group') {
             final customTitle = c['title'] as String?;
             if (customTitle != null && customTitle.trim().isNotEmpty) {
               title = customTitle.trim();
@@ -1629,6 +1707,9 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
           videoPath: m['video_url'],
           created: DateTime.parse(m['created_at']).toLocal(), // FORCE LOCAL TIME
           incoming: m['sender_id'] != myProfileId,
+          replyTo: m['reply_to'],
+          replyText: m['reply_text'],
+          replyAuthor: m['reply_author'],
           edited: m['edited_at'] != null,
           forwardedFrom: m['forward_from'],
         );
@@ -1669,8 +1750,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       final myIdNow = myProfileId!;
       // «Избранное»: личный чат с самим собой (Saved Messages в TG).
       final isSaved = (c['kind'] == 'pm' || c['kind'] == null) &&
-          members.length == 1 &&
-          members.first == myIdNow;
+          members.every((m) => m == myIdNow);
       final peerId = members.firstWhere(
         (m) => m != myProfileId,
         orElse: () => myProfileId!,
@@ -1715,8 +1795,10 @@ peerName: peer?.displayName,
     String chatId,
     String text, {
     String? localId,
+    String? replyTo,
     String? replyText,
     String? replyAuthor,
+    bool silent = false,
   }) async {
     final lId = localId ?? _nextLocalId();
     final local = _ownLocal(
@@ -1810,6 +1892,9 @@ peerName: peer?.displayName,
       if (encryptedJson != null) {
         insertData['encrypted_content'] = encryptedJson;
       }
+      if (replyTo != null) insertData['reply_to'] = replyTo;
+      if (replyText != null) insertData['reply_text'] = replyText;
+      if (replyAuthor != null) insertData['reply_author'] = replyAuthor;
 
       final row = await _client.from('messages').insert(insertData)
           .select().single().timeout(const Duration(seconds: 5));
@@ -1903,6 +1988,9 @@ peerName: peer?.displayName,
     String? localId,
     String? localPath,
   }) async {
+    if (bytes.lengthInBytes > _maxPhotoBytes) {
+      throw Exception('Фото слишком большое (${(bytes.lengthInBytes / 1048576).round()} МБ, макс. 100 МБ)');
+    }
     final lId = localId ?? _nextLocalId();
     final local = _ownLocal(
       chatId: chatId,
@@ -2003,6 +2091,10 @@ peerName: peer?.displayName,
     String? localPath,
     String? mime,
   }) async {
+    final fileSize = file.lengthSync();
+    if (fileSize > _maxFileBytes) {
+      throw Exception('Файл слишком большой (${(fileSize / 1048576).round()} МБ, макс. 100 МБ)');
+    }
     final lId = localId ?? _nextLocalId();
     final name = file.uri.pathSegments.isEmpty
         ? 'file'
@@ -2152,6 +2244,10 @@ peerName: peer?.displayName,
     String? localPath,
     int? voiceSeconds,
   }) async {
+    final voiceSize = voiceFile.lengthSync();
+    if (voiceSize > _maxVoiceBytes) {
+      throw Exception('Голосовое сообщение слишком большое (${(voiceSize / 1048576).round()} МБ, макс. 25 МБ)');
+    }
     final lId = localId ?? _nextLocalId();
     final local = _ownLocal(
       chatId: chatId,
@@ -2240,6 +2336,15 @@ peerName: peer?.displayName,
       _sentByIdTime[rowId] = DateTime.now();
       _cleanupSentById();
       streamController.add(sent);
+      // Whisper: fire-and-forget транскрибация голосового (не блокирует отправку)
+      unawaited(() async {
+        try {
+          await _client.functions.invoke('whisper-transcribe', body: {
+            'message_id': rowId,
+            'storage_path': path,
+          });
+        } catch (_) {}
+      }());
       return sent;
     } catch (_) {
       streamController.add(local.copyWith(status: MsgStatus.failed));
@@ -2255,6 +2360,10 @@ peerName: peer?.displayName,
     String? localId,
     String? localPath,
   }) async {
+    final videoSize = videoFile.lengthSync();
+    if (videoSize > _maxVideoBytes) {
+      throw Exception('Видео слишком большое (${(videoSize / 1048576).round()} МБ, макс. 200 МБ)');
+    }
     final lId = localId ?? _nextLocalId();
     final local = _ownLocal(
       chatId: chatId,
@@ -2363,6 +2472,9 @@ peerName: peer?.displayName,
       videoPath: row['video_url'],
       created: DateTime.parse(row['created_at']),
       incoming: false,
+      replyTo: row['reply_to'],
+      replyText: row['reply_text'],
+      replyAuthor: row['reply_author'],
       edited: row['edited_at'] != null,
       forwardedFrom: row['forward_from'],
       stickerEmoji: row['sticker_emoji'],
@@ -2383,6 +2495,7 @@ peerName: peer?.displayName,
     String? photoPath,
     String? videoPath,
     MsgStatus? status,
+    String? replyTo,
     String? replyText,
     String? replyAuthor,
     String? stickerEmoji,
@@ -2402,6 +2515,7 @@ peerName: peer?.displayName,
       incoming: false,
       status: status ?? MsgStatus.sending,
       localId: localId,
+      replyTo: replyTo,
       replyText: replyText,
       replyAuthor: replyAuthor,
       stickerEmoji: stickerEmoji,
@@ -2869,7 +2983,6 @@ _personal = _client.channel('u_$myId')
         _chatsController.add(null);
       })
       ..onBroadcast(event: 'typing', callback: (m) {
-        // Собеседник печатает — показываем «печатает…» в шапке.
         final inner = m['payload'];
         final data = (inner is Map<String, dynamic> ||
                 inner is Map<dynamic, dynamic>)
@@ -2877,24 +2990,26 @@ _personal = _client.channel('u_$myId')
             : m;
         final chatId = '${data['chat_id']}';
         if (chatId.isEmpty || _typingController.isClosed) return;
-        _typingController.add(chatId);
+        final userId = '${data['user_id'] ?? ''}';
+        final action = '${data['action'] ?? 'typing'}';
+        _typingController.add(TypingEvent(chatId: chatId, userId: userId, action: action));
       });
     _personal!.subscribe();
   }
 
-  /// События «печатает…»: chatId собеседника.
-  final _typingController = StreamController<String>.broadcast();
-  Stream<String> get typingEvents => _typingController.stream;
+  /// События «печатает…»: TypingEvent с chatId/userId/action.
+  final _typingController = StreamController<TypingEvent>.broadcast();
+  Stream<TypingEvent> get typingEvents => _typingController.stream;
 
   /// Сообщить собеседникам чата, что я печатаю (для PM и групп).
-  /// UI сам сглаживает частоту вызовов.
-  Future<void> sendTyping(String chatId) async {
+  /// Поддерживает action: typing|record_voice|record_video|upload (как в TG).
+  Future<void> sendTyping(String chatId, {String action = 'typing'}) async {
     final me = myProfileId;
     if (me == null) return;
     final ids = await chatMemberIds(chatId);
     final others = ids.where((m) => m != me).toList();
     for (final m in others) {
-      unawaited(_sendRemote('u_$m', 'typing', {'chat_id': chatId}));
+      unawaited(_sendRemote('u_$m', 'typing', {'chat_id': chatId, 'user_id': me, 'action': action}));
     }
   }
 
@@ -3407,8 +3522,9 @@ _personal = _client.channel('u_$myId')
   /// «Переслано от …» (как в Telegram). Возвращает новое сообщение.
   Future<VibeMessage?> forwardMessage(
     String targetChatId,
-    VibeMessage original,
-  ) async {
+    VibeMessage original, {
+    bool hideSender = false,
+  }) async {
     final myId = myProfileId;
     if (myId == null || !await _isMyChat(targetChatId)) return null;
     // V2 forward is unsupported — never copy decrypted plaintext to server.
@@ -3435,12 +3551,12 @@ _personal = _client.channel('u_$myId')
       'voice_url': original.voicePath,
       'video_url': original.videoPath,
       'sticker_emoji': original.stickerEmoji,
-      'forward_from': original.senderName,
+      'forward_from': hideSender ? null : original.senderName,
     }).select().single();
     _broadcastMessageRow(row);
     _chatsController.add(null);
     final sent = _ownMessage(row).copyWith(
-      forwardedFrom: original.senderName,
+      forwardedFrom: hideSender ? null : original.senderName,
       status: MsgStatus.sent,
     );
     final rowId3 = '${row['id']}';

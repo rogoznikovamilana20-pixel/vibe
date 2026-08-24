@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/services/scheduled_service.dart';
@@ -11,6 +12,7 @@ import 'core/env_config.dart';
 import 'core/profile_avatar.dart';
 import 'core/theme/vibe_theme.dart';
 import 'core/localization/vibe_localizations.dart';
+import 'data/account_service.dart';
 import 'data/backend.dart';
 import 'data/settings_service.dart';
 import 'data/passcode_service.dart';
@@ -19,6 +21,13 @@ import 'screens/lock_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Глобальный обработчик ошибок Flutter framework > Crashlytics.
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  // Перехват необработанных async-ошибок > Crashlytics.
+  runZonedGuarded(() {}, (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+  });
   
   try {
     await Firebase.initializeApp();
@@ -35,6 +44,7 @@ void main() async {
   );
 
   await SettingsService.instance.init();
+  await AccountService.instance.init();
   await PasscodeService.instance.init();
   await ProfileAvatar.load();
   await ScheduledService.instance.init();
@@ -46,7 +56,7 @@ void main() async {
       debugPrint('[e2e] PIN уже установлен');
     } else {
       await PasscodeService.instance.setPasscode(e2ePin);
-      debugPrint('[e2e] PIN установлен: $e2ePin');
+      debugPrint('[e2e] PIN установлен');
     }
   }
   

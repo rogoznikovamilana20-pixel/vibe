@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,6 +12,7 @@ import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_backdrop.dart';
 import '../../core/widgets/vibe_button.dart';
 import '../../core/widgets/vibe_input.dart';
+import '../../data/account_service.dart';
 import '../../data/backend.dart';
 import '../../data/e2e_service.dart';
 import '../profile_setup_screen.dart';
@@ -108,6 +110,18 @@ class _AuthScreenState extends State<AuthScreen> {
           }
         }
       }
+
+      // Сохранить мультиаккаунт (до 3 как в ТГ)
+      try {
+        await AccountService.instance.saveAccount(
+          phone: _phone,
+          password: _password.text,
+          userId: profile.id,
+          displayName: profile.displayName,
+          emoji: profile.emoji,
+          avatarUrl: profile.avatar,
+        );
+      } catch (_) {}
 
       // E2E: generate keys if not exist
       try {
@@ -339,7 +353,7 @@ class _AuthScreenState extends State<AuthScreen> {
             textAlign: TextAlign.center,
             style: VibeTypography.bodyMedium.copyWith(
               color: active ? Colors.white : context.vibeTextSecondary,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -379,7 +393,7 @@ class _AuthScreenState extends State<AuthScreen> {
         style: VibeTypography.bodyMedium.copyWith(
           color: context.vibeTextPrimary,
           fontSize: 17,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
         dropdownTextStyle: TextStyle(color: context.vibeTextPrimary),
         cursorColor: context.vibePrimary,
