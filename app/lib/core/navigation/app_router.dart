@@ -6,10 +6,13 @@ import '../../screens/chat_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../screens/root_shell.dart';
 
+final GlobalKey<NavigatorState> vibeNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Центральный роутер Vibe — named routes + deep links (vibe://, https://vibe.me).
 /// Постепенно мигрируем с императивного Navigator.push на go_router.
 /// Пока — обёртка над существующими экранами, сохраняет TG-компоновку.
 final GoRouter vibeRouter = GoRouter(
+  navigatorKey: vibeNavigatorKey,
   initialLocation: '/',
   routes: [
     GoRoute(

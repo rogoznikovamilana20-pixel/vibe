@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -12,17 +14,34 @@ import 'core/env_config.dart';
 import 'core/profile_avatar.dart';
 import 'data/message_cache.dart';
 import 'core/di/service_locator.dart';
+import 'core/navigation/app_router.dart';
 import 'core/theme/vibe_theme.dart';
 import 'core/localization/vibe_localizations.dart';
 import 'data/account_service.dart';
 import 'data/backend.dart';
 import 'data/settings_service.dart';
 import 'data/passcode_service.dart';
-import 'screens/splash_screen.dart';
 import 'screens/lock_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    try {
+      await windowManager.ensureInitialized();
+      const opts = WindowOptions(
+        size: Size(1280, 720),
+        minimumSize: Size(1080, 720),
+        center: true,
+        backgroundColor: Colors.transparent,
+        titleBarStyle: TitleBarStyle.normal,
+      );
+      windowManager.waitUntilReadyToShow(opts, () async {
+        await windowManager.show();
+        await windowManager.focus();
+      });
+    } catch (_) {}
+  }
 
   try {
     await Firebase.initializeApp();
@@ -105,7 +124,6 @@ SystemUiOverlayStyle _overlayFor(ThemeMode mode) {
 }
 
 class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
-  static final _navigatorKey = GlobalKey<NavigatorState>();
   bool _lockPushed = false;
   Timer? _autoNightTimer;
 
@@ -164,7 +182,7 @@ class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
   Future<void> _maybeLockOnResume() async {
     if (_lockPushed) return;
     if (!await PasscodeService.instance.shouldLockOnResume()) return;
-    final navigator = _navigatorKey.currentState;
+    final navigator = vibeNavigatorKey.currentState;
     if (navigator == null) return;
     _lockPushed = true;
     navigator.push(
@@ -191,7 +209,7 @@ class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
               builder: (context, _, _) {
                 return AnnotatedRegion<SystemUiOverlayStyle>(
                   value: _overlayFor(mode),
-                  child: MaterialApp(
+                  child: MaterialApp.router(
                     title: 'Vibe',
                     debugShowCheckedModeBanner: false,
                     theme: VibeTheme.light(),
@@ -209,8 +227,7 @@ class _VibeAppState extends State<VibeApp> with WidgetsBindingObserver {
                       Locale('en'),
                     ],
                     scrollBehavior: const VibeScrollBehavior(),
-                    navigatorKey: _navigatorKey,
-                    home: const SplashScreen(),
+                    routerConfig: vibeRouter,
                   ),
                 );
               },

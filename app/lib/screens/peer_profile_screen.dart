@@ -20,6 +20,7 @@ import '../data/settings_service.dart';
 import 'settings/privacy/e2ee_verification_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import '../../core/localization/vibe_localizations.dart';
 
 /// Один медиафайл из переписки (фото или видеокружок).
 class PeerMedia {
@@ -246,7 +247,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                       icon: VibeIcons.phone,
                       label: 'Аудио',
                       onTap: () {
-                        VibeToast.show(context, 'Аудиозвонок — в v2.0');
+                        VibeToast.show(context, VibeLocalizations.of(context).callAudioSoon);
                       },
                     ),
                   ),
@@ -256,7 +257,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                       icon: VibeIcons.video,
                       label: 'Видео',
                       onTap: () {
-                        VibeToast.show(context, 'Видеозвонок — в v2.0');
+                        VibeToast.show(context, VibeLocalizations.of(context).callVideoSoon);
                       },
                     ),
                   ),
