@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -73,46 +71,6 @@ class _TypingDotsState extends State<_TypingDots>
   }
 }
 
-/// Стеклянная пилюля шапки чата — как в Telegram: одна плавающая капсула.
-/// Использует стекло темы, поэтому дружит и со светлой, и с тёмной темой.
-class _HeaderPill extends StatelessWidget {
-  const _HeaderPill({
-    required this.child,
-    this.onTap,
-    this.onLongPress,
-  });
-
-  final Widget child;
-  final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: VibeSpacing.sm,
-          vertical: 7,
-        ),
-        decoration: BoxDecoration(
-          color: context.vibeGlass.withValues(
-            alpha: context.isDarkMode ? 0.35 : 0.65,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: context.isDarkMode
-                ? Colors.white.withValues(alpha: 0.06)
-                : const Color(0x1A1C1B22),
-          ),
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
 /// Шапка чата: назад, аватар+имя+статус, действия (поиск/звонок/меню).
 class ChatAppBar extends StatelessWidget {
   const ChatAppBar({
@@ -120,7 +78,9 @@ class ChatAppBar extends StatelessWidget {
     required this.chat,
     this.groupTitle,
     this.peerTyping = false,
+    this.typingUsers = const {},
     required this.onBack,
+    this.onBackLongPress,
     required this.onOpenProfile,
     required this.onOpenGroupInfo,
     required this.onOpenSearch,
@@ -133,8 +93,10 @@ class ChatAppBar extends StatelessWidget {
 
   /// Индикатор «печатает…» для личного чата.
   final bool peerTyping;
+  final Set<String> typingUsers;
 
   final VoidCallback onBack;
+  final VoidCallback? onBackLongPress;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenGroupInfo;
   final VoidCallback onOpenSearch;
@@ -145,57 +107,69 @@ class ChatAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
     final isGroup = chat.kind == 'group';
-    final typing = !isGroup && peerTyping;
+    final typing = peerTyping || typingUsers.isNotEmpty;
     final subtitle = typing
         ? null
         : (isGroup
-            ? l.chatStatusGroup
-            : (chat.peerOnline
-                ? l.statusOnline
-                : (chat.peerLastSeen != null
-                    ? 'был(а) в сети ${VibeBackend.formatTime(chat.peerLastSeen)}'
-                    : l.statusRecently)));
+              ? l.chatStatusGroup
+              : (chat.peerOnline
+                    ? l.statusOnline
+                    : (chat.peerLastSeen != null
+                          ? l.statusLastSeenAt.replaceFirst(
+                              '{time}',
+                              VibeBackend.formatTime(chat.peerLastSeen),
+                            )
+                          : l.statusRecently)));
     final subtitleColor = typing
         ? context.vibePrimary
         : ((!isGroup && chat.peerOnline)
-            ? VibeColors.success
-            : context.vibeTextTertiary);
+              ? VibeColors.success
+              : context.vibeTextTertiary);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        VibeSpacing.sm,
-        VibeSpacing.xs,
-        VibeSpacing.sm,
-        VibeSpacing.xs,
+    return Material(
+      color: context.vibeGlass.withValues(
+        alpha: context.isDarkMode ? 0.96 : 0.94,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Row(
-            children: [
-              VibeIconButton(
-                icon: Icons.arrow_back_ios_new_rounded,
-                onPressed: onBack,
-                iconSize: 22,
-                tooltip: l.tooltipBack,
-                color: context.vibeTextPrimary,
-              ),
-              const SizedBox(width: VibeSpacing.xs),
-              Expanded(
-                child: _HeaderPill(
-                  onTap: isGroup ? onOpenGroupInfo : onOpenProfile,
-                  onLongPress: () {
-                    HapticFeedback.mediumImpact();
-                    if (!isGroup) onOpenProfile();
-                  },
+      child: Container(
+        padding: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: context.vibeDivider)),
+        ),
+        child: Row(
+          children: [
+            VibeIconButton(
+              icon: Icons.arrow_back_ios_new_rounded,
+              onPressed: onBack,
+              onLongPress: onBackLongPress == null
+                  ? null
+                  : () {
+                      HapticFeedback.mediumImpact();
+                      onBackLongPress!.call();
+                    },
+              iconSize: 22,
+              tooltip: l.tooltipBack,
+              color: context.vibeTextPrimary,
+            ),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(VibeRadius.sm),
+                onTap: isGroup ? onOpenGroupInfo : onOpenProfile,
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  if (!isGroup) onOpenProfile();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: VibeSpacing.xs,
+                    vertical: 2,
+                  ),
                   child: Row(
                     children: [
                       Hero(
                         tag: 'avatar_${chat.id}',
                         child: VibeAvatar(
                           name: chat.title,
-                          size: 38,
+                          size: 40,
                           online: chat.peerOnline,
                           photoUrl: chat.peerAvatar,
                         ),
@@ -232,52 +206,26 @@ class ChatAppBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: VibeSpacing.xs),
-              _HeaderPill(
-                child: IntrinsicHeight(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      VibeIconButton(
-                        icon: VibeIcons.search,
-                        onPressed: onOpenSearch,
-                        tooltip: l.tooltipSearch,
-                        color: context.vibeTextPrimary,
-                      ),
-                      VerticalDivider(
-                        width: 1,
-                        indent: 4,
-                        endIndent: 4,
-                        color: context.isDarkMode
-                            ? Colors.white24
-                            : context.vibeBorder,
-                      ),
-                      VibeIconButton(
-                        icon: Icons.call_outlined,
-                        onPressed: onChooseCall,
-                        tooltip: l.tooltipCall,
-                        color: context.vibeTextPrimary,
-                      ),
-                      VerticalDivider(
-                        width: 1,
-                        indent: 4,
-                        endIndent: 4,
-                        color: context.isDarkMode
-                            ? Colors.white24
-                            : context.vibeBorder,
-                      ),
-                      VibeIconButton(
-                        icon: VibeIcons.moreVertical,
-                        onPressed: onShowMenu,
-                        tooltip: l.tooltipMore,
-                        color: context.vibeTextPrimary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            VibeIconButton(
+              icon: VibeIcons.search,
+              onPressed: onOpenSearch,
+              tooltip: l.tooltipSearch,
+              color: context.vibeTextPrimary,
+            ),
+            VibeIconButton(
+              icon: Icons.call_outlined,
+              onPressed: onChooseCall,
+              tooltip: l.tooltipCall,
+              color: context.vibeTextPrimary,
+            ),
+            VibeIconButton(
+              icon: VibeIcons.moreVertical,
+              onPressed: onShowMenu,
+              tooltip: l.tooltipMore,
+              color: context.vibeTextPrimary,
+            ),
+          ],
         ),
       ),
     );
@@ -317,15 +265,13 @@ class SheetCallTile extends StatelessWidget {
       title: Text(
         title,
         style: VibeTypography.body.copyWith(
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
           color: context.vibeTextPrimary,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: VibeTypography.caption.copyWith(
-          color: context.vibeTextTertiary,
-        ),
+        style: VibeTypography.caption.copyWith(color: context.vibeTextTertiary),
       ),
       onTap: onTap,
     );

@@ -81,7 +81,7 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
         name,
         style: VibeTypography.bodyMedium.copyWith(
           color: active ? context.vibePrimary : context.vibeTextPrimary,
-          fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+          fontWeight: active ? FontWeight.w500 : FontWeight.w500,
         ),
       ),
       subtitle: comingSoon

@@ -336,6 +336,21 @@ class NotificationService {
   /// Переслать FCM-токен в профиль (после входа).
   Future<void> syncToken() => _syncToken();
 
+  /// Удалить FCM-токен (при logout).
+  Future<void> deleteToken() async {
+    try {
+      await _messaging?.deleteToken();
+    } catch (_) {}
+  }
+
+  /// Сбросить состояние (при logout) — отменить подписки, очистить кэш.
+  void reset() {
+    _realtimeSub?.cancel();
+    _realtimeSub = null;
+    activeChatId = null;
+    _pendingChatId = null;
+  }
+
   Future<void> _syncToken() async {
     try {
       final token = await _messaging?.getToken();
@@ -363,6 +378,9 @@ class NotificationService {
       body: n.body ?? '',
       chatId: chatId,
       photoUrl: data['photoUrl'],
+      callId: data['callId'],
+      callerId: data['callerId'],
+      callType: data['callType'],
     );
   }
 }

@@ -1,6 +1,8 @@
-﻿import 'package:flutter/material.dart';
+// ignore_for_file: deprecated_member_use
+import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_animations.dart';
+import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
@@ -52,22 +54,43 @@ class _FoldersScreenState extends State<FoldersScreen> {
           if (folders.isEmpty) {
             return _buildEmpty(context);
           }
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(
-              VibeSpacing.lg,
-              VibeSpacing.sm,
-              VibeSpacing.lg,
-              VibeSpacing.xxl,
-            ),
+          return Column(
             children: [
-              for (final f in folders) _folderTile(context, f),
-              const SizedBox(height: VibeSpacing.lg),
-              VibeButton(
-                label: l.foldersNewFolder,
-                icon: Icons.create_new_folder_outlined,
-                size: VibeButtonSize.s,
-                expand: true,
-                onPressed: () => _openEditor(context, null),
+              Expanded(
+                child: ReorderableListView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    VibeSpacing.lg,
+                    VibeSpacing.sm,
+                    VibeSpacing.lg,
+                    VibeSpacing.sm,
+                  ),
+                  buildDefaultDragHandles: false,
+                  itemCount: folders.length,
+                  onReorder: (oldIndex, newIndex) => settings.reorderFolders(oldIndex, newIndex),
+                  itemBuilder: (context, index) {
+                    final f = folders[index];
+                    return ReorderableDragStartListener(
+                      key: ValueKey(f.id),
+                      index: index,
+                      child: _folderTile(context, f),
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  VibeSpacing.lg,
+                  0,
+                  VibeSpacing.lg,
+                  VibeSpacing.xxl,
+                ),
+                child: VibeButton(
+                  label: l.foldersNewFolder,
+                  icon: Icons.create_new_folder_outlined,
+                  size: VibeButtonSize.s,
+                  expand: true,
+                  onPressed: () => _openEditor(context, null),
+                ),
               ),
             ],
           );
@@ -126,9 +149,9 @@ class _FoldersScreenState extends State<FoldersScreen> {
 
   Widget _folderTile(BuildContext context, VibeChatFolder folder) {
     final settings = SettingsService.instance;
-    final count = widget.chats
-        .where((c) => settings.folderOf(c.id) == folder.id)
-        .length;
+    final chatsInFolder = widget.chats.where((c) => settings.folderOf(c.id) == folder.id).toList();
+    final count = chatsInFolder.length;
+    final unread = chatsInFolder.fold(0, (s, c) => s + c.unread);
     return Padding(
       padding: const EdgeInsets.only(bottom: VibeSpacing.sm),
       child: Material(
@@ -157,19 +180,39 @@ class _FoldersScreenState extends State<FoldersScreen> {
                         folder.title,
                         style: VibeTypography.body.copyWith(
                           color: context.vibeTextPrimary,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        _plural(count),
-                        style: VibeTypography.caption.copyWith(
-                          color: context.vibeTextTertiary,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            _plural(count),
+                            style: VibeTypography.caption.copyWith(
+                              color: context.vibeTextTertiary,
+                            ),
+                          ),
+                          if (unread > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: VibeColors.unreadBlue,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$unread',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
                 ),
+                Icon(Icons.drag_handle_rounded, color: context.vibeTextTertiary, size: 20),
+                const SizedBox(width: 8),
                 Icon(
                   Icons.chevron_right_rounded,
                   color: context.vibeTextTertiary,
@@ -224,6 +267,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
   late final TextEditingController _title;
   late String _emoji;
   late final Set<String> _assigned;
+  late Set<String> _filters;
 
   bool get _isNew => widget.folderId == null;
 
@@ -236,6 +280,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
         : settings.chatFolders.where((f) => f.id == widget.folderId).firstOrNull;
     _title = TextEditingController(text: folder?.title ?? '');
     _emoji = folder?.emoji ?? _emojis.first;
+    _filters = Set<String>.from(folder?.filters ?? const <String>{});
     _assigned = {
       for (final c in widget.chats)
         if (settings.folderOf(c.id) == widget.folderId) c.id,
@@ -258,14 +303,14 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
     if (_isNew) {
       // Новая папка: сначала создаём, затем назначаем выбранные чаты.
       final before = settings.chatFolders.length;
-      await settings.addFolder(title, emoji: _emoji);
+      await settings.addFolder(title, emoji: _emoji, filters: _filters);
       if (settings.chatFolders.length == before) return;
       final newId = settings.chatFolders.last.id;
       for (final c in widget.chats) {
         await settings.setFolderForChat(c.id, _assigned.contains(c.id) ? newId : null);
       }
     } else {
-      await settings.renameFolder(widget.folderId!, title, emoji: _emoji);
+      await settings.renameFolder(widget.folderId!, title, emoji: _emoji, filters: _filters);
       for (final c in widget.chats) {
         final inThis = _assigned.contains(c.id);
         final now = settings.folderOf(c.id);
@@ -359,6 +404,32 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
                   ),
                 ),
             ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          SwitchListTile(
+            title: const Text('Только непрочитанные'),
+            value: _filters.contains('unread'),
+            onChanged: (v) => setState(() {
+              if (v) {
+                _filters.add('unread');
+              } else {
+                _filters.remove('unread');
+              }
+            }),
+            contentPadding: EdgeInsets.zero,
+          ),
+          SwitchListTile(
+            title: const Text('Без звука'),
+            subtitle: const Text('Только чаты без звука', style: TextStyle(fontSize: 12)),
+            value: _filters.contains('muted'),
+            onChanged: (v) => setState(() {
+              if (v) {
+                _filters.add('muted');
+              } else {
+                _filters.remove('muted');
+              }
+            }),
+            contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: VibeSpacing.lg),
           Text(

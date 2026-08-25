@@ -1,11 +1,9 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
-import '../../core/theme/vibe_theme.dart';
 
 /// Telegram-style bottom sheet with drag handle, swipe-to-dismiss,
 /// and spring physics. Replaces default showModalBottomSheet.
@@ -168,7 +166,7 @@ class _TelegramBottomSheetState extends State<TelegramBottomSheet>
                               widget.title!,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w500,
                                 color: textColor,
                               ),
                             ),

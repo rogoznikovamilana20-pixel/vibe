@@ -1,10 +1,17 @@
 -- GAP8 fix: cron должен вставлять все NOT NULL колонки messages + уважать silent
 -- Пересоздаём джоб из v1_19 с правильными полями
 
--- Удалить старый джоб если есть
-select cron.unschedule('deliver-scheduled-messages') where exists (
-  select 1 from cron.job where jobname = 'deliver-scheduled-messages'
-);
+create extension if not exists pg_cron with schema pg_catalog;
+grant usage on schema cron to postgres;
+
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    if exists (select 1 from cron.job where jobname = 'deliver-scheduled-messages') then
+      perform cron.unschedule('deliver-scheduled-messages');
+    end if;
+  end if;
+end $$;
 
 select cron.schedule(
   'deliver-scheduled-messages',

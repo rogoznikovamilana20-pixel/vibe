@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -263,7 +263,7 @@ class _VideoRoundRecorderScreenState extends State<VideoRoundRecorderScreen> {
                               '0:${_seconds.toString().padLeft(2, '0')}',
                               style: VibeTypography.bodyMedium.copyWith(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],

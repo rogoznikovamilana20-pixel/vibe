@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 import '../core/theme/vibe_spacing.dart';
 import '../core/widgets/vibe_avatar.dart';
@@ -266,7 +267,7 @@ class _StoryPlayerScreenState extends State<StoryPlayerScreen> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             if (_showHint) ...[
@@ -313,6 +314,63 @@ class _StoryPlayerScreenState extends State<StoryPlayerScreen> {
                         icon: const Icon(VibeIcons.close),
                         color: Colors.white,
                         tooltip: 'Закрыть',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Реакции и ответ как в TG (деградация тостом).
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(VibeSpacing.md, 0, VibeSpacing.md, VibeSpacing.md),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.md, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final e in const ['❤️', '🔥', '😂', '😮', '😢', '👍'])
+                                GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    VibeToast.show(context, 'Реакция $e');
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: Text(e, style: const TextStyle(fontSize: 22)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: VibeSpacing.sm),
+                      GestureDetector(
+                        onTap: () {
+                          VibeToast.show(context, 'Ответ на историю — в v2');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                        ),
                       ),
                     ],
                   ),
@@ -403,7 +461,7 @@ class _StoryPlayerScreenState extends State<StoryPlayerScreen> {
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),

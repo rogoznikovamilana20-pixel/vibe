@@ -85,11 +85,13 @@ class VibeLocalizations {
       'lock_title': 'Vibe заблокирован',
       'lock_enter_passcode': 'Введите код-пароль',
       'lock_wrong_passcode': 'Неверный код-пароль',
-      'lock_too_many_attempts': 'Слишком много неверных попыток. Ввод заблокирован на 30 секунд.',
+      'lock_too_many_attempts':
+          'Слишком много неверных попыток. Ввод заблокирован на 30 секунд.',
       'lock_attempts_left': 'Неверный код-пароль. Осталось попыток: ',
       'auto_lock_off': 'Выключено',
       'auto_lock_immediately': 'Сразу',
-      'languages_available': 'Доступные сейчас: Русский и English. Остальные — скоро.',
+      'languages_available':
+          'Доступные сейчас: Русский и English. Остальные — скоро.',
       'general_settings': 'Основные настройки',
       'tooltip_back': 'Назад',
       'tooltip_clear': 'Очистить',
@@ -109,7 +111,10 @@ class VibeLocalizations {
       'search_hint': 'Поиск',
       'search_by_nick_hint': 'Поиск по никнейму или телефону...',
       'search_global_title': 'Глобальный поиск',
-      'search_global_subtitle': 'Введите @никнейм или номер телефона, чтобы найти человека в Vibe.',
+      'search_chats': 'Чаты',
+      'search_people': 'Люди',
+      'search_global_subtitle':
+          'Введите @никнейм или номер телефона, чтобы найти человека в Vibe.',
       'new_message_title': 'Новое сообщение',
       'new_message_subtitle': 'Начните переписку или позвоните',
       'new_contact_title': 'Новый контакт',
@@ -162,6 +167,7 @@ class VibeLocalizations {
       'chat_swipe_enable_notifications': 'Включить уведомления',
       'chat_draft_label': 'Черновик: ',
       'chat_in_archive': 'В архиве',
+      'chat_typing': 'печатает…',
       'chat_new': 'Новый',
       'invite_text': 'Заходи в Vibe — мой мессенджер. Жду тебя!',
       'invite_copied': 'Приглашение скопировано — отправьте его другу',
@@ -187,10 +193,12 @@ class VibeLocalizations {
       'recording_camera_unavailable': 'Камера недоступна',
       'recording_swipe_to_lock': 'Свайп вверх — зафиксировать',
       'two_step_create_password': 'Придумайте пароль',
-      'two_step_password_description': 'Этот пароль будет запрашиваться при входе на новом устройстве в дополнение к коду из SMS.',
+      'two_step_password_description':
+          'Этот пароль будет запрашиваться при входе на новом устройстве в дополнение к коду из SMS.',
       'two_step_confirm_password': 'Повторите пароль',
       'two_step_hint': 'Подсказка для пароля',
-      'two_step_hint_description': 'Вы можете оставить подсказку, которая поможет вспомнить пароль.',
+      'two_step_hint_description':
+          'Вы можете оставить подсказку, которая поможет вспомнить пароль.',
       'two_step_password_too_short': 'Пароль слишком короткий',
       'two_step_passwords_dont_match': 'Пароли не совпадают',
       'two_step_enabled': 'Двухэтапная аутентификация включена',
@@ -219,7 +227,8 @@ class VibeLocalizations {
       'settings_data_clear_all': 'Очистить всё',
       'settings_data_clear_cache': 'Очистить кэш',
       'settings_appearance_reset_confirm': 'Сбросить настройки?',
-      'settings_appearance_reset_description': 'Все настройки внешнего вида будут сброшены к значениям по умолчанию.',
+      'settings_appearance_reset_description':
+          'Все настройки внешнего вида будут сброшены к значениям по умолчанию.',
       'settings_appearance_reset': 'Сбросить',
       'settings_appearance_auto_night': 'Авто-ночь',
       'settings_appearance_enter_to_send': 'Отправка по Enter',
@@ -279,9 +288,11 @@ class VibeLocalizations {
       'chat_list_done_tooltip': 'Готово',
       'chat_list_menu_tooltip': 'Меню чатов',
       'voice_recorder_locked_hint': 'Зафиксировано — тап по кнопке: отправить',
-      'voice_recorder_swipe_hint': 'Свайп вверх — зафиксировать · влево — отменить',
+      'voice_recorder_swipe_hint':
+          'Свайп вверх — зафиксировать · влево — отменить',
       'video_recorder_locked_hint': 'Зафиксировано',
-      'video_recorder_swipe_hint': 'Свайп вверх — зафиксировать · влево — отмена',
+      'video_recorder_swipe_hint':
+          'Свайп вверх — зафиксировать · влево — отмена',
       'peer_profile_message': 'Сообщение',
       'peer_profile_audio': 'Аудио',
       'peer_profile_video': 'Видео',
@@ -301,6 +312,13 @@ class VibeLocalizations {
       'chat_mark_read': 'Отметить прочитанным',
       'chat_mark_unread': 'Отметить непрочитанным',
       'chat_reordered': 'Порядок чатов обновлён',
+      'settings_swipe_title': 'Свайп по чату',
+      'settings_swipe_subtitle': 'Действие при свайпе влево по чату',
+      'settings_swipe_archive': 'В архив',
+      'settings_swipe_read': 'Прочитано',
+      'settings_swipe_mute': 'Без звука',
+      'settings_swipe_pin': 'Закрепить',
+      'settings_swipe_delete': 'Удалить',
       'msg_translate': 'Перевести',
       'msg_translated': 'Переведено',
       'chat_menu_export': 'Экспорт чата',
@@ -361,13 +379,15 @@ class VibeLocalizations {
       'hidden_empty': 'Скрытых чатов нет',
       'chat_empty': 'Нет чатов',
       'hidden_empty_subtitle': 'Здесь будут чаты, которые вы спрячете сюда',
-      'chat_empty_subtitle': 'Начните переписку — это самый быстрый способ попробовать Vibe',
+      'chat_empty_subtitle':
+          'Начните переписку — это самый быстрый способ попробовать Vibe',
       'action_new_message': 'Новое сообщение',
       'archive_title': 'Архив',
       'hidden_title': 'Скрытые',
       'action_back_to_chats': 'К чатам →',
       'hidden_protection_title': 'Защита скрытых чатов',
-      'hidden_protection_body': 'Скрытые чаты охраняются код-паролем. Настройте его в «Настройки → Конфиденциальность».',
+      'hidden_protection_body':
+          'Скрытые чаты охраняются код-паролем. Настройте его в «Настройки → Конфиденциальность».',
       'action_later': 'Позже',
       'action_set': 'Установить',
       'aurion_card_subtitle': 'Твой встроенный ИИ-ассистент',
@@ -413,7 +433,8 @@ class VibeLocalizations {
       'call_video_soon': 'Видеозвонок — в v2.0',
       'chat_archived_snack': 'Чат в архиве',
       'chat_delete_title': 'Удалить чат?',
-      'chat_delete_body': 'Чат исчезнет из вашего списка. Сообщения будут удалены.',
+      'chat_delete_body':
+          'Чат исчезнет из вашего списка. Сообщения будут удалены.',
       'chat_kind_pm': 'Личный чат',
       'chat_kind_group': 'Группа',
       'chat_kind_channel': 'Канал',
@@ -421,7 +442,8 @@ class VibeLocalizations {
       'chat_member': 'Участник',
       'chat_messages_count': 'Сообщений',
       'chat_clear_history_title': 'Очистить историю?',
-      'chat_clear_history_body': 'Все сообщения этого чата будут удалены у всех участников.',
+      'chat_clear_history_body':
+          'Все сообщения этого чата будут удалены у всех участников.',
       'action_clear': 'Очистить',
       'attachment_title': 'Вложение',
       'attachment_photo': 'Фото',
@@ -481,6 +503,7 @@ class VibeLocalizations {
       'chat_emoji_stickers': 'Эмодзи и стикеры',
       'search_result_of': 'из',
       'status_last_seen': 'был(а) в сети',
+      'status_last_seen_at': 'был(а) в сети в {time}',
       'group_leave_title': 'Выйти из группы?',
       'group_leave_body': 'Вы перестанете получать сообщения этой группы.',
       'group_leave_confirm': 'Выйти из группы',
@@ -544,24 +567,30 @@ class VibeLocalizations {
       'aurion_suggestion2': 'Перепиши позлее',
       'aurion_suggestion3': 'Сделай из этого список задач',
       'aurion_suggestion4': 'Идеи для поста в канал',
-      'aurion_connect_failed': 'Не удалось подключиться: проверьте ключ доступа.',
+      'aurion_connect_failed':
+          'Не удалось подключиться: проверьте ключ доступа.',
       'aurion_unavailable': 'Aurion временно недоступен.',
       'aurion_try_asking': 'Попробуй спросить',
       'aurion_input_hint': 'Спроси Aurion…',
       'aurion_greeting': 'Привет! Я Aurion — твой персональный AI-ассистент.',
-      'aurion_hero_text': 'Я могу помочь с текстами, переводом, задачами и идеями.',
+      'aurion_hero_text':
+          'Я могу помочь с текстами, переводом, задачами и идеями.',
       'aurion_connect_title': 'Подключите Aurion',
-      'aurion_connect_body': 'Введите персональный ключ GigaChat для подключения.',
+      'aurion_connect_body':
+          'Введите персональный ключ GigaChat для подключения.',
       'aurion_api_key_hint': 'API-ключ',
       'aurion_status_online': 'онлайн',
       'aurion_status_degraded': 'аварийный',
       'aurion_status_off': 'выключен',
       'aurion_answer': 'Ответ Aurion',
       'aurion_insert_to_field': 'Вставить в поле',
-      'onboarding_security_text': 'Сообщения шифруются end-to-end. Никто, кроме вас и собеседника, не может их прочитать.',
-      'onboarding_business_text': 'Витрина, заказы и AI-менеджер прямо в мессенджере.',
+      'onboarding_security_text':
+          'Сообщения шифруются end-to-end. Никто, кроме вас и собеседника, не может их прочитать.',
+      'onboarding_business_text':
+          'Витрина, заказы и AI-менеджер прямо в мессенджере.',
       'onboarding_economy_title': 'Своя экономика и вайб',
-      'onboarding_economy_text': 'Искры, студия креатора и репутация — всё внутри.',
+      'onboarding_economy_text':
+          'Искры, студия креатора и репутация — всё внутри.',
       'action_skip': 'Пропустить',
       'action_start': 'Начать',
       'action_next': 'Дальше',
@@ -578,12 +607,14 @@ class VibeLocalizations {
       'composer_locked_hint': 'Зафиксировано — тап по кнопке: отправить',
       'composer_swipe_hint': 'Свайп вверх — зафиксировать · влево — отменить',
       'composer_locked': 'Зафиксировано',
-      'composer_swipe_hint_video': 'Свайп вверх — зафиксировать · влево — отмена',
+      'composer_swipe_hint_video':
+          'Свайп вверх — зафиксировать · влево — отмена',
       'faq_q1': 'Как войти в Vibe?',
       'faq_q2': 'Как найти друга?',
       'faq_q3': 'Меня нет в списке чатов?',
       'faq_q4': 'Фото не синхронизируется?',
-      'policy_text': 'Vibe заботится о вашей приватности. Мы не продаём данные третьим лицам.',
+      'policy_text':
+          'Vibe заботится о вашей приватности. Мы не продаём данные третьим лицам.',
       'data_other': 'Другое',
       'data_video_gif': 'Видео/GIF',
       'data_photo': 'Фото',
@@ -604,14 +635,16 @@ class VibeLocalizations {
       'appearance_none': 'Нет',
       'appearance_gradient': 'Градиент',
       'appearance_reset_title': 'Сбросить настройки?',
-      'appearance_reset_body': 'Все настройки внешнего вида будут сброшены к значениям по умолчанию.',
+      'appearance_reset_body':
+          'Все настройки внешнего вида будут сброшены к значениям по умолчанию.',
       'appearance_reset_done': 'Настройки сброшены',
       'appearance_auto_night': 'Авто-ночь',
       'appearance_auto_night_enable': 'Включить по расписанию',
       'appearance_auto_night_start': 'Начало',
       'appearance_auto_night_end': 'Конец',
       'appearance_send_by_enter': 'Отправка по Enter',
-      'appearance_send_by_enter_desc': 'Enter — отправить, Shift+Enter — перенос',
+      'appearance_send_by_enter_desc':
+          'Enter — отправить, Shift+Enter — перенос',
       'appearance_default': 'По умолчанию',
       'appearance_color': 'Цвет',
       'appearance_list_density': 'Плотность списка',
@@ -636,9 +669,11 @@ class VibeLocalizations {
       'e2ee_not_verified': 'Не подтверждено',
       'e2ee_verified': 'Проверено',
       'e2ee_changed': 'Ключ безопасности изменился',
-      'e2ee_verify_description': 'Сравните этот код с кодом на устройстве собеседника.',
+      'e2ee_verify_description':
+          'Сравните этот код с кодом на устройстве собеседника.',
       'e2ee_verified_description': 'Ключ безопасности подтверждён вами.',
-      'e2ee_changed_description': 'Это может произойти после переустановки приложения или смены устройства. Перед продолжением общения проверьте новый код.',
+      'e2ee_changed_description':
+          'Это может произойти после переустановки приложения или смены устройства. Перед продолжением общения проверьте новый код.',
       'e2ee_confirm_verify': 'Вы сравнили код с собеседником?',
       'e2ee_confirm_yes': 'Да, код совпадает',
       'e2ee_confirm_cancel': 'Отмена',
@@ -723,11 +758,13 @@ class VibeLocalizations {
       'lock_title': 'Vibe is Locked',
       'lock_enter_passcode': 'Enter your passcode',
       'lock_wrong_passcode': 'Wrong passcode',
-      'lock_too_many_attempts': 'Too many failed attempts. Input is locked for 30 seconds.',
+      'lock_too_many_attempts':
+          'Too many failed attempts. Input is locked for 30 seconds.',
       'lock_attempts_left': 'Wrong passcode. Attempts left: ',
       'auto_lock_off': 'Disabled',
       'auto_lock_immediately': 'Immediately',
-      'languages_available': 'Available now: Russian and English. Others coming soon.',
+      'languages_available':
+          'Available now: Russian and English. Others coming soon.',
       'general_settings': 'General Settings',
       'tooltip_back': 'Back',
       'tooltip_clear': 'Clear',
@@ -747,7 +784,10 @@ class VibeLocalizations {
       'search_hint': 'Search',
       'search_by_nick_hint': 'Search by nickname or phone...',
       'search_global_title': 'Global Search',
-      'search_global_subtitle': 'Enter @nickname or phone number to find someone on Vibe.',
+      'search_chats': 'Chats',
+      'search_people': 'People',
+      'search_global_subtitle':
+          'Enter @nickname or phone number to find someone on Vibe.',
       'new_message_title': 'New Message',
       'new_message_subtitle': 'Start a conversation or make a call',
       'new_contact_title': 'New Contact',
@@ -800,13 +840,15 @@ class VibeLocalizations {
       'chat_swipe_enable_notifications': 'Enable notifications',
       'chat_draft_label': 'Draft: ',
       'chat_in_archive': 'In archive',
+      'chat_typing': 'typing…',
       'chat_new': 'New',
       'invite_text': 'Come to Vibe — my messenger. I\'m waiting for you!',
       'invite_copied': 'Invitation copied — send it to your friend',
       'folders_title': 'Folders',
       'folders_new_folder': 'New Folder',
       'folders_empty_title': 'No folders yet',
-      'folders_empty_subtitle': 'Organize chats by topics: work, school, personal',
+      'folders_empty_subtitle':
+          'Organize chats by topics: work, school, personal',
       'folders_create_folder': 'Create Folder',
       'folders_delete_folder': 'Delete Folder',
       'folders_save': 'Save',
@@ -825,10 +867,12 @@ class VibeLocalizations {
       'recording_camera_unavailable': 'Camera unavailable',
       'recording_swipe_to_lock': 'Swipe up to lock',
       'two_step_create_password': 'Create a password',
-      'two_step_password_description': 'This password will be required when logging in on a new device in addition to the SMS code.',
+      'two_step_password_description':
+          'This password will be required when logging in on a new device in addition to the SMS code.',
       'two_step_confirm_password': 'Confirm password',
       'two_step_hint': 'Password hint',
-      'two_step_hint_description': 'You can leave a hint to help remember the password.',
+      'two_step_hint_description':
+          'You can leave a hint to help remember the password.',
       'two_step_password_too_short': 'Password too short',
       'two_step_passwords_dont_match': 'Passwords do not match',
       'two_step_enabled': 'Two-step verification enabled',
@@ -857,7 +901,8 @@ class VibeLocalizations {
       'settings_data_clear_all': 'Clear All',
       'settings_data_clear_cache': 'Clear Cache',
       'settings_appearance_reset_confirm': 'Reset settings?',
-      'settings_appearance_reset_description': 'All appearance settings will be reset to defaults.',
+      'settings_appearance_reset_description':
+          'All appearance settings will be reset to defaults.',
       'settings_appearance_reset': 'Reset',
       'settings_appearance_auto_night': 'Auto-Night',
       'settings_appearance_enter_to_send': 'Send by Enter',
@@ -939,6 +984,13 @@ class VibeLocalizations {
       'chat_mark_read': 'Mark as read',
       'chat_mark_unread': 'Mark as unread',
       'chat_reordered': 'Chat order updated',
+      'settings_swipe_title': 'Swipe on chat',
+      'settings_swipe_subtitle': 'Action on left swipe over chat',
+      'settings_swipe_archive': 'Archive',
+      'settings_swipe_read': 'Read',
+      'settings_swipe_mute': 'Mute',
+      'settings_swipe_pin': 'Pin',
+      'settings_swipe_delete': 'Delete',
       'msg_translate': 'Translate',
       'msg_translated': 'Translated',
       'chat_menu_export': 'Export Chat',
@@ -999,13 +1051,15 @@ class VibeLocalizations {
       'hidden_empty': 'No hidden chats',
       'chat_empty': 'No chats',
       'hidden_empty_subtitle': 'Chats you hide will appear here',
-      'chat_empty_subtitle': 'Start a conversation — it\'s the quickest way to try Vibe',
+      'chat_empty_subtitle':
+          'Start a conversation — it\'s the quickest way to try Vibe',
       'action_new_message': 'New message',
       'archive_title': 'Archive',
       'hidden_title': 'Hidden',
       'action_back_to_chats': 'Back to chats →',
       'hidden_protection_title': 'Hidden chats protection',
-      'hidden_protection_body': 'Hidden chats are protected by a passcode. Set it in Settings → Privacy.',
+      'hidden_protection_body':
+          'Hidden chats are protected by a passcode. Set it in Settings → Privacy.',
       'action_later': 'Later',
       'action_set': 'Set',
       'aurion_card_subtitle': 'Your built-in AI assistant',
@@ -1051,7 +1105,8 @@ class VibeLocalizations {
       'call_video_soon': 'Video call — in v2.0',
       'chat_archived_snack': 'Chat archived',
       'chat_delete_title': 'Delete chat?',
-      'chat_delete_body': 'The chat will be removed from your list. Messages will be deleted.',
+      'chat_delete_body':
+          'The chat will be removed from your list. Messages will be deleted.',
       'chat_kind_pm': 'Private chat',
       'chat_kind_group': 'Group',
       'chat_kind_channel': 'Channel',
@@ -1059,7 +1114,8 @@ class VibeLocalizations {
       'chat_member': 'Member',
       'chat_messages_count': 'Messages',
       'chat_clear_history_title': 'Clear history?',
-      'chat_clear_history_body': 'All messages in this chat will be deleted for all members.',
+      'chat_clear_history_body':
+          'All messages in this chat will be deleted for all members.',
       'action_clear': 'Clear',
       'attachment_title': 'Attachment',
       'attachment_photo': 'Photo',
@@ -1119,6 +1175,7 @@ class VibeLocalizations {
       'chat_emoji_stickers': 'Emoji & stickers',
       'search_result_of': 'of',
       'status_last_seen': 'last seen',
+      'status_last_seen_at': 'last seen at {time}',
       'group_leave_title': 'Leave group?',
       'group_leave_body': 'You will stop receiving messages from this group.',
       'group_leave_confirm': 'Leave group',
@@ -1162,7 +1219,8 @@ class VibeLocalizations {
       'profile_pick_avatar': 'Choose an avatar',
       'profile_start_chatting': 'Start chatting',
       'profile_qr_code': 'Profile QR code',
-      'profile_qr_subtitle': 'Show this code — people can find your profile with it',
+      'profile_qr_subtitle':
+          'Show this code — people can find your profile with it',
       'action_more': 'More',
       'profile_misc': 'Misc',
       'profile_other': 'Other',
@@ -1187,19 +1245,24 @@ class VibeLocalizations {
       'aurion_try_asking': 'Try asking',
       'aurion_input_hint': 'Ask Aurion…',
       'aurion_greeting': 'Hi! I\'m Aurion — your personal AI assistant.',
-      'aurion_hero_text': 'I can help with texts, translation, tasks, and ideas.',
+      'aurion_hero_text':
+          'I can help with texts, translation, tasks, and ideas.',
       'aurion_connect_title': 'Connect Aurion',
-      'aurion_connect_body': 'Enter your personal GigaChat access key to connect.',
+      'aurion_connect_body':
+          'Enter your personal GigaChat access key to connect.',
       'aurion_api_key_hint': 'API key',
       'aurion_status_online': 'online',
       'aurion_status_degraded': 'degraded',
       'aurion_status_off': 'off',
       'aurion_answer': 'Aurion answer',
       'aurion_insert_to_field': 'Insert into field',
-      'onboarding_security_text': 'Messages are end-to-end encrypted. No one but you and the recipient can read them.',
-      'onboarding_business_text': 'Storefront, orders, and AI manager right in the messenger.',
+      'onboarding_security_text':
+          'Messages are end-to-end encrypted. No one but you and the recipient can read them.',
+      'onboarding_business_text':
+          'Storefront, orders, and AI manager right in the messenger.',
       'onboarding_economy_title': 'Your own economy and vibe',
-      'onboarding_economy_text': 'Sparks, creator studio, and reputation — all inside.',
+      'onboarding_economy_text':
+          'Sparks, creator studio, and reputation — all inside.',
       'action_skip': 'Skip',
       'action_start': 'Start',
       'action_next': 'Next',
@@ -1221,7 +1284,8 @@ class VibeLocalizations {
       'faq_q2': 'How to find a friend?',
       'faq_q3': 'I\'m not in the chat list?',
       'faq_q4': 'Photo not syncing?',
-      'policy_text': 'Vibe cares about your privacy. We do not sell data to third parties.',
+      'policy_text':
+          'Vibe cares about your privacy. We do not sell data to third parties.',
       'data_other': 'Other',
       'data_video_gif': 'Video/GIF',
       'data_photo': 'Photos',
@@ -1242,7 +1306,8 @@ class VibeLocalizations {
       'appearance_none': 'None',
       'appearance_gradient': 'Gradient',
       'appearance_reset_title': 'Reset settings?',
-      'appearance_reset_body': 'All appearance settings will be reset to defaults.',
+      'appearance_reset_body':
+          'All appearance settings will be reset to defaults.',
       'appearance_reset_done': 'Settings reset',
       'appearance_auto_night': 'Auto-Night',
       'appearance_auto_night_enable': 'Enable on schedule',
@@ -1274,9 +1339,11 @@ class VibeLocalizations {
       'e2ee_not_verified': 'Not verified',
       'e2ee_verified': 'Verified',
       'e2ee_changed': 'Security key changed',
-      'e2ee_verify_description': 'Compare this code with the code on your contact\'s device.',
+      'e2ee_verify_description':
+          'Compare this code with the code on your contact\'s device.',
       'e2ee_verified_description': 'You have confirmed this security key.',
-      'e2ee_changed_description': 'This may happen after reinstalling the app or changing devices. Verify the new code before continuing to communicate.',
+      'e2ee_changed_description':
+          'This may happen after reinstalling the app or changing devices. Verify the new code before continuing to communicate.',
       'e2ee_confirm_verify': 'Did you compare the code with your contact?',
       'e2ee_confirm_yes': 'Yes, the codes match',
       'e2ee_confirm_cancel': 'Cancel',
@@ -1388,6 +1455,8 @@ class VibeLocalizations {
   String get searchHint => _get('search_hint');
   String get searchByNickHint => _get('search_by_nick_hint');
   String get searchGlobalTitle => _get('search_global_title');
+  String get searchChats => _get('search_chats');
+  String get searchPeople => _get('search_people');
   String get searchGlobalSubtitle => _get('search_global_subtitle');
   String get newMessageTitle => _get('new_message_title');
   String get newMessageSubtitle => _get('new_message_subtitle');
@@ -1398,7 +1467,8 @@ class VibeLocalizations {
   String get actionWrite => _get('action_write');
   String get dateToday => _get('date_today');
   String get dateYesterday => _get('date_yesterday');
-  String messageForwardedFrom(String name) => '${_get('message_forwarded_from')} $name';
+  String messageForwardedFrom(String name) =>
+      '${_get('message_forwarded_from')} $name';
   String get messageEdited => _get('message_edited');
   String get messagePhotoToChat => _get('message_photo_to_chat');
   String get messageNoVoice => _get('message_no_voice');
@@ -1432,15 +1502,18 @@ class VibeLocalizations {
   String get muteDuration1Day => _get('mute_duration_1_day');
   String get muteDuration2Days => _get('mute_duration_2_days');
   String get muteDuration1Week => _get('mute_duration_1_week');
-  String composerReplyTo(String author) => '${_get('composer_reply_to')} $author';
+  String composerReplyTo(String author) =>
+      '${_get('composer_reply_to')} $author';
   String get composerCancelReply => _get('composer_cancel_reply');
   String get chatSwipeUnpin => _get('chat_swipe_unpin');
   String get chatSwipeArchive => _get('chat_swipe_archive');
   String get chatSwipeFromArchive => _get('chat_swipe_from_archive');
   String get chatSwipeDnd => _get('chat_swipe_dnd');
-  String get chatSwipeEnableNotifications => _get('chat_swipe_enable_notifications');
+  String get chatSwipeEnableNotifications =>
+      _get('chat_swipe_enable_notifications');
   String get chatDraftLabel => _get('chat_draft_label');
   String get chatInArchive => _get('chat_in_archive');
+  String get chatTyping => _get('chat_typing');
   String get chatNew => _get('chat_new');
   String get inviteText => _get('invite_text');
   String get inviteCopied => _get('invite_copied');
@@ -1466,7 +1539,8 @@ class VibeLocalizations {
   String get recordingCameraUnavailable => _get('recording_camera_unavailable');
   String get recordingSwipeToLock => _get('recording_swipe_to_lock');
   String get twoStepCreatePassword => _get('two_step_create_password');
-  String get twoStepPasswordDescription => _get('two_step_password_description');
+  String get twoStepPasswordDescription =>
+      _get('two_step_password_description');
   String get twoStepConfirmPassword => _get('two_step_confirm_password');
   String get twoStepHint => _get('two_step_hint');
   String get twoStepHintDescription => _get('two_step_hint_description');
@@ -1479,7 +1553,8 @@ class VibeLocalizations {
   String get chatScreenActionCopyLink => _get('chat_screen_action_copy_link');
   String get chatScreenActionForward => _get('chat_screen_action_forward');
   String get chatScreenActionEdit => _get('chat_screen_action_edit');
-  String get chatScreenActionEditHistory => _get('chat_screen_action_edit_history');
+  String get chatScreenActionEditHistory =>
+      _get('chat_screen_action_edit_history');
   String get chatScreenActionDelete => _get('chat_screen_action_delete');
   String get chatScreenActionPin => _get('chat_screen_action_pin');
   String get chatScreenActionUnpin => _get('chat_screen_action_unpin');
@@ -1490,22 +1565,32 @@ class VibeLocalizations {
   String get chatScreenDownloadError => _get('chat_screen_download_error');
   String get chatScreenEditHistory => _get('chat_screen_edit_history');
   String get chatScreenNoEdits => _get('chat_screen_no_edits');
-  String get settingsPrivacyVoiceMessages => _get('settings_privacy_voice_messages');
+  String get settingsPrivacyVoiceMessages =>
+      _get('settings_privacy_voice_messages');
   String get settingsPrivacyBiography => _get('settings_privacy_biography');
   String get settingsPrivacyBirthday => _get('settings_privacy_birthday');
   String get settingsPrivacyBlocked => _get('settings_privacy_blocked');
-  String get settingsDataClearCacheConfirm => _get('settings_data_clear_cache_confirm');
+  String get settingsDataClearCacheConfirm =>
+      _get('settings_data_clear_cache_confirm');
   String get settingsDataClearAll => _get('settings_data_clear_all');
   String get settingsDataClearCache => _get('settings_data_clear_cache');
-  String get settingsAppearanceResetConfirm => _get('settings_appearance_reset_confirm');
-  String get settingsAppearanceResetDescription => _get('settings_appearance_reset_description');
+  String get settingsAppearanceResetConfirm =>
+      _get('settings_appearance_reset_confirm');
+  String get settingsAppearanceResetDescription =>
+      _get('settings_appearance_reset_description');
   String get settingsAppearanceReset => _get('settings_appearance_reset');
-  String get settingsAppearanceAutoNight => _get('settings_appearance_auto_night');
-  String get settingsAppearanceEnterToSend => _get('settings_appearance_enter_to_send');
-  String get settingsAppearanceChatWallpaper => _get('settings_appearance_chat_wallpaper');
-  String get settingsAppearanceResetDefaults => _get('settings_appearance_reset_defaults');
-  String get settingsNotificationsBadgeQuietHours => _get('settings_notifications_badge_quiet_hours');
-  String get settingsNotificationsQuietHours => _get('settings_notifications_quiet_hours');
+  String get settingsAppearanceAutoNight =>
+      _get('settings_appearance_auto_night');
+  String get settingsAppearanceEnterToSend =>
+      _get('settings_appearance_enter_to_send');
+  String get settingsAppearanceChatWallpaper =>
+      _get('settings_appearance_chat_wallpaper');
+  String get settingsAppearanceResetDefaults =>
+      _get('settings_appearance_reset_defaults');
+  String get settingsNotificationsBadgeQuietHours =>
+      _get('settings_notifications_badge_quiet_hours');
+  String get settingsNotificationsQuietHours =>
+      _get('settings_notifications_quiet_hours');
   String get profileLogoutConfirm => _get('profile_logout_confirm');
   String get dialogCancel => _get('dialog_cancel');
   String get dialogDelete => _get('dialog_delete');
@@ -1548,7 +1633,8 @@ class VibeLocalizations {
   String get createGroupCreateFailed => _get('create_group_create_failed');
   String get chatListNewMessage => _get('chat_list_new_message');
   String get chatListStoryPublished => _get('chat_list_story_published');
-  String get chatListStoryPublishFailed => _get('chat_list_story_publish_failed');
+  String get chatListStoryPublishFailed =>
+      _get('chat_list_story_publish_failed');
   String get chatListBlockTooltip => _get('chat_list_block_tooltip');
   String get chatListDeselect => _get('chat_list_deselect');
   String get chatListMarkRead => _get('chat_list_mark_read');
@@ -1568,6 +1654,13 @@ class VibeLocalizations {
   String get settingsReportSent => _get('settings_report_sent');
   String get settingsSend => _get('settings_send');
   String get settingsClose => _get('settings_close');
+  String get settingsSwipeTitle => _get('settings_swipe_title');
+  String get settingsSwipeSubtitle => _get('settings_swipe_subtitle');
+  String get settingsSwipeArchive => _get('settings_swipe_archive');
+  String get settingsSwipeRead => _get('settings_swipe_read');
+  String get settingsSwipeMute => _get('settings_swipe_mute');
+  String get settingsSwipePin => _get('settings_swipe_pin');
+  String get settingsSwipeDelete => _get('settings_swipe_delete');
   String get chatPinChat => _get('chat_pin_chat');
   String get chatUnpinChat => _get('chat_unpin_chat');
   String get chatEnableNotifications => _get('chat_enable_notifications');
@@ -1760,6 +1853,7 @@ class VibeLocalizations {
   String get chatEmojiStickers => _get('chat_emoji_stickers');
   String get searchResultOf => _get('search_result_of');
   String get statusLastSeen => _get('status_last_seen');
+  String get statusLastSeenAt => _get('status_last_seen_at');
   String get groupLeaveTitle => _get('group_leave_title');
   String get groupLeaveBody => _get('group_leave_body');
   String get groupLeaveConfirm => _get('group_leave_confirm');
@@ -1898,7 +1992,8 @@ class VibeLocalizations {
   String get appearanceSpacious => _get('appearance_spacious');
   String get appearanceMedium => _get('appearance_medium');
   String get appearanceResetDefaults => _get('appearance_reset_defaults');
-  String get notificationsBadgeAndQuietHours => _get('notifications_badge_and_quiet_hours');
+  String get notificationsBadgeAndQuietHours =>
+      _get('notifications_badge_and_quiet_hours');
   String get notificationsBadge => _get('notifications_badge');
   String get notificationsShowBadge => _get('notifications_show_badge');
   String get notificationsBadgeHidden => _get('notifications_badge_hidden');
@@ -1928,7 +2023,8 @@ class VibeLocalizations {
   String get e2eeCopied => _get('e2ee_copied');
 }
 
-class VibeLocalizationsDelegate extends LocalizationsDelegate<VibeLocalizations> {
+class VibeLocalizationsDelegate
+    extends LocalizationsDelegate<VibeLocalizations> {
   const VibeLocalizationsDelegate();
 
   @override

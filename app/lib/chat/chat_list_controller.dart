@@ -49,9 +49,15 @@ class ChatListController extends ChangeNotifier {
   // ─── Подписки ───
   StreamSubscription<dynamic>? _streamSub;
   StreamSubscription<dynamic>? _chatSub;
+  StreamSubscription<TypingEvent>? _typingSub;
+  final Map<String, Timer> _typingTimers = {};
   Timer? _reloadTimer;
   Timer? _ticker;
   bool _disposed = false;
+
+  /// Чаты, где собеседник печатает (как в Telegram).
+  final Set<String> _typing = {};
+  bool isTyping(String chatId) => _typing.contains(chatId);
 
   /// 5.1: время последнего realtime-события — тикер перезагружает ленту
   /// только при «заснувшем» websocket (офлайн/фокус).
@@ -105,6 +111,7 @@ class ChatListController extends ChangeNotifier {
     // Guard: cancel existing subscriptions/timers/listeners if load() called again.
     _streamSub?.cancel();
     _chatSub?.cancel();
+    _typingSub?.cancel();
     _reloadTimer?.cancel();
     _ticker?.cancel();
     _presenceTimer?.cancel();
@@ -135,10 +142,7 @@ class ChatListController extends ChangeNotifier {
     // 5.1: realtime-пульс. Периодическая перезагрузка — только если
     // websocket «заснул» (нет realtime-событий дольше 20 секунд).
     _lastRealtimeEvent = DateTime.now();
-    _ticker = Timer.periodic(
-      const Duration(seconds: 20),
-      (_) => _pulse(),
-    );
+    _ticker = Timer.periodic(const Duration(seconds: 20), (_) => _pulse());
 
     _streamSub = backend.stream.listen((msg) {
       // Мгновенная подмена превью последнего сообщения (как в TG) и
@@ -151,8 +155,23 @@ class ChatListController extends ChangeNotifier {
       _lastRealtimeEvent = DateTime.now();
       scheduleReload();
     });
+    _typingSub = backend.typingEvents.listen(_onTyping);
 
     await loadChats();
+  }
+
+  /// Собеседник печатает в чате — показываем в строке списка 6 секунд.
+  void _onTyping(TypingEvent ev) {
+    final chatId = ev.chatId;
+    if (_disposed) return;
+    _typing.add(chatId);
+    _typingTimers.remove(chatId)?.cancel();
+    _typingTimers[chatId] = Timer(const Duration(seconds: 6), () {
+      if (_disposed) return;
+      _typingTimers.remove(chatId);
+      if (_typing.remove(chatId)) notifyListeners();
+    });
+    notifyListeners();
   }
 
   void syncMuted() {
@@ -170,7 +189,8 @@ class ChatListController extends ChangeNotifier {
   void syncHidden() {
     if (_disposed) return;
     final hiddenNow = SettingsService.instance.hiddenChats.toSet();
-    if (hiddenNow.length != hidden.length || hiddenNow.difference(hidden).isNotEmpty) {
+    if (hiddenNow.length != hidden.length ||
+        hiddenNow.difference(hidden).isNotEmpty) {
       hidden
         ..clear()
         ..addAll(hiddenNow);
@@ -197,7 +217,8 @@ class ChatListController extends ChangeNotifier {
   void syncCloudArchive() {
     if (_disposed) return;
     final cloud = backend.archivedNotifier.value;
-    if (cloud.length != archived.length || cloud.difference(archived).isNotEmpty) {
+    if (cloud.length != archived.length ||
+        cloud.difference(archived).isNotEmpty) {
       archived
         ..clear()
         ..addAll(cloud);
@@ -235,8 +256,7 @@ class ChatListController extends ChangeNotifier {
   Future<void> onPresenceChanged() async {
     if (_disposed) return;
     final last = _lastPresenceReload;
-    if (last != null &&
-        DateTime.now().difference(last) < _presenceInterval) {
+    if (last != null && DateTime.now().difference(last) < _presenceInterval) {
       _presenceTimer?.cancel();
       _presenceTimer = Timer(_presenceInterval, () => _reloadFromPresence());
       return;
@@ -470,6 +490,15 @@ class ChatListController extends ChangeNotifier {
     onSnack('Удалено');
   }
 
+  /// Удалить один чат (свайп → 🗑): локально, как в TG (см. _deleteChat).
+  void removeChat(String id) {
+    chats.removeWhere((c) => c.id == id);
+    deleted.add(id);
+    SettingsService.instance.setDeletedChats(deleted.toList());
+    notifyListeners();
+    onSnack('Удалено');
+  }
+
   void clearSelection() {
     selected.clear();
     notifyListeners();
@@ -480,6 +509,7 @@ class ChatListController extends ChangeNotifier {
     _disposed = true;
     _streamSub?.cancel();
     _chatSub?.cancel();
+    _typingSub?.cancel();
     SettingsService.instance.mutedVersion.removeListener(syncMuted);
     SettingsService.instance.blockedVersion.removeListener(syncBlocked);
     SettingsService.instance.hiddenVersion.removeListener(syncHidden);
@@ -490,6 +520,10 @@ class ChatListController extends ChangeNotifier {
     _reloadTimer?.cancel();
     _ticker?.cancel();
     _presenceTimer?.cancel();
+    for (final t in _typingTimers.values) {
+      t.cancel();
+    }
+    _typingTimers.clear();
     super.dispose();
   }
 }

@@ -13,7 +13,7 @@ abstract class VibeBackendApi {
   // ─── Realtime-потоки ───
   Stream<VibeMessage> get stream;
   Stream<VibeMsgEvent> get msgEvents;
-  Stream<String> get typingEvents;
+  Stream<TypingEvent> get typingEvents;
   Stream<void> get chatEvents;
   Stream<PinChanged> get pinEvents;
 
@@ -44,8 +44,10 @@ abstract class VibeBackendApi {
     String chatId,
     String text, {
     String? localId,
+    String? replyTo,
     String? replyText,
     String? replyAuthor,
+    bool silent = false,
   });
 
   Future<VibeMessage> sendSticker(
@@ -102,7 +104,7 @@ abstract class VibeBackendApi {
   // ─── Действия ───
   Future<void> setReaction(String chatId, String messageId, String emoji);
   Future<void> refreshChatReactions(String chatId);
-  Future<void> sendTyping(String chatId);
+  Future<void> sendTyping(String chatId, {String action = 'typing'});
   Future<void> markChatRead(String chatId);
   Future<void> setChatArchived(String chatId, {required bool archived});
   Future<void> setChatMuted(String chatId, {required bool muted});
@@ -112,8 +114,9 @@ abstract class VibeBackendApi {
   Future<String> ensureSavedChat();
   Future<VibeMessage?> forwardMessage(
     String targetChatId,
-    VibeMessage original,
-  );
+    VibeMessage original, {
+    bool hideSender = false,
+  });
 
   // ─── Профиль ───
   Future<bool> isUsernameAvailable(String username);
@@ -134,6 +137,10 @@ abstract class VibeBackendApi {
   Future<PrivacySettings?> fetchPrivacy();
   Future<void> savePrivacy(PrivacySettings settings);
 
+  // ─── Черновики (как в TG messages.saveDraft) ───
+  Future<void> saveDraft(String chatId, String? text);
+  Future<String?> fetchDraft(String chatId);
+
   /// Форматирование времени (в `VibeBackend` — статика, здесь — метод).
   String formatTime(dynamic raw);
 }
@@ -151,7 +158,7 @@ class LiveVibeBackend implements VibeBackendApi {
   Stream<VibeMsgEvent> get msgEvents => _b.msgEvents;
 
   @override
-  Stream<String> get typingEvents => _b.typingEvents;
+  Stream<TypingEvent> get typingEvents => _b.typingEvents;
 
   @override
   Stream<void> get chatEvents => _b.chatEvents;
@@ -196,15 +203,19 @@ class LiveVibeBackend implements VibeBackendApi {
     String chatId,
     String text, {
     String? localId,
+    String? replyTo,
     String? replyText,
     String? replyAuthor,
+    bool silent = false,
   }) =>
       _b.sendText(
         chatId,
         text,
         localId: localId,
+        replyTo: replyTo,
         replyText: replyText,
         replyAuthor: replyAuthor,
+        silent: silent,
       );
 
   @override
@@ -303,7 +314,7 @@ class LiveVibeBackend implements VibeBackendApi {
       _b.refreshChatReactions(chatId);
 
   @override
-  Future<void> sendTyping(String chatId) => _b.sendTyping(chatId);
+  Future<void> sendTyping(String chatId, {String action = 'typing'}) => _b.sendTyping(chatId, action: action);
 
   @override
   Future<void> markChatRead(String chatId) => _b.markChatRead(chatId);
@@ -325,9 +336,10 @@ class LiveVibeBackend implements VibeBackendApi {
   @override
   Future<VibeMessage?> forwardMessage(
     String targetChatId,
-    VibeMessage original,
-  ) =>
-      _b.forwardMessage(targetChatId, original);
+    VibeMessage original, {
+    bool hideSender = false,
+  }) =>
+      _b.forwardMessage(targetChatId, original, hideSender: hideSender);
 
   @override
   Future<bool> isUsernameAvailable(String username) =>
@@ -353,6 +365,12 @@ class LiveVibeBackend implements VibeBackendApi {
   @override
   Future<void> savePrivacy(PrivacySettings settings) =>
       _b.savePrivacy(settings);
+
+  @override
+  Future<void> saveDraft(String chatId, String? text) => _b.saveDraft(chatId, text);
+
+  @override
+  Future<String?> fetchDraft(String chatId) => _b.fetchDraft(chatId);
 
   @override
   String formatTime(dynamic raw) => VibeBackend.formatTime(raw);

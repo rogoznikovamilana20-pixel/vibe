@@ -269,7 +269,7 @@ class VibeAvatar extends StatelessWidget {
               style: TextStyle(
                 color: Colors.white,
                 fontSize: size * 0.36,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 height: 1,
               ),
             ),
@@ -322,7 +322,7 @@ class VibeUnreadBadge extends StatelessWidget {
           style: const TextStyle(
             color: Colors.white,
             fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             height: 1.2,
           ),
         ),

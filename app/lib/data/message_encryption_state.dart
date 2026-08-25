@@ -1,4 +1,3 @@
-import 'package:vibe_app/data/v2_message_storage.dart';
 
 /// Unified encryption state for a message row.
 ///

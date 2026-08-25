@@ -1,4 +1,5 @@
-﻿import 'dart:convert';
+﻿// ignore_for_file: use_build_context_synchronously
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -86,12 +87,14 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
   }
 
   String get _statusText {
-    final chat = widget.chat;
-    return chat.peerOnline
-        ? 'в сети'
-        : (chat.peerLastSeen != null
-            ? 'был(а) в сети ${VibeBackend.formatTime(chat.peerLastSeen)}'
-            : 'был(а) недавно');
+    final p = _profile;
+    final isOnline = p?.online ?? widget.chat.peerOnline;
+    if (isOnline) return 'в сети';
+    final privacy = SettingsService.instance.privacyLastSeen;
+    if (privacy == 2) return 'был(а) недавно';
+    final lastSeen = p?.lastSeen ?? widget.chat.peerLastSeen;
+    if (lastSeen != null) return 'был(а) в сети ${VibeBackend.formatTime(lastSeen)}';
+    return 'был(а) недавно';
   }
 
   Widget _mediaTile(PeerMedia m) {
@@ -199,7 +202,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
                 Text(
                   _statusText,
                   style: VibeTypography.bodyMedium.copyWith(
-                    color: chat.peerOnline
+                    color: (_profile?.online ?? chat.peerOnline)
                         ? VibeColors.success
                         : context.vibeTextTertiary,
                   ),

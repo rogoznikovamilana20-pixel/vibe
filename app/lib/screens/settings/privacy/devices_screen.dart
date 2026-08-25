@@ -1,4 +1,4 @@
-﻿
+
 import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'package:flutter/material.dart';
 import '../../../core/localization/vibe_localizations.dart';
 import '../../../core/theme/vibe_colors.dart';
@@ -53,7 +53,7 @@ class DevicesScreen extends StatelessWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.smartphone_rounded, color: VibeColors.success),
-                title: Text('Vibe Mobile', style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary, fontWeight: FontWeight.w600)),
+                title: Text('Vibe Mobile', style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary, fontWeight: FontWeight.w500)),
                 subtitle: Text(
                   l.locale.languageCode == 'ru' ? 'Vibe v0.9 · Android 14 · В сети' : 'Vibe v0.9 · Android 14 · Online',
                   style: VibeTypography.caption.copyWith(color: VibeColors.success),

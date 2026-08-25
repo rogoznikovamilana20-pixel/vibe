@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import '../core/env_config.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
@@ -27,8 +28,8 @@ class _GifSearchPanelState extends State<GifSearchPanel> {
   bool _initialLoad = true;
   String? _nextPos;
 
-  // Tenor API key (free tier: 1000 req/day)
-  static const _apiKey = 'AIzaSyBBJFS7BYOhPz2G0JmKXEgPCBau2pEkGm8';
+  // Tenor API key — передаётся через --dart-define=TENOR_API_KEY=...
+  static const _apiKey = EnvConfig.tenorApiKey;
   static const _limit = 20;
 
   @override
@@ -237,7 +238,7 @@ class _GifSearchPanelState extends State<GifSearchPanel> {
                               child: Image.network(
                                 gif.tinyUrl ?? gif.url ?? '',
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
+                                errorBuilder: (_, _, _) => Container(
                                   color: context.vibeSurfaceVariant,
                                   child: Icon(Icons.gif_box_outlined,
                                       color: context.vibeTextTertiary),

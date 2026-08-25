@@ -43,6 +43,40 @@ mixin ProfileBackendMixin {
     }, onConflict: 'user_id');
   }
 
+  /// Черновики (как в TG messages.saveDraft) — best-effort облачное зеркало.
+  Future<void> saveDraft(String chatId, String? text) async {
+    final uid = VibeBackend.instance.myProfileId;
+    if (uid == null) return;
+    try {
+      if (text == null || text.trim().isEmpty) {
+        await VibeBackend.instance._client.from('drafts').delete().eq('user_id', uid).eq('chat_id', chatId);
+      } else {
+        await VibeBackend.instance._client.from('drafts').upsert({
+          'user_id': uid,
+          'chat_id': chatId,
+          'text': text,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'user_id,chat_id');
+      }
+    } catch (_) {}
+  }
+
+  Future<String?> fetchDraft(String chatId) async {
+    final uid = VibeBackend.instance.myProfileId;
+    if (uid == null) return null;
+    try {
+      final row = await VibeBackend.instance._client
+          .from('drafts')
+          .select('text')
+          .eq('user_id', uid)
+          .eq('chat_id', chatId)
+          .maybeSingle();
+      return row?['text'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Мои контакты: только те, с кем у меня уже есть личные чаты.
   /// Никаких глобальных списков — чужие профили (и телефоны) наружу
   /// не попадают.
@@ -92,7 +126,14 @@ mixin ProfileBackendMixin {
 
   final _profileCache = <String, _CachedProfile>{};
 
+  /// Удалить протухшие записи из _profileCache.
+  void _pruneProfileCache() {
+    final now = DateTime.now();
+    _profileCache.removeWhere((_, v) => v.expiresAt.isBefore(now));
+  }
+
   Future<VibeProfile?> profileById(String id) async {
+    _pruneProfileCache();
     final hit = _profileCache[id];
     if (hit != null && hit.expiresAt.isAfter(DateTime.now())) {
       return hit.profile;
@@ -163,14 +204,10 @@ Future<void> setMyProfile(VibeProfile p) async {
 
   Future<void> _writeOnline(String id, bool value) async {
     try {
-      // Время последнего входа пишем заодно со статусом «в сети»:
-      // по нему показываем «был(а) в сети …», когда человек офлайн.
-      await VibeBackend.instance._client.from('profiles').update({
-        'online': value,
-      }).eq('id', id);
-    } catch (_) {
-      // Оффлайн/права — статус просто не обновится, ничего не ломаем.
-    }
+      final data = <String, dynamic>{'online': value};
+      if (!value) data['last_seen'] = DateTime.now().toUtc().toIso8601String();
+      await VibeBackend.instance._client.from('profiles').update(data).eq('id', id);
+    } catch (_) {}
   }
 
   void _subscribePresence() {
@@ -214,6 +251,19 @@ Future<void> setMyProfile(VibeProfile p) async {
     VibeBackend.instance.stopNetworkMonitor();
 
     await VibeBackend.instance._client.auth.signOut();
+
+    // Clear FCM token from DB and local state to prevent stale notifications.
+    try {
+      final fcmToken = VibeBackend.instance._myProfile?.fcmToken;
+      if (fcmToken != null) {
+        await VibeBackend.instance._client
+            .from('profiles')
+            .update({'fcm_token': null}).eq('id', id ?? '');
+      }
+      await NotificationService.instance.deleteToken();
+      NotificationService.instance.reset();
+      ProfileAvatar.myPhoto.value = null;
+    } catch (_) {}
 
     // Unsubscribe personal channel.
     final old = VibeBackend.instance._personal;

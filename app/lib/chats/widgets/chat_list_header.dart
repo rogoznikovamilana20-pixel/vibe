@@ -200,7 +200,7 @@ class ChatManageRow extends StatelessWidget {
                     label,
                     style: VibeTypography.bodyMedium.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(width: VibeSpacing.sm),
@@ -222,7 +222,7 @@ class ChatManageRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: VibeTypography.bodyMedium.copyWith(
                     color: context.vibePrimary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -304,7 +304,7 @@ class ChatManageRow extends StatelessWidget {
                 label,
                 style: VibeTypography.bodyMedium.copyWith(
                   color: active ? Colors.white : context.vibeTextSecondary,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: active ? FontWeight.w500 : FontWeight.w500,
                 ),
               ),
               const SizedBox(width: VibeSpacing.xs),

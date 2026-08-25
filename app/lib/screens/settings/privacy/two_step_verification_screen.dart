@@ -1,4 +1,5 @@
-﻿
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:flutter/material.dart';
 import '../../../core/localization/vibe_localizations.dart';

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -11,11 +11,13 @@ import '../core/widgets/vibe_button.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
-/// Результат композера: фото истории (байты PNG/JPEG).
+/// Результат композера: фото/видео + подпись как в TG.
 class StoryComposerResult {
-  const StoryComposerResult(this.bytes);
+  const StoryComposerResult(this.bytes, {this.videoFile, this.caption});
 
   final Uint8List bytes;
+  final File? videoFile;
+  final String? caption;
 }
 
 /// Полноэкранный композер истории как в Telegram:
@@ -31,6 +33,7 @@ class StoryComposerScreen extends StatefulWidget {
 class _StoryComposerScreenState extends State<StoryComposerScreen> {
   CameraController? _cam;
   Uint8List? _captured;
+  final TextEditingController _captionCtrl = TextEditingController();
   bool _front = false;
   bool _busy = false;
 
@@ -110,6 +113,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   @override
   void dispose() {
     _cam?.dispose();
+    _captionCtrl.dispose();
     super.dispose();
   }
 
@@ -171,6 +175,18 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                 iconSize: 30,
                 tooltip: 'Из галереи',
               ),
+              IconButton(
+                onPressed: () async {
+                  final file = await StoryComposerGallery.pickVideo(context);
+                  if (file != null && context.mounted) {
+                    Navigator.of(context).pop(StoryComposerResult(Uint8List(0), videoFile: file));
+                  }
+                },
+                icon: const Icon(Icons.video_library_outlined),
+                color: Colors.white,
+                iconSize: 30,
+                tooltip: 'Видео',
+              ),
               GestureDetector(
                 onTap: _busy ? null : _capture,
                 child: AnimatedScale(
@@ -230,6 +246,27 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               VibeSpacing.lg,
               0,
               VibeSpacing.lg,
+              VibeSpacing.sm,
+            ),
+            child: TextField(
+              controller: _captionCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Подпись...',
+                hintStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: Colors.black45,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              maxLines: 2,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              VibeSpacing.lg,
+              0,
+              VibeSpacing.lg,
               VibeSpacing.xl,
             ),
             child: Row(
@@ -238,7 +275,10 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                   child: VibeButton(
                     type: VibeButtonType.ghost,
                     label: 'Повторить',
-                    onPressed: () => setState(() => _captured = null),
+                    onPressed: () => setState(() {
+                      _captured = null;
+                      _captionCtrl.clear();
+                    }),
                   ),
                 ),
                 const SizedBox(width: VibeSpacing.md),
@@ -247,7 +287,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                     type: VibeButtonType.primary,
                     label: 'Опубликовать',
                     onPressed: () => Navigator.of(context).pop(
-                      StoryComposerResult(bytes),
+                      StoryComposerResult(bytes, caption: _captionCtrl.text.trim().isEmpty ? null : _captionCtrl.text.trim()),
                     ),
                   ),
                 ),
@@ -260,7 +300,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   }
 }
 
-/// Галерея для композера: фото из памяти устройства.
+/// Галерея для композера: фото/видео из памяти устройства.
 class StoryComposerGallery {
   static Future<Uint8List?> pick(BuildContext context) async {
     try {
@@ -274,6 +314,16 @@ class StoryComposerGallery {
       } catch (_) {
         return null;
       }
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<File?> pickVideo(BuildContext context) async {
+    try {
+      final picked = await ImagePicker().pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 60));
+      if (picked == null) return null;
+      return File(picked.path);
     } catch (_) {
       return null;
     }

@@ -17,6 +17,7 @@ class VibeTopBar extends StatelessWidget {
     this.subtitle,
     this.actions = const [],
     this.height = 60,
+    this.floating = true,
     this.padding = const EdgeInsets.fromLTRB(
       VibeSpacing.xs,
       VibeSpacing.xs,
@@ -30,47 +31,59 @@ class VibeTopBar extends StatelessWidget {
   final Widget? subtitle;
   final List<Widget> actions;
   final double height;
+  final bool floating;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: padding,
-      child: Container(
-        height: height,
-        decoration: BoxDecoration(
-          color: context.vibeGlass,
-          borderRadius: BorderRadius.circular(VibeRadius.bottomSheet),
-          border: Border.all(color: context.vibeGlassBorder),
-          boxShadow: [context.vibeGlassShadow],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(VibeRadius.bottomSheet),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: VibeBlur.panel, sigmaY: VibeBlur.panel),
-            child: Row(
-              children: [
-                if (leading != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: VibeSpacing.xs),
-                    child: leading,
-                  ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: VibeSpacing.sm,
-                    ),
-                    child: _buildTitle(context),
-                  ),
-                ),
-                for (final a in actions)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: a,
-                  ),
-              ],
+      child: _buildSurface(
+        context,
+        child: Row(
+          children: [
+            if (leading != null)
+              Padding(
+                padding: const EdgeInsets.only(left: VibeSpacing.xs),
+                child: leading,
+              ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.sm),
+                child: _buildTitle(context),
+              ),
             ),
+            for (final a in actions)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: a,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSurface(BuildContext context, {required Widget child}) {
+    if (!floating) {
+      return SizedBox(height: height, child: child);
+    }
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: context.vibeGlass,
+        borderRadius: BorderRadius.circular(VibeRadius.bottomSheet),
+        border: Border.all(color: context.vibeGlassBorder),
+        boxShadow: [context.vibeGlassShadow],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(VibeRadius.bottomSheet),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: VibeBlur.panel,
+            sigmaY: VibeBlur.panel,
           ),
+          child: child,
         ),
       ),
     );
@@ -88,10 +101,7 @@ class VibeTopBar extends StatelessWidget {
         ?t,
         ?s == null
             ? null
-            : Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: s,
-              ),
+            : Padding(padding: const EdgeInsets.only(top: 2), child: s),
       ],
     );
   }
@@ -112,8 +122,7 @@ class VibeTopBarAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget child;
 
   @override
-  Size get preferredSize =>
-      Size.fromHeight(VibeSizes.toolbarHeight + topInset);
+  Size get preferredSize => Size.fromHeight(VibeSizes.toolbarHeight + topInset);
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +147,8 @@ class VibeTopBarTitle extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style:
-          style ?? VibeTypography.title.copyWith(color: context.vibeTextPrimary),
+          style ??
+          VibeTypography.title.copyWith(color: context.vibeTextPrimary),
     );
   }
 }

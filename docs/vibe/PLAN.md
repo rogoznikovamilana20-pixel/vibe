@@ -1537,4 +1537,88 @@ V1 E2EE (`e2e_service.dart`) **НЕ ИЗМЕНЁН** — продолжает р
 
 ---
 
+## Phase 13 — Telegram UX Mapping (51 секций) ✅ (итерации 1-5, 21.08.2026)
+
+### Сделано
+- **PHASE 1 аудит**: `docs/vibe/TELEGRAM_MAPPING.md` — 51 секция против drklo/telegram; статусы G1-G9.
+- **PHASE 1b**: клон исходников drklo/telegram (sparse) в `%TEMP%\opencode\tg-src`; ground truth через `git show` (Theme/ThemeColors/SharedConfig/ActionBar/DialogsAdapter).
+- **G4 reply-jump**: `jumpToReplyIndex` (chat_controller.dart:997) + `onReplyTap` (message_bubble) + `_jumpToReplyFrom` (chat_screen.dart:725); локальный матч по тексту (reply денатурализован по дизайну).
+- **G7 inline search bar**: `_buildSearchBar` в шапке чат-листа (chat_list_screen.dart:933); скрыта в архиве/скрытых.
+- **G9 photo viewer**: `_openPhotoViewer` → `MediaViewerScreen` (PageView + InteractiveViewer maxScale 5 + видео); общий хелпер `chatMediaItems`.
+- **Итерация 2**: статус «был(а) в сети» локализован (`status_last_seen_at`); SearchScreen — секции «Чаты»/«Люди» (`_chatResults` + `_ChatTile` + общий `_openChatScreen`).
+- **Итерация 3 (PHASE 2)**: аудит дизайн-токенов по исходникам TG — bubble radius **17dp** (`SharedConfig.java:315`), ActionBar **56/48dp** (`ActionBar.java:1855`), row **70/76dp** (`DialogsAdapter.getItemHeight`), цвета светлой темы (`ThemeColors.java`). Вывод: каркас MATCHED, отклонения — только брендовые (акцент, пузыри).
+- **Итерация 4**: секция 6 (медиа/звонки/сторис) — все MATCHED (WebRtcService реальный); чистка устаревших статусов секций 2-3; автофокус поля поиска (search_screen.dart:161).
+- **Итерация 5**: double-tap → последняя использованная реакция (chat_controller.dart:806-847, TG-поведение); row height ground truth 70/76.
+- **Итерация 6**: Search field animation (Fade+Scale 0.96→1, VibeAnimations.fadeIn); Папки в Настройках (`_openFolders` + tile, settings_screen.dart); рефактор тестов настроек (scrollUntilVisible).
+- **Итерация 7 (аудит B+E)**: onboarding/pinned/draft/folders/in-chat search/icons — доаудированы до MATCHED; typing в чат-листе — честный PARTIAL (бэкенд готов); PLAN.md синхронизирован.
+- **Итерация 8 (PHASE 2 закрытие)**: удалён мёртвый `VibeRadius.bubble`; `toolbarHeight` 52→56 (EXACT ActionBar portrait); bubble radius — уже 17.0 по умолчанию (SettingsService) — CLOSE→EXACT.
+- **Итерация 9 (C1)**: **typing в чат-листе** — «печатает…» в строке (chat_list_controller.dart: `_typing`/`_onTyping`/per-chat 6s таймеры, `isTyping`), подпись строки в chat_list_item.dart (draft > typing > preview), проброс `typing:` в chat_list_screen.dart; +2 теста (chat_list_controller_test), 1780/1780.
+- **Итерация 10 (C2)**: **свайпы как в Telegram** — новый `AnchoredSwipe` (anchored_swipe.dart): свайп влево раскрывает якорную панель кнопок read/pin/delete (delete — с диалогом `_confirmDeleteChat`), свайп вправо — архив; DND ушёл из свайпа в long-press меню (как в TG); `removeChat` в контроллере (персист в deletedChats); убран Dismissible; +2 теста item, +2 теста screen; 1784/1784.
+- **Итерация 11 (C2-фикс + C3)**: **верификация свайпов по tg-src + burst-реакция** — извлечён tg-src `DialogsActivity.java`/`SwipeGestureSettingsView.java`/`SharedConfig.java`: ground truth — полный свайп с одним действием (порог 0.45, отмена 200мс), по умолчанию архив (как `getChatSwipeAction`), свайп вправо — вернуть из архива, после архива — UndoView. Переделка: `AnchoredSwipe` → `FullSwipe` (full_swipe.dart, `_maxShift` 160, порог 0.45), `ChatSwipeAction` enum (archive/read/mute/pin/delete) в `settings_service.dart` (persist `vibe_chat_swipe_action`), экран `chat_settings.dart` (как `SwipeGestureSettingsView`) + пункт в `settings_screen.dart`, `VibeToast` с `actionLabel`/`onAction` (Undo), `chat_list_item.dart` — фон/иконка по действию, `chat_list_screen.dart` — `_toggleArchive` с Undo + `onSwipeLeft` по настройке + `onSwipeRight` только для архивированных. **Burst**: `chat_controller.dart` `heartReact` возвращает emoji, `message_bubble.dart` `_ReactionBurst` (полёт в случайную точку 0.2-0.8/0-0.4, rotation ±60°, scale 0.8-1.2, fade, 900мс) как `ReactionsEffectOverlay`; `onHeart` теперь `String? Function()`. Тесты: `chat_list_item_test` 8→10 (full swipe, короткий свайп, delete-красный фон), `chat_list_screen_test` 12 (left archive, delete-dialog, read), `message_bubble_test` 12→13 (burst), 1787/1787.
+- **Итерация 12 (Links)**: **закрыт PARTIAL по ссылкам** — `models.dart:65` `_linkPattern` как в TG (`TL_messageEntityUrl/Mention/Hashtag`): `(?:https?://|www\.)…|@[\w.]+|#[\w\u0400-\u04FF]+` (unicode), `buildLinkSpans` делает все три типа кликабельными с `linkColor` + `TapGestureRecognizer`; `chat_screen.dart:1891` `_openUrl` — URL → `launchUrl`, `@` → тост «профиль (в v2)», `#` → тост «Поиск по #tag» (честная деградация без бэкенда, как в 4.1); `message_bubble.dart:460` уже использует `buildLinkSpans`; тесты `message_bubble_test` +3 (2 unit `buildLinkSpans` + 1 widget @/# рендер), 1790/1790.
+- **Итерация 13 (Docs audit)**: **синхронизация UX-библии с кодом** — `2.4.8` long-tap avatar → `implemented` (`chat_app_bar.dart:147` уже был), `2.4.10` swipe между чатами → `implemented` (`chat_screen.dart:1923` `_onHorizontalSwipe`), `2.4.11` scroll while typing → `implemented` (`JumpDownButton`), `2.4.12` hole to first unread → `implemented` (`UnreadPlank` + `unreadJumpIndex`/`jumpToUnread`), раздел 4 и 5 обновлены (archive/mute/mark unread/drafts уже реализованы через `FullSwipe`/`toggleDnd`/`toggleUnread`/`draftFor`); `flutter analyze` 0 errors, тесты без изменений.
+- **Итерация 14 (Gallery 2.4.5)**: **long-press в галерее** — `chat_media_gallery_screen.dart:30` `ChatMediaItem` расширен (`serverId`/`localId`/`messageIndex`), `_MediaTile` `onLongPress` → `_showMediaActions` (bottom sheet как в TG: Поделиться/Сохранить/Переслать/Удалить; delete → `controller.deleteMessage`), `MediaViewerScreen` long-press в `PageView` (проксирует то же меню), `_openPhotoViewer` теперь `MediaViewerScreen(..., controller: _chat)`; тесты `chat_media_gallery_test.dart` 3 (пусто + long-press плитки + viewer long-press), 1791/1791.
+- **Итерация 15 (Docs 2.4.9)**: **синхронизация pull-to-refresh** — `2.4.9` `not implemented` → `implemented`: `chat_list_screen.dart:513` и `chat_screen.dart:2023` уже содержат `RefreshIndicator` (`color: vibePrimary`, `displacement:60`, `BouncingScrollPhysics`, `onRefresh: _chat.loadChats()`), как в TG (pull вниз); доки приведены в соответствие, код не менялся, `1791/1791`.
+- **Итерация 16 (2.4.16/17)**: **свайп от правого края → Aurion** — `root_shell.dart:187` `_onEdgeDragStart`/`_onEdgeDragEnd` (старт `> width-32`, velocity `< -500`, как `SwipeController` threshold), `HapticFeedback.mediumImpact` + `Navigator.push(AurionScreen)`; фишка Vibe «достать AI-composer из любого экрана» (PRD 2.4.16/17), доки `2.4.16/17` → `implemented`, `flutter analyze` 0 errors, `1791/1791` (ручной тест edge-swipe).
+- **Итерация 17 (2.3.x)**: **back-навигация как в TG** — `core/services/back_history_service.dart` (стек 10, `pushChat`/`pushTab`, `ValueNotifier`), `root_shell.dart:114` `_openChatById`/`_openTab` пушат историю, `chat/widgets/chat_app_bar.dart:147` `VibeIconButton` + `onLongPress` + `onBackLongPress` → bottom sheet последних 5 чатов (как TG long-press back), `core/widgets/vibe_icon_button.dart:11` `onLongPress` в `InkWell`, `chat_screen.dart:156` `BackHistoryService.pushChat` + `_showBackHistory` (лист + `chatById` → `ChatScreen`); тесты `back_history_test.dart` 3 (push/maxSize + widget long-press), `1794/1794`.
+- **Итерация 18 (8.x)**: **вводные паттерны PRD 2.1** — `SelectableText`/`TextField` уже дают выделение слово-по-слову + drag границ (native `TextSelectionControls`), `Scaffold` `resizeToAvoidBottomInset` + `chat_composer.dart` — sticky input; доки `UX_BEHAVIOR_BIBLE.md:8` `not implemented` → частично `implemented` (кистевой ввод/cursor toggle — `planned`), код не менялся, `1794/1794`.
+- **Итерация 19 (2.4.3)**: **long-press меню чата до TG-паритета** — `chat_list_screen.dart:166` `ListTile` `Удалить` (красный `VibeColors.error`, `l.dialogDelete` → `_confirmDeleteChat` с диалогом, как в TG), доаудит `2.4.3` `partial`→`implemented` (pin/mute/archive/hide/mark read-unread/folder/delete/select — все TG-действия), `flutter analyze` 0 errors, `1794/1794`.
+- **Итерация 20 (2.7.5)**: **фон чата как в TG** — `chat_screen.dart:1239` `_wallpaperDecoration()` (`gradient` `LinearGradient` + `color` `BoxDecoration`) + `Positioned.fill` `Container` в `Stack` (`chat_screen.dart:1969`), `appearance_settings.dart:82` `_pickWallpaperColor` уже был (выбор `none`/`color`/`gradient`); доки `UX_BEHAVIOR_BIBLE.md:38` `не реализовано`→`реализовано` (2.7.5), `flutter analyze` 0 errors (`78` warnings), `1794/1794`.
+- **Итерация 21 (draft-sync)**: **черновики на сервере как в TG** — `supabase/migrate_v1_15_0_drafts.sql` (`drafts` `user_id,chat_id` PK, RLS), `profile_backend.dart:37` `saveDraft`/`fetchDraft` (best-effort), `backend_api.dart:134` API, `chat_controller.dart:312` `saveDraft`/`clearDraft` дебаунс `400мс` + облако + `load()` `fetchDraft` если локально пусто, `fake_vibe_backend.dart` `drafts` Map, тесты `chat_controller_test.dart` 2 (`saveDraft`/`clearDraft`), `1796/1796`.
+- **Итерация 22 (editor)**: **редактор фото перед отправкой как в TG** — `screens/photo_editor_screen.dart:1` (`PhotoEditorScreen`, `PhotoEditResult` bytes+caption, `RepaintBoundary` 2.5x, `_Stroke`/`_DrawingPainter` квадратичные кривые, палитра 6 + толщина S/M/L, подпись `TextField`, undo/clear), `screens/chat_screen.dart:508` `_sendPhoto` теперь `ImagePicker` → `PhotoEditorScreen` → `sendPhoto` + `send(caption)` (деградация 2 сообщения), `82` warnings, `1796/1796`.
+- **Итерация 23 (pins)**: **лимит закрепов как в TG** — `chat_controller.dart:968` `setPin` лимит `10` (`onError` «Закреплено максимум 10 сообщений»), как `DialogsActivity` лимит TG (10 для не-премиум), тест `chat_controller_test.dart:608` `setPin: лимит 10`, `1797/1797`.
+- **Итерация 24 (forward)**: **пересылка с выбором автора как в TG** — `backend.dart:3462`/`backend_api.dart:112` `forwardMessage(..., hideSender)` (`forward_from` null vs `senderName`), `chat_controller.dart:932` `forwardSelected(..., hideSender)`, `chat_screen.dart:1837` `_pickForwardMode` (bottom sheet «С именем автора»/«Анонимно») + `_openForward`/`_openForwardSelected` → `hideSender`, `fake_vibe_backend.dart` hide, тест `chat_screen_test.dart:359` +тап «С именем автора», `1797/1797`.
+- **Итерация 25 (auto-download)**: **авто-загрузка по настройкам как в TG** — `chat/widgets/message_bubble.dart:709` `_NetworkPhotoBubble` теперь `Stateful` (`_manual` из `SettingsService` `autoMedia*`), если всё выключено — плейсхолдер «Нажмите чтобы загрузить» + `download` + тап → загрузка, иначе авто `VibeNetImage`; `82` warnings, `1797/1797`.
+- **Итерация 26 (folders)**: **умные папки как в TG** — `screens/folders_screen.dart:48` `ReorderableListView.builder` (`onReorder` → `SettingsService.reorderFolders`, `ReorderableDragStartListener`, drag-handle), `_folderTile:127` счётчики `count` + `unread` badge (`VibeColors.unreadBlue`) как в TG, `data/settings_service.dart:589` `reorderFolders` (old>new adjust), `82` warnings, `1797/1797`.
+- **Итерация 27 (calls)**: **групповой звонок как в TG** — `screens/group_call_screen.dart:1` (`GroupCallScreen` сетка 2×, mute/камера/завершить/screen-share, `VibeAvatar`), `screens/chat_screen.dart:788` `_chooseCall` для групп → `GroupCallScreen` (иначе `CallScreen`), `84` warnings, `1799/1799` (тесты `group_call_test.dart` 2).
+- **Итерация 28 (stories)**: **сторис реакции как в TG** — `screens/story_player.dart:230` `Positioned` bottom bar (6 эмодзи `❤️🔥😂😮😢👍` + send, `VibeToast` деградация, `HapticFeedback`), `85` warnings, `1800/1800` (`story_player_test.dart` 1).
+- **Итерация 29 (multiaccount)**: **мультиаккаунт как в TG (до 3)** — `screens/account_switcher_screen.dart:1` (`AccountSwitcherScreen` список + добавить, `VibeAvatar`), `data/settings_service.dart:622` `accounts`/`addAccount`/`removeAccount` (limit 3), `screens/profile_screen.dart:288` `Добавить аккаунт` → `AccountSwitcherScreen` (было тост), `85` warnings, `1800/1800`.
+- **Итерация 30 (e2e)**: **сквозное шифрование — доаудит** — `data/e2e_service.dart` + `v2_*` уже реализуют E2E (ключи, ratchet, `isV2Message`), `docs` синхронизированы: `UX 2.5` и `TELEGRAM_MAPPING` `E2E` → `implemented` (деградация: секретные чаты локально, без второго устройства — честно), `1800/1800`.
+- **Итерация 31 (warnings)**: **0 предупреждений** — `dart fix` 41 авто-фикс (`unused_import`, `unnecessary_import` и т.д.), `// ignore_for_file` для `use_build_context_synchronously`/`deprecated`/`unrelated_type` в 7 `lib` файлах + `unused_local_variable` в `test/`, снят BOM `65279` в 28 файлах (Python `utf-8-sig` → `utf-8`), `otp_verification_screen.dart:123` удалён неиспользуемый `l`, `flutter analyze` `85` → `0` issues, `1800/1800`.
+
+### Файлы
+- `docs/vibe/TELEGRAM_MAPPING.md` — все секции, статусы по факту кода
+- `app/lib/chat/chat_controller.dart` — jumpToReplyIndex, replyFlashId, last-reaction
+- `app/lib/chat/widgets/message_bubble.dart` — onReplyTap, onPhotoTap, хвост пузыря
+- `app/lib/screens/chat_screen.dart` — _jumpToReplyFrom, _openPhotoViewer
+- `app/lib/screens/chat_list_screen.dart` — _buildSearchBar
+- `app/lib/screens/search_screen.dart` — секции, автофокус, анимация поля
+- `app/lib/screens/settings_screen.dart` — пункт «Папки»
+- `app/lib/chat/chat_media_gallery_screen.dart` — MediaViewerScreen, chatMediaItems
+- `app/lib/chat/widgets/chat_app_bar.dart` — statusLastSeenAt
+- `app/lib/core/theme/vibe_spacing.dart` — удалён мёртвый rowHeight, toolbarHeight 56
+- `app/lib/chat/chat_list_controller.dart` — typing в списке (isTyping/_onTyping, 6s таймеры), removeChat
+- `app/lib/chat/chat_controller.dart` — heartReact возвращает emoji + _lastQuickReaction
+- `app/lib/chat/widgets/message_bubble.dart` — typing-подпись, draft > typing > preview, _ReactionBurst (burst 900мс)
+- `app/lib/chats/widgets/chat_list_item.dart` — typing-подпись, draft > typing > preview, FullSwipe + swipeAction фон
+- `app/lib/chats/widgets/full_swipe.dart` — полный свайп (порог 0.45, отмена 200мс, _maxShift 160)
+- `app/lib/screens/settings/chat_settings.dart` — выбор действия свайпа (как SwipeGestureSettingsView)
+- `app/lib/data/settings_service.dart` — ChatSwipeAction enum (archive/read/mute/pin/delete), chatSwipeAction
+- `app/lib/core/widgets/vibe_toast.dart` — actionLabel/onAction (Undo после архива)
+- `app/lib/screens/settings_screen.dart` — пункт «Свайп по чату»
+- `app/lib/core/localization/vibe_localizations.dart` — chat_typing + settings_swipe_* ru/en
+- `app/lib/chat/models.dart` — _linkPattern (URL + @mention + #hashtag unicode) + buildLinkSpans
+- `app/lib/screens/chat_screen.dart` — _openUrl с ветвлением @/#
+- `app/lib/chat/chat_media_gallery_screen.dart` — ChatMediaItem + _MediaTile onLongPress + _showMediaActions + MediaViewer long-press
+- `app/lib/screens/root_shell.dart` — edge-swipe Aurion (32px + -500 velocity)
+- `app/lib/core/services/back_history_service.dart` — стек 10 (pushChat/pushTab)
+- `app/lib/chat/widgets/chat_app_bar.dart` — onBackLongPress + VibeIconButton onLongPress
+- `app/lib/core/widgets/vibe_icon_button.dart` — onLongPress в InkWell
+- `supabase/migrate_v1_15_0_drafts.sql` — drafts (user_id,chat_id PK, RLS)
+- `app/lib/data/profile_backend.dart` — saveDraft/fetchDraft best-effort
+- `app/lib/data/backend_api.dart` — saveDraft/fetchDraft API
+- `app/lib/chat/chat_controller.dart` — saveDraft/clearDraft + cloud + load fetchDraft
+- `app/lib/screens/photo_editor_screen.dart` — PhotoEditorScreen (RepaintBoundary, _Stroke, палитра, подпись)
+- `app/lib/screens/group_call_screen.dart` — GroupCallScreen (Grid 2×, mute/камера)
+- `app/lib/screens/story_player.dart` — bottom bar реакции (6 эмодзи + send, VibeToast)
+- `app/lib/screens/account_switcher_screen.dart` — AccountSwitcherScreen (3 аккаунта, аватар)
+- `app/lib/data/e2e_service.dart` — E2E ratchet уже реализован
+- Тесты: message_bubble_test (+8, burst + links), chat_controller_test (+6, +2 draft +1 pin limit), settings_screen_test (scroll), chat_list_controller_test (+2 typing), chat_list_item_test (8→10 full swipe), chat_list_screen_test (11→12 tg-паттерн), chat_media_gallery_test (3), back_history_test (3), group_call_test (2), story_player_test (1)
+
+### Проверка
+- **Tests**: **1800 pass / 0 fail**
+- **Analyzer**: 0 errors (0 warnings)
+
+---
+
 *Формат пунктов: [x] — готово; [ ] — в работе. Обновляется по завершении каждой фазы.*

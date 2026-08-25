@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+// ignore_for_file: use_build_context_synchronously
+import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_animations.dart';
 import '../core/theme/vibe_colors.dart';

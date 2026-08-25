@@ -20,6 +20,10 @@ class AttachmentData {
     this.nick,
     this.question,
     this.options = const [],
+    this.anonymous = true,
+    this.multiple = false,
+    this.quiz = false,
+    this.correctOption,
     this.pollId,
     this.opt = 0,
   });
@@ -45,6 +49,10 @@ class AttachmentData {
   // poll
   final String? question;
   final List<String> options;
+  final bool anonymous;
+  final bool multiple;
+  final bool quiz;
+  final int? correctOption;
 
   // pollVote
   final String? pollId;
@@ -64,6 +72,10 @@ class AttachmentData {
     String? nick,
     String? question,
     List<String> options = const [],
+    bool anonymous = true,
+    bool multiple = false,
+    bool quiz = false,
+    int? correctOption,
     String? pollId,
     int opt = 0,
   }) {
@@ -82,6 +94,10 @@ class AttachmentData {
       'nick': nick,
       'q': question,
       'opts': options,
+      'anon': anonymous,
+      'multiple': multiple,
+      'quiz': quiz,
+      'correct': correctOption,
       'poll': pollId,
       'opt': opt,
     });
@@ -109,6 +125,10 @@ class AttachmentData {
         nick: map['nick'] as String?,
         question: map['q'] as String?,
         options: (map['opts'] as List?)?.cast<String>() ?? const [],
+        anonymous: map['anon'] as bool? ?? true,
+        multiple: map['multiple'] as bool? ?? false,
+        quiz: map['quiz'] as bool? ?? false,
+        correctOption: (map['correct'] as num?)?.toInt(),
         pollId: map['poll'] as String?,
         opt: (map['opt'] as num?)?.toInt() ?? 0,
       );

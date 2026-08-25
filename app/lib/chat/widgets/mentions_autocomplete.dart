@@ -160,7 +160,7 @@ class _MentionsAutocompleteState extends State<MentionsAutocomplete>
                                     Text(
                                       user.displayName,
                                       style: VibeTypography.body.copyWith(
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.w500,
                                         color: context.vibeTextPrimary,
                                       ),
                                     ),

@@ -163,7 +163,7 @@ class _LockScreenState extends State<LockScreen> {
                                 height: 44,
                                 textStyle: VibeTypography.subtitle.copyWith(
                                   color: context.vibeTextPrimary,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w500,
                                 ),
                                 decoration: BoxDecoration(
                                   color: isDark
@@ -181,7 +181,7 @@ class _LockScreenState extends State<LockScreen> {
                                 height: 44,
                                 textStyle: VibeTypography.subtitle.copyWith(
                                   color: context.vibeTextPrimary,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w500,
                                 ),
                                 decoration: BoxDecoration(
                                   color: context.vibePrimary
@@ -262,7 +262,7 @@ class _LockedPill extends StatelessWidget {
             '$secondsLeft с',
             style: VibeTypography.subtitle.copyWith(
               color: context.vibeTextPrimary,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

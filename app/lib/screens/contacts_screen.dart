@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../core/localization/vibe_localizations.dart';
 
@@ -258,7 +258,7 @@ class _ContactTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: VibeTypography.bodyMedium.copyWith(
                         color: context.vibeTextPrimary,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 1),

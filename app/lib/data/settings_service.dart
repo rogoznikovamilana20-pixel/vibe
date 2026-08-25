@@ -9,6 +9,15 @@ import 'backend.dart';
 import 'backend_api.dart';
 import 'chat_folder.dart';
 
+/// Действие свайпа по чату в списке (TG: SwipeGestureSettingsView).
+enum ChatSwipeAction {
+  archive,
+  read,
+  mute,
+  pin,
+  delete,
+}
+
 class SettingsService {
   SettingsService._();
   static final instance = SettingsService._();
@@ -85,6 +94,23 @@ class SettingsService {
   static const _keyAutoNightEnabled = 'vibe_auto_night_enabled';
   static const _keyAutoNightStart = 'vibe_auto_night_start';
   static const _keyAutoNightEnd = 'vibe_auto_night_end';
+
+  // Свайп по чату в списке (как TG: одно действие, настраивается в настройках)
+  static const _keyChatSwipeAction = 'vibe_chat_swipe_action';
+
+  ChatSwipeAction get chatSwipeAction {
+    final name = _prefs.getString(_keyChatSwipeAction);
+    if (name == null) return ChatSwipeAction.archive; // TG default
+    return ChatSwipeAction.values.firstWhere(
+      (a) => a.name == name,
+      orElse: () => ChatSwipeAction.archive,
+    );
+  }
+
+  Future<void> setChatSwipeAction(ChatSwipeAction action) async {
+    await _prefs.setString(_keyChatSwipeAction, action.name);
+    _bumpAppearance();
+  }
 
   // Приватность: голосовые сообщения, био, день рождения
   static const _keyPrivacyVoiceMessages = 'vibe_privacy_voice_messages';
@@ -366,6 +392,9 @@ class SettingsService {
       forward: privacyForward,
       calls: privacyCalls,
       groups: privacyGroups,
+      voiceMessages: privacyVoiceMessages,
+      bio: privacyBio,
+      birthday: privacyBirthday,
     );
     unawaited(() async {
       try {
@@ -388,6 +417,9 @@ class SettingsService {
       await setPrivacyForward(p.forward);
       await setPrivacyCalls(p.calls);
       await setPrivacyGroups(p.groups);
+      await setPrivacyVoiceMessages(p.voiceMessages);
+      await setPrivacyBio(p.bio);
+      await setPrivacyBirthday(p.birthday);
     } catch (_) {}
   }
 
@@ -530,13 +562,14 @@ class SettingsService {
     ]);
   }
 
-  Future<void> addFolder(String title, {String emoji = '📁'}) async {
+  Future<void> addFolder(String title, {String emoji = '📁', Set<String> filters = const {}}) async {
     final folders = [...chatFolders];
     folders.add(
       VibeChatFolder(
         id: 'folder_${DateTime.now().millisecondsSinceEpoch}',
         title: title,
         emoji: emoji,
+        filters: filters,
       ),
     );
     await _saveFolders(folders);
@@ -547,11 +580,12 @@ class SettingsService {
     String id,
     String title, {
     String? emoji,
+    Set<String>? filters,
   }) async {
     final folders = [
       for (final f in chatFolders)
         if (f.id == id)
-          VibeChatFolder(id: f.id, title: title, emoji: emoji ?? f.emoji)
+          VibeChatFolder(id: f.id, title: title, emoji: emoji ?? f.emoji, filters: filters ?? f.filters)
         else
           f,
     ];
@@ -574,6 +608,17 @@ class SettingsService {
     foldersVersion.value++;
   }
 
+  /// Перетаскивание папок как в TG (ReorderableListView).
+  Future<void> reorderFolders(int oldIndex, int newIndex) async {
+    final folders = [...chatFolders];
+    if (oldIndex < 0 || oldIndex >= folders.length || newIndex < 0 || newIndex > folders.length) return;
+    if (newIndex > oldIndex) newIndex--;
+    final item = folders.removeAt(oldIndex);
+    folders.insert(newIndex, item);
+    await _saveFolders(folders);
+    foldersVersion.value++;
+  }
+
   /// Папка чата (null — «Без папки»).
   String? folderOf(String chatId) =>
       _prefs.getString('$_keyFolderAssign:$chatId');
@@ -592,6 +637,22 @@ class SettingsService {
   static const _keyWallpaperType = 'vibe_wallpaper_type'; // 'none' | 'color' | 'gradient'
   static const _keyWallpaperValue = 'vibe_wallpaper_value'; // int color value
   static const _keyWallpaperEndValue = 'vibe_wallpaper_end_value';
+
+  // ── Мультиаккаунт (как в TG: до 3) ──
+  static const _keyAccounts = 'vibe_accounts';
+  List<String> get accounts => _prefs.getStringList(_keyAccounts) ?? const [];
+  Future<void> addAccount(String id) async {
+    final list = [...accounts];
+    if (list.length >= 3) return;
+    if (list.contains(id)) return;
+    list.add(id);
+    await _prefs.setStringList(_keyAccounts, list);
+  }
+
+  Future<void> removeAccount(String id) async {
+    final list = [...accounts]..remove(id);
+    await _prefs.setStringList(_keyAccounts, list);
+  }
 
   String get wallpaperType => _prefs.getString(_keyWallpaperType) ?? 'none';
   int get wallpaperColor => _prefs.getInt(_keyWallpaperValue) ?? 0xFF1A1A2E;

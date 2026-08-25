@@ -38,6 +38,24 @@
 6. **Локализация**: не хардкодить строки вне локализованных файлов (точечный аудит — в плане фаз).
 7. **Документация**: статусы в доках менять только вместе с кодом (факты, не намерения).
 
+## MCP routing (engineered environment)
+
+Подключено в `opencode.jsonc` (корень воркспейса). Направление задач:
+
+| Задача | MCP-сервер | Что даёт |
+|---|---|---|
+| Документация Flutter/Dart/пакетов | `context7` | актуальные API, версии, синтаксис (не полагаться на устаревшие знания модели) |
+| Flutter/Dart тулинг, тесты, интроспекция | `dart-flutter` | analyze, widget tree, hot reload, pub, DTD |
+| Репозиторий/PR/issues/CI/релизы | `github` | официальный GitHub MCP server (локальный бинарник + `GITHUB_PERSONAL_ACCESS_TOKEN` из gh) |
+| Браузер/E2E web-поверхностей | `playwright` | chromium-автоматизация, visual/E2E для web/admin |
+| Backend/DB Supabase | `supabase` | схема, RLS, SQL, миграции (read-only режим) |
+| Сложные многошаговые рассуждения | `sequential-thinking` | декомпозиция/верификация гипотез |
+| Долговременное знание проекта | `memory` | ADR, архитектурные решения, лимиты |
+
+Использовать только когда нативные инструменты OpenCode не покрывают задачу. Не включать все MCP в каждый workflow.
+
+Известные ограничения: `ui-color-palette` **отключён** — его схема тула `create_color_harmony` (кортежный `items`) отклоняется провайдером (400). Секреты в конфиге — только через `{env:VAR}` (переменные заданы в user env: `TOKENROUTER_API_KEY`, `SUPABASE_ACCESS_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`).
+
 ## Проверка (если код менялся)
 
 ```bash

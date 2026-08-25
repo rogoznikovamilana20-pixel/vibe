@@ -14,9 +14,9 @@ import '../../../data/e2e_v2_identity_verification.dart';
 ///
 /// Displays the identity safety code and allows the user to:
 /// - View the current safety code
-/// - Explicitly verify the identity (UNKNOWN → VERIFIED)
+/// - Explicitly verify the identity (UNKNOWN в†’ VERIFIED)
 /// - See key change warnings (CHANGED state)
-/// - Re-verify after key change (CHANGED → VERIFIED)
+/// - Re-verify after key change (CHANGED в†’ VERIFIED)
 ///
 /// ## Security Properties
 ///
@@ -191,7 +191,7 @@ class _E2eeVerificationScreenState extends State<E2eeVerificationScreen> {
                   title,
                   style: VibeTypography.subtitle.copyWith(
                     color: context.vibeTextPrimary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: VibeSpacing.xs),
@@ -248,7 +248,7 @@ class _E2eeVerificationScreenState extends State<E2eeVerificationScreen> {
                   line,
                   style: VibeTypography.headline.copyWith(
                     color: context.vibeTextPrimary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                     letterSpacing: 2.0,
                   ),
                 ),

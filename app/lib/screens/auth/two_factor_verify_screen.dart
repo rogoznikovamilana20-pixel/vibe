@@ -7,7 +7,6 @@ import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_backdrop.dart';
 import '../../core/widgets/vibe_button.dart';
 import '../../core/widgets/vibe_input.dart';
-import '../../core/widgets/vibe_toast.dart';
 import '../../data/backend.dart';
 
 /// Экран проверки пароля 2FA после входа.

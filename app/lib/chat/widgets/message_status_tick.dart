@@ -54,6 +54,9 @@ class _MessageStatusTickState extends State<MessageStatusTick>
     if (widget.status == MsgStatus.read) {
       _colorController.value = 1.0;
     }
+    if (widget.status == MsgStatus.retrying) {
+      _drawController.value = 0.5;
+    }
   }
 
   @override
@@ -69,6 +72,8 @@ class _MessageStatusTickState extends State<MessageStatusTick>
         Future.delayed(const Duration(milliseconds: 150), () {
           if (mounted) _colorController.forward();
         });
+      } else if (widget.status == MsgStatus.retrying) {
+        _drawController.forward(from: 0.0);
       }
     }
   }
@@ -92,19 +97,28 @@ class _MessageStatusTickState extends State<MessageStatusTick>
         return _colorAnimation.value ?? const Color(0xFF8AB4F8);
       case MsgStatus.failed:
         return const Color(0xFFFF6B6B);
+      case MsgStatus.queued:
+        return Colors.white38;
+      case MsgStatus.retrying:
+        return Colors.white54;
+      case MsgStatus.cancelled:
+        return Colors.white24;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.status == MsgStatus.sending) {
+    if (widget.status == MsgStatus.sending ||
+        widget.status == MsgStatus.queued ||
+        widget.status == MsgStatus.retrying) {
       return SizedBox(
         width: widget.size,
         height: widget.size,
         child: const _ClockSpinner(),
       );
     }
-    if (widget.status == MsgStatus.failed) {
+    if (widget.status == MsgStatus.failed ||
+        widget.status == MsgStatus.cancelled) {
       return Icon(Icons.error_outline_rounded,
           size: widget.size, color: _color(widget.status));
     }

@@ -63,12 +63,12 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Ждём минимум 1.4с для красивой анимации (не блокируемся сетью).
     await Future.delayed(const Duration(milliseconds: 1400));
-    
+
     if (!mounted) return;
 
     final profile = backend.myProfile;
     final Widget next;
-    
+
     if (profile != null) {
       // PIN-блокировка: показываем экран ввода код-пароля до главного экрана.
       if (PasscodeService.instance.hasPasscode) {
@@ -149,7 +149,7 @@ class _SplashScreenState extends State<SplashScreen>
                       const Text(
                         'VIBE',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Roboto',
                           fontSize: 44,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 6,
@@ -160,7 +160,7 @@ class _SplashScreenState extends State<SplashScreen>
                       const Text(
                         'мессенджер нового поколения',
                         style: TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Roboto',
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
                           letterSpacing: 0.4,

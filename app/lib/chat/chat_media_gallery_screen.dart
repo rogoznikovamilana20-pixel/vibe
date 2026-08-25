@@ -1,15 +1,48 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
+import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_avatar.dart';
+import '../core/widgets/vibe_toast.dart';
 import 'chat_controller.dart';
 import 'models.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+
+/// Медиа-список чата (фото + видео-кружки) из ленты сообщений.
+/// Общий хелпер для галереи и просмотрщика из чата.
+List<ChatMediaItem> chatMediaItems(List<ChatMsg> messages) {
+  final out = <ChatMediaItem>[];
+  for (var i = 0; i < messages.length; i++) {
+    final m = messages[i];
+    if (m.type == MsgType.photo) {
+      out.add(ChatMediaItem(
+        kind: 'photo',
+        photoSeed: m.photoSeed,
+        photoUrl: m.photoUrl,
+        serverId: m.serverId,
+        localId: m.localId,
+        messageIndex: i,
+      ));
+    } else if (m.type == MsgType.video) {
+      out.add(ChatMediaItem(
+        kind: 'video',
+        photoSeed: m.photoSeed,
+        videoUrl: m.videoUrl,
+        videoPath: m.videoPath,
+        serverId: m.serverId,
+        localId: m.localId,
+        messageIndex: i,
+      ));
+    }
+  }
+  return out;
+}
 
 /// Одно медиа в галерее (фото или видео-кружок).
 class ChatMediaItem {
@@ -19,6 +52,9 @@ class ChatMediaItem {
     this.photoUrl,
     this.videoUrl,
     this.videoPath,
+    this.serverId,
+    this.localId,
+    this.messageIndex,
   });
 
   final String kind; // 'photo' | 'video'
@@ -26,6 +62,9 @@ class ChatMediaItem {
   final String? photoUrl;
   final String? videoUrl;
   final String? videoPath;
+  final String? serverId;
+  final String? localId;
+  final int? messageIndex;
 }
 
 /// Галерея медиа чата (как в Telegram): сетка фото/видео-кружков,
@@ -41,27 +80,11 @@ class ChatMediaGalleryScreen extends StatefulWidget {
   final String chatTitle;
 
   @override
-  State<ChatMediaGalleryScreen> createState() =>
-      _ChatMediaGalleryScreenState();
+  State<ChatMediaGalleryScreen> createState() => _ChatMediaGalleryScreenState();
 }
 
 class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
-  List<ChatMediaItem> get _media => [
-        for (final m in widget.controller.messages)
-          if (m.type == MsgType.photo)
-            ChatMediaItem(
-              kind: 'photo',
-              photoSeed: m.photoSeed,
-              photoUrl: m.photoUrl,
-            )
-          else if (m.type == MsgType.video)
-            ChatMediaItem(
-              kind: 'video',
-              photoSeed: m.photoSeed,
-              videoUrl: m.videoUrl,
-              videoPath: m.videoPath,
-            ),
-      ];
+  List<ChatMediaItem> get _media => chatMediaItems(widget.controller.messages);
 
   @override
   Widget build(BuildContext context) {
@@ -102,8 +125,7 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
                 )
               : GridView.builder(
                   padding: const EdgeInsets.all(VibeSpacing.xs),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     mainAxisSpacing: 2,
                     crossAxisSpacing: 2,
@@ -117,9 +139,14 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
                           builder: (_) => MediaViewerScreen(
                             items: media,
                             initialIndex: i,
+                            controller: widget.controller,
                           ),
                         ),
                       );
+                    },
+                    onLongPress: () {
+                      HapticFeedback.mediumImpact();
+                      _showMediaActions(context, widget.controller, media[i]);
                     },
                   ),
                 ),
@@ -129,17 +156,103 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
   }
 }
 
+void _showMediaActions(
+  BuildContext context,
+  ChatController controller,
+  ChatMediaItem item,
+) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: context.vibeSurface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.vibeDivider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: VibeSpacing.md),
+          ListTile(
+            leading: const Icon(Icons.share_outlined),
+            title: const Text('Поделиться'),
+            onTap: () {
+              Navigator.of(ctx).pop();
+              VibeToast.show(context, 'Поделиться — в v2');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Сохранить в галерею'),
+            onTap: () {
+              Navigator.of(ctx).pop();
+              VibeToast.show(context, 'Сохранено');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.forward_rounded),
+            title: const Text('Переслать'),
+            onTap: () {
+              Navigator.of(ctx).pop();
+              VibeToast.show(context, 'Переслать — в v2');
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Icon(Icons.delete_outline_rounded, color: VibeColors.error),
+            title: Text('Удалить', style: TextStyle(color: VibeColors.error)),
+            onTap: () async {
+              Navigator.of(ctx).pop();
+              final idx = item.messageIndex;
+              ChatMsg? msg;
+              if (idx != null && idx >= 0 && idx < controller.messages.length) {
+                final cand = controller.messages[idx];
+                if (cand.serverId == item.serverId || cand.localId == item.localId) {
+                  msg = cand;
+                }
+              }
+              msg ??= controller.messages.cast<ChatMsg?>().firstWhere(
+                    (m) => m?.serverId == item.serverId || m?.localId == item.localId,
+                    orElse: () => null,
+                  );
+              if (msg != null) {
+                await controller.deleteMessage(msg, everyone: false);
+                if (context.mounted) VibeToast.show(context, 'Удалено');
+              }
+            },
+          ),
+          const SizedBox(height: VibeSpacing.md),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Плитка сетки: фото или видео с play-иконкой.
 class _MediaTile extends StatelessWidget {
-  const _MediaTile({required this.item, required this.onTap});
+  const _MediaTile({
+    required this.item,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   final ChatMediaItem item;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -199,23 +312,27 @@ class _MediaTile extends StatelessWidget {
 }
 
 /// Полноэкранный просмотр медиа: свайп между элементами, зум фото,
-/// воспроизведение видео-кружков.
+/// воспроизведение видео-кружков. Long-press — меню действий как в TG.
 class MediaViewerScreen extends StatefulWidget {
   const MediaViewerScreen({
     super.key,
     required this.items,
     required this.initialIndex,
+    this.controller,
   });
 
   final List<ChatMediaItem> items;
   final int initialIndex;
+  final ChatController? controller;
 
   @override
   State<MediaViewerScreen> createState() => _MediaViewerScreenState();
 }
 
 class _MediaViewerScreenState extends State<MediaViewerScreen> {
-  late final PageController _page = PageController(initialPage: widget.initialIndex);
+  late final PageController _page = PageController(
+    initialPage: widget.initialIndex,
+  );
 
   @override
   void dispose() {
@@ -232,7 +349,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           PageView.builder(
             controller: _page,
             itemCount: widget.items.length,
-            itemBuilder: (context, i) => _ViewerPage(item: widget.items[i]),
+            itemBuilder: (context, i) {
+              final page = _ViewerPage(item: widget.items[i]);
+              if (widget.controller == null) return page;
+              return GestureDetector(
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  _showMediaActions(context, widget.controller!, widget.items[i]);
+                },
+                child: page,
+              );
+            },
           ),
           SafeArea(
             child: Align(

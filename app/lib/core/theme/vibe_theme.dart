@@ -25,16 +25,27 @@ class VibeTheme {
     final accentDark = Color.lerp(accent, Colors.black, 0.3)!;
 
     final bg = isDark ? VibeColors.surface0Dark : VibeColors.surface0Light;
-    final surface1 = isDark ? VibeColors.surface1Dark : VibeColors.surface1Light;
-    final surface2 = isDark ? VibeColors.surface2Dark : VibeColors.surface2Light;
-    final surface3 = isDark ? VibeColors.surface3Dark : VibeColors.surface3Light;
-    final surface4 = isDark ? VibeColors.surface4Dark : VibeColors.surface4Light;
-    final textPrimary =
-        isDark ? VibeColors.textPrimaryDark : VibeColors.textPrimaryLight;
-    final textSecondary =
-        isDark ? VibeColors.textSecondaryDark : VibeColors.textSecondaryLight;
-    final textTertiary =
-        isDark ? VibeColors.textTertiaryDark : VibeColors.textTertiaryLight;
+    final surface1 = isDark
+        ? VibeColors.surface1Dark
+        : VibeColors.surface1Light;
+    final surface2 = isDark
+        ? VibeColors.surface2Dark
+        : VibeColors.surface2Light;
+    final surface3 = isDark
+        ? VibeColors.surface3Dark
+        : VibeColors.surface3Light;
+    final surface4 = isDark
+        ? VibeColors.surface4Dark
+        : VibeColors.surface4Light;
+    final textPrimary = isDark
+        ? VibeColors.textPrimaryDark
+        : VibeColors.textPrimaryLight;
+    final textSecondary = isDark
+        ? VibeColors.textSecondaryDark
+        : VibeColors.textSecondaryLight;
+    final textTertiary = isDark
+        ? VibeColors.textTertiaryDark
+        : VibeColors.textTertiaryLight;
 
     // Ошибки: тёмная тема — яркий красный, светлая — тёмный (контраст AA).
     final errorColor = isDark ? VibeColors.error : VibeColors.errorLight;
@@ -76,7 +87,7 @@ class VibeTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      fontFamily: 'Inter',
+      fontFamily: 'Roboto',
       scaffoldBackgroundColor: bg,
       splashFactory: InkRipple.splashFactory,
       visualDensity: VisualDensity.standard,
@@ -88,9 +99,7 @@ class VibeTheme {
         },
       ),
       scrollbarTheme: ScrollbarThemeData(
-        thumbColor: WidgetStatePropertyAll(
-          textTertiary.withValues(alpha: 0.5),
-        ),
+        thumbColor: WidgetStatePropertyAll(textTertiary.withValues(alpha: 0.5)),
         radius: const Radius.circular(4),
         thickness: WidgetStatePropertyAll(4),
       ),
@@ -107,7 +116,9 @@ class VibeTheme {
       ),
       appBarTheme: AppBarTheme(
         // Telegram: строгая сплошная шапка.
-        backgroundColor: isDark ? VibeColors.toolbarDark : VibeColors.surface0Light,
+        backgroundColor: isDark
+            ? VibeColors.toolbarDark
+            : VibeColors.surface0Light,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -186,7 +197,7 @@ class VibeTheme {
           final active = states.contains(WidgetState.selected);
           return VibeTypography.label.copyWith(
             color: active ? accent : textSecondary,
-            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+            fontWeight: active ? FontWeight.w500 : FontWeight.w500,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
@@ -244,9 +255,7 @@ class VibeTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected)
-              ? Colors.white
-              : textTertiary,
+          (s) => s.contains(WidgetState.selected) ? Colors.white : textTertiary,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected)
@@ -272,9 +281,7 @@ class VibeTheme {
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStatePropertyAll(accent),
         checkColor: const WidgetStatePropertyAll(Colors.white),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
@@ -300,8 +307,7 @@ extension VibeContext on BuildContext {
 
   Color get vibeSurface => Theme.of(this).colorScheme.surface;
 
-  Color get vibeSurfaceVariant =>
-      Theme.of(this).colorScheme.surfaceContainer;
+  Color get vibeSurfaceVariant => Theme.of(this).colorScheme.surfaceContainer;
 
   Color get vibeSurfaceLowest =>
       Theme.of(this).colorScheme.surfaceContainerLowest;
@@ -317,9 +323,8 @@ extension VibeContext on BuildContext {
 
   Color get vibeTextSecondary => Theme.of(this).colorScheme.onSurfaceVariant;
 
-  Color get vibeTextTertiary => isDarkMode
-      ? VibeColors.textTertiaryDark
-      : VibeColors.textTertiaryLight;
+  Color get vibeTextTertiary =>
+      isDarkMode ? VibeColors.textTertiaryDark : VibeColors.textTertiaryLight;
 
   Color get vibeSurfaceHighlight => isDarkMode
       ? VibeColors.surfaceHighlightDark
@@ -347,9 +352,8 @@ extension VibeContext on BuildContext {
       ? Colors.white.withValues(alpha: 0.06)
       : VibeColors.dividerLight;
 
-  Color get vibeBorder => isDarkMode
-      ? VibeColors.borderDark
-      : VibeColors.borderLight;
+  Color get vibeBorder =>
+      isDarkMode ? VibeColors.borderDark : VibeColors.borderLight;
 
   Color get vibePrimary => Theme.of(this).colorScheme.primary;
 
@@ -367,11 +371,11 @@ class VibeScrollBehavior extends MaterialScrollBehavior {
 
   @override
   Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.stylus,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
 
   @override
   Widget buildOverscrollIndicator(

@@ -1,4 +1,5 @@
-﻿
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -179,13 +180,15 @@ class _ChatListScreenState extends State<ChatListScreen>
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: sheetBg,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             const SizedBox(height: 8),
             ListTile(
               leading: Icon(
@@ -252,6 +255,17 @@ class _ChatListScreenState extends State<ChatListScreen>
               },
             ),
             ListTile(
+              leading: Icon(Icons.delete_outline_rounded, color: VibeColors.error),
+              title: Text(
+                l.dialogDelete,
+                style: TextStyle(color: VibeColors.error, fontSize: 16),
+              ),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _confirmDeleteChat(context, chat);
+              },
+            ),
+            ListTile(
               leading: const Icon(VibeIcons.check, color: Colors.grey),
               title: Text(
                 l.chatMarkRead,
@@ -309,6 +323,7 @@ class _ChatListScreenState extends State<ChatListScreen>
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -338,11 +353,19 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   /// Попадает ли чат в активную вкладку (8.3.7: пользовательские папки
-  /// учитывают ручное назначение папки).
+  /// учитывают ручное назначение + auto-фильтры как в TG).
   bool _inSelectedTab(VibeChat chat) {
     if (_selectedTab == 'all') return true;
     final settings = SettingsService.instance;
-    if (settings.folderOf(chat.id) == _selectedTab) return true;
+    if (settings.folderOf(chat.id) == _selectedTab) {
+      // Auto-фильтры папки (как в TG: unread/muted)
+      final folder = settings.chatFolders.where((f) => f.id == _selectedTab).firstOrNull;
+      if (folder != null) {
+        if (folder.filters.contains('unread') && _chat.unreadOf(chat) == 0) return false;
+        if (folder.filters.contains('muted') && !_chat.dnd.contains(chat.id)) return false;
+      }
+      return true;
+    }
     return _tabOf(chat) == _selectedTab;
   }
 
@@ -1171,8 +1194,9 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
     if (result == null || !mounted) return;
     try {
-      await VibeBackend.instance.uploadStory(result.bytes);
-      setState(() => _stories.insert(0, result.bytes));
+      final bytes = result.videoFile != null ? await result.videoFile!.readAsBytes() : result.bytes;
+      await VibeBackend.instance.uploadStory(bytes);
+      setState(() => _stories.insert(0, bytes));
       _snack(VibeLocalizations.of(context).storyPublished);
     } catch (e) {
       _snack('${VibeLocalizations.of(context).storyPublishFailed}: $e');
@@ -1808,6 +1832,7 @@ class _ChatListScreenState extends State<ChatListScreen>
       selectionMode: _chat.selectionMode,
       density: SettingsService.instance.listDensity,
       draft: SettingsService.instance.draftFor(id),
+      typing: _chat.isTyping(id),
       onTap: () async {
         if (_chat.selectionMode) {
           _chat.toggleSelect(id);
@@ -1845,24 +1870,79 @@ class _ChatListScreenState extends State<ChatListScreen>
         HapticFeedback.mediumImpact();
         _showChatMenu(context, chat);
       },
-      onDismissed: (direction) {
-        if (direction == DismissDirection.endToStart) {
-          _chat.toggleDnd(id);
-        } else {
-          _chat.toggleArchived(id);
+      swipeAction: SettingsService.instance.chatSwipeAction,
+      onSwipeLeft: () {
+        switch (SettingsService.instance.chatSwipeAction) {
+          case ChatSwipeAction.archive:
+            _toggleArchive(chat, fromSwipe: true);
+          case ChatSwipeAction.read:
+            if (unreadOfChat(chat) > 0) {
+              _chat.markChatRead(id);
+            } else {
+              _chat.toggleUnread(id);
+            }
+          case ChatSwipeAction.mute:
+            _chat.toggleDnd(id);
+          case ChatSwipeAction.pin:
+            _chat.togglePin(id);
+          case ChatSwipeAction.delete:
+            _confirmDeleteChat(context, chat);
         }
-        HapticFeedback.mediumImpact();
-        if (direction == DismissDirection.endToStart) {
-          _snack(
-            isDnd ? '$name — уведомления включены' : '$name — не беспокоить',
-          );
-        } else if (_chat.archived.contains(id)) {
+      },
+      onSwipeRight: () {
+        // TG: свайп вправо — вернуть из архива.
+        if (_chat.archived.contains(id)) {
+          _chat.toggleArchived(id);
           _snack('$name — из архива');
-        } else {
-          _snack('$name — в архив');
         }
       },
     );
+  }
+
+  int unreadOfChat(VibeChat chat) => _chat.unreadOf(chat);
+
+  /// Архивация со свайпа: как в TG — тост с Undo (UndoView ACTION_ARCHIVE).
+  void _toggleArchive(VibeChat chat, {required bool fromSwipe}) {
+    final id = chat.id;
+    final name = chat.title;
+    final archivedNow = !_chat.archived.contains(id);
+    _chat.toggleArchived(id);
+    HapticFeedback.mediumImpact();
+    if (fromSwipe) {
+      VibeToast.show(
+        context,
+        archivedNow ? '$name — в архив' : '$name — из архива',
+        actionLabel: VibeLocalizations.of(context).dialogCancel,
+        onAction: () => _chat.toggleArchived(id),
+      );
+    } else {
+      _snack(archivedNow ? '$name — в архив' : '$name — из архива');
+    }
+  }
+
+  /// Свайп → 🗑: подтверждение удаления (как в TG и в чате, см. _deleteChat).
+  Future<void> _confirmDeleteChat(BuildContext context, VibeChat chat) async {
+    final l = VibeLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(l.chatDeleteTitle),
+        content: Text(l.chatDeleteBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(l.dialogCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(l.dialogDelete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    _chat.removeChat(chat.id);
+    HapticFeedback.mediumImpact();
   }
 
   void _snack(String msg) {

@@ -117,10 +117,10 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                       'Новое фото профиля',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Roboto',
                         color: Colors.white,
                         fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -155,8 +155,9 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                                       child: InteractiveViewer(
                                         maxScale: 6,
                                         minScale: 1,
-                                        boundaryMargin:
-                                            const EdgeInsets.all(400),
+                                        boundaryMargin: const EdgeInsets.all(
+                                          400,
+                                        ),
                                         child: Image.memory(
                                           bytes,
                                           fit: BoxFit.cover,

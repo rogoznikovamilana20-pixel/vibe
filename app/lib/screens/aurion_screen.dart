@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/aurion/aurion_service.dart';
@@ -473,7 +473,7 @@ class _PreviewCard extends StatelessWidget {
                 'Ответ Aurion',
                 style: VibeTypography.caption.copyWith(
                   color: context.vibePrimary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

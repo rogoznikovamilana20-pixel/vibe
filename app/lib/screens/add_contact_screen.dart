@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/vibe_animations.dart';
@@ -242,7 +242,7 @@ class _ResultTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: VibeTypography.bodyMedium.copyWith(
                         color: context.vibeTextPrimary,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     Text(
@@ -260,7 +260,7 @@ class _ResultTile extends StatelessWidget {
                 VibeLocalizations.of(context).actionWrite,
                 style: VibeTypography.caption.copyWith(
                   color: context.vibePrimary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

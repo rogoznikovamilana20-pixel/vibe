@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+// ignore_for_file: use_build_context_synchronously
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -19,6 +20,7 @@ import '../data/backend.dart';
 import 'avatar_editor_screen.dart';
 import 'chat_screen.dart';
 import 'edit_profile_screen.dart';
+import 'account_switcher_screen.dart';
 import 'my_links_screen.dart';
 import 'settings_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
@@ -285,7 +287,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _ProfileActionTile(
           icon: Icons.person_add_alt_1_rounded,
           title: l.profileAddAccount,
-            onTap: () => _snack(l.profileMultiSoon),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AccountSwitcherScreen()),
+          ),
         ),
         _ProfileActionTile(
           icon: Icons.logout_rounded,
@@ -715,7 +719,7 @@ class _SectionHeader extends StatelessWidget {
           title,
           style: VibeTypography.caption.copyWith(
             color: context.vibeTextSecondary,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),

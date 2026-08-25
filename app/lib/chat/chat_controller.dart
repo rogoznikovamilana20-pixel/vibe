@@ -64,6 +64,9 @@ class ChatController extends ChangeNotifier {
   String? pinFlashId;
   String? groupTitle;
   bool peerTyping = false;
+  final Map<String, DateTime> _typingByUser = {};
+  Set<String> _typingUsers = {};
+  Set<String> get typingUsers => Set.unmodifiable(_typingUsers);
 
   // ─── Multi-select (V4.1) ───
   bool get selectionMode => _selectedMsgIds.isNotEmpty;
@@ -118,7 +121,7 @@ class ChatController extends ChangeNotifier {
   StreamSubscription<VibeMessage>? _sub;
   StreamSubscription<VibeMsgEvent>? _msgEventsSub;
   StreamSubscription<PinChanged>? _pinSub;
-  StreamSubscription<String>? _typingSub;
+  StreamSubscription<TypingEvent>? _typingSub;
   Timer? _typingReset;
   Timer? _pinTimer;
   Timer? _draftTimer;
@@ -130,6 +133,17 @@ class ChatController extends ChangeNotifier {
   Future<void> load() async {
     pins = List.of(SettingsService.instance.pinnedMessageIds(chatId));
     draft = SettingsService.instance.draftFor(chatId) ?? '';
+    // Облачный черновик — best-effort, как у приватности: если локально пусто — берём с сервера.
+    unawaited(() async {
+      try {
+        final remote = await backend.fetchDraft(chatId);
+        if (remote != null && remote.trim().isNotEmpty && draft.trim().isEmpty) {
+          draft = remote;
+          await SettingsService.instance.setDraft(chatId, remote);
+          if (!_disposed) notifyListeners();
+        }
+      } catch (_) {}
+    }());
     backend.markChatRead(chatId);
     _subscribe();
     await loadMessages();
@@ -139,10 +153,7 @@ class ChatController extends ChangeNotifier {
   Future<void> loadMessages() async {
     if (_initialLoadDone) return;
     try {
-      final list = await backend.listMessages(
-        chatId,
-        limit: _pageSize,
-      );
+      final list = await backend.listMessages(chatId, limit: _pageSize);
       if (_disposed) return;
       messages
         ..clear()
@@ -191,14 +202,12 @@ class ChatController extends ChangeNotifier {
     final da = a.date;
     final db = b.date;
     if (da == null || db == null) return false;
-    return a.incoming == b.incoming &&
-        db.difference(da).abs() <= groupWindow;
+    return a.incoming == b.incoming && db.difference(da).abs() <= groupWindow;
   }
 
   /// Первое (самое старое) сообщение своей группы в списке `messages`.
   static bool isFirstInGroup(List<ChatMsg> messages, int i) =>
-      i == messages.length - 1 ||
-      !inSameGroup(messages[i], messages[i + 1]);
+      i == messages.length - 1 || !inSameGroup(messages[i], messages[i + 1]);
 
   /// Последнее (самое новое, нижнее) сообщение своей группы.
   static bool isLastInGroup(List<ChatMsg> messages, int i) =>
@@ -246,12 +255,19 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     });
 
-    _typingSub = backend.typingEvents.listen((id) {
-      if (id != chatId || _disposed) return;
-      peerTyping = true;
+    _typingSub = backend.typingEvents.listen((ev) {
+      if (ev.chatId != chatId || _disposed) return;
+      // Multi-user typing как в TG: храним per-user таймаут 6с
+      _typingByUser[ev.userId] = DateTime.now().add(const Duration(seconds: 6));
+      // Чистим протухших
+      _typingByUser.removeWhere((_, exp) => exp.isBefore(DateTime.now()));
+      _typingUsers = Set<String>.from(_typingByUser.keys);
+      peerTyping = _typingUsers.isNotEmpty;
       _typingReset?.cancel();
       _typingReset = Timer(const Duration(seconds: 6), () {
         if (_disposed) return;
+        _typingByUser.clear();
+        _typingUsers.clear();
         peerTyping = false;
         notifyListeners();
       });
@@ -277,10 +293,9 @@ class ChatController extends ChangeNotifier {
           if (reac == null) return;
           final i = messages.indexWhere((m) => m.serverId == ev.messageId);
           if (i < 0) return;
-          messages[i] = _copyReactions(
-            messages[i],
-            [for (final e in reac.entries) ChatReaction(e.key, e.value)],
-          );
+          messages[i] = _copyReactions(messages[i], [
+            for (final e in reac.entries) ChatReaction(e.key, e.value),
+          ]);
       }
       notifyListeners();
     });
@@ -315,13 +330,21 @@ class ChatController extends ChangeNotifier {
   // ─── Черновик ───
 
   /// Сохранение черновика с дебаунсом (не пишем в prefs на каждое нажатие).
+  /// Локально — главный, облако — best-effort зеркало как в TG.
   void saveDraft(String text) {
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(milliseconds: 400), () {
       if (_disposed) return;
       if (text == draft) return;
       draft = text;
-      SettingsService.instance.setDraft(chatId, draft.trim().isEmpty ? null : draft);
+      final toSave = draft.trim().isEmpty ? null : draft;
+      SettingsService.instance.setDraft(chatId, toSave);
+      // Облако — не блокируем UI, как у приватности.
+      unawaited(() async {
+        try {
+          await backend.saveDraft(chatId, toSave);
+        } catch (_) {}
+      }());
     });
   }
 
@@ -330,6 +353,11 @@ class ChatController extends ChangeNotifier {
     _draftTimer?.cancel();
     draft = '';
     SettingsService.instance.setDraft(chatId, null);
+    unawaited(() async {
+      try {
+        await backend.saveDraft(chatId, null);
+      } catch (_) {}
+    }());
   }
 
   // ─── Unread-jump ───
@@ -362,9 +390,7 @@ class ChatController extends ChangeNotifier {
     _unreadTimer?.cancel();
     _unreadTimer = Timer(const Duration(seconds: 3), () {
       if (_disposed) return;
-      final j = messages.indexWhere(
-        (m) => (m.localId ?? m.serverId) == sameId,
-      );
+      final j = messages.indexWhere((m) => (m.localId ?? m.serverId) == sameId);
       if (j == 0) {
         messages.removeAt(0);
         messages.insert(i > 0 ? i : 0, msg);
@@ -404,8 +430,8 @@ class ChatController extends ChangeNotifier {
     if (id == null) return;
     _undoTimer?.cancel();
     undoMessageId = id;
-    undoText = (messages[i].type == MsgType.text &&
-            messages[i].text.trim().isNotEmpty)
+    undoText =
+        (messages[i].type == MsgType.text && messages[i].text.trim().isNotEmpty)
         ? messages[i].text
         : null;
     notifyListeners();
@@ -431,9 +457,7 @@ class ChatController extends ChangeNotifier {
     }
     notifyListeners();
 
-    final i = messages.indexWhere(
-      (m) => m.serverId == id || m.localId == id,
-    );
+    final i = messages.indexWhere((m) => m.serverId == id || m.localId == id);
     if (i < 0) return;
     final msg = messages[i];
     try {
@@ -462,10 +486,7 @@ class ChatController extends ChangeNotifier {
     if (editIdx != null) {
       final msg = messages[editIdx];
       try {
-        final updated = await backend.updateMessage(
-          msg.serverId!,
-          t,
-        );
+        final updated = await backend.updateMessage(msg.serverId!, t);
         if (_disposed) return;
         if (updated != null) {
           messages[editIdx] = _copyEditedText(msg, t);
@@ -483,20 +504,25 @@ class ChatController extends ChangeNotifier {
     final replyAuthor = replyIdx == null
         ? null
         : messages[replyIdx].incoming
-            ? chatTitle
-            : 'Вы';
+        ? chatTitle
+        : 'Вы';
+    final replyToId = replyIdx == null ? null : (messages[replyIdx].serverId ?? messages[replyIdx].localId);
     final localId = 'c${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: MsgType.text,
-      incoming: false,
-      time: _fmtTime(DateTime.now()),
-      text: t,
-      replyText: replyText,
-      replyAuthor: replyAuthor,
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-    ));
+    messages.insert(
+      0,
+      ChatMsg(
+        type: MsgType.text,
+        incoming: false,
+        time: _fmtTime(DateTime.now()),
+        text: t,
+        replyTo: replyToId,
+        replyText: replyText,
+        replyAuthor: replyAuthor,
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+      ),
+    );
     replyTo = null;
     notifyListeners();
     try {
@@ -504,6 +530,7 @@ class ChatController extends ChangeNotifier {
         chatId,
         t,
         localId: localId,
+        replyTo: replyToId,
         replyText: replyText,
         replyAuthor: replyAuthor,
       );
@@ -517,14 +544,16 @@ class ChatController extends ChangeNotifier {
       // Сохранить в очередь для повторной отправки.
       final accountId = backend.myProfileId ?? '';
       if (accountId.isNotEmpty) {
-        unawaited(OfflineQueueService.instance.enqueue(
-          accountId,
-          localId: localId,
-          chatId: chatId,
-          text: t,
-          replyText: replyText,
-          replyAuthor: replyAuthor,
-        ));
+        unawaited(
+          OfflineQueueService.instance.enqueue(
+            accountId,
+            localId: localId,
+            chatId: chatId,
+            text: t,
+            replyText: replyText,
+            replyAuthor: replyAuthor,
+          ),
+        );
       }
       onError('Не удалось отправить сообщение');
     }
@@ -540,7 +569,7 @@ class ChatController extends ChangeNotifier {
     final accountId = backend.myProfileId ?? '';
     if (accountId.isEmpty) return;
 
-    messages[i] = msg.copyWith(status: MsgStatus.sending);
+    messages[i] = msg.copyWith(status: MsgStatus.retrying);
     notifyListeners();
 
     await OfflineQueueService.instance.markSending(accountId, localId);
@@ -568,15 +597,18 @@ class ChatController extends ChangeNotifier {
 
   Future<void> sendSticker(String emoji) async {
     final localId = 's${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: MsgType.text,
-      incoming: false,
-      time: _fmtTime(DateTime.now()),
-      stickerEmoji: emoji,
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-    ));
+    messages.insert(
+      0,
+      ChatMsg(
+        type: MsgType.text,
+        incoming: false,
+        time: _fmtTime(DateTime.now()),
+        stickerEmoji: emoji,
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+      ),
+    );
     notifyListeners();
     try {
       await backend.sendSticker(chatId, emoji, localId: localId);
@@ -593,18 +625,20 @@ class ChatController extends ChangeNotifier {
   Future<void> sendPhoto(Uint8List bytes) async {
     final localId = 'c${DateTime.now().microsecondsSinceEpoch}';
     try {
-      final sent = await backend
-          .sendPhoto(chatId, bytes, localId: localId);
+      final sent = await backend.sendPhoto(chatId, bytes, localId: localId);
       if (_disposed) return;
-      messages.insert(0, ChatMsg(
-        type: MsgType.photo,
-        incoming: false,
-        time: _fmtTime(sent.created),
-        photoSeed: 0,
-        photoUrl: sent.photoPath,
-        localId: localId,
-        date: sent.created,
-      ));
+      messages.insert(
+        0,
+        ChatMsg(
+          type: MsgType.photo,
+          incoming: false,
+          time: _fmtTime(sent.created),
+          photoSeed: 0,
+          photoUrl: sent.photoPath,
+          localId: localId,
+          date: sent.created,
+        ),
+      );
       notifyListeners();
       _armUndo(localId);
     } catch (_) {
@@ -612,21 +646,21 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  Future<void> sendVoice({
-    required String path,
-    required int seconds,
-  }) async {
+  Future<void> sendVoice({required String path, required int seconds}) async {
     final localId = 'c${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: MsgType.voice,
-      incoming: false,
-      time: _now(),
-      voiceSeconds: seconds,
-      voicePath: path,
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-    ));
+    messages.insert(
+      0,
+      ChatMsg(
+        type: MsgType.voice,
+        incoming: false,
+        time: _now(),
+        voiceSeconds: seconds,
+        voicePath: path,
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+      ),
+    );
     notifyListeners();
     try {
       await backend.sendVoice(
@@ -648,19 +682,26 @@ class ChatController extends ChangeNotifier {
 
   Future<void> sendVideo(File file) async {
     final localId = 'c${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: MsgType.video,
-      incoming: false,
-      time: _now(),
-      videoPath: file.path,
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-    ));
+    messages.insert(
+      0,
+      ChatMsg(
+        type: MsgType.video,
+        incoming: false,
+        time: _now(),
+        videoPath: file.path,
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+      ),
+    );
     notifyListeners();
     try {
-      await backend
-          .sendVideo(chatId, file, localId: localId, localPath: file.path);
+      await backend.sendVideo(
+        chatId,
+        file,
+        localId: localId,
+        localPath: file.path,
+      );
       _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
@@ -678,22 +719,30 @@ class ChatController extends ChangeNotifier {
         ? 'file'
         : file.uri.pathSegments.last;
     final localId = 'f${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: MsgType.file,
-      incoming: false,
-      time: _now(),
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-      attachment: AttachmentData(
-        kind: AttachmentKind.file,
-        name: name,
-        size: file.lengthSync(),
+    messages.insert(
+      0,
+      ChatMsg(
+        type: MsgType.file,
+        incoming: false,
+        time: _now(),
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+        attachment: AttachmentData(
+          kind: AttachmentKind.file,
+          name: name,
+          size: file.lengthSync(),
+        ),
       ),
-    ));
+    );
     notifyListeners();
     try {
-      await backend.sendFile(chatId, file, localId: localId, localPath: file.path);
+      await backend.sendFile(
+        chatId,
+        file,
+        localId: localId,
+        localPath: file.path,
+      );
       _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
@@ -707,23 +756,31 @@ class ChatController extends ChangeNotifier {
   /// Гифка: анимированное медиа (kind=gif), в пузыре крупный GIF.
   Future<void> sendGif(File file, String name) async {
     final localId = 'g${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: MsgType.file,
-      incoming: false,
-      time: _now(),
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-      attachment: AttachmentData(
-        kind: AttachmentKind.gif,
-        name: name,
-        size: file.lengthSync(),
+    messages.insert(
+      0,
+      ChatMsg(
+        type: MsgType.file,
+        incoming: false,
+        time: _now(),
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+        attachment: AttachmentData(
+          kind: AttachmentKind.gif,
+          name: name,
+          size: file.lengthSync(),
+        ),
       ),
-    ));
+    );
     notifyListeners();
     try {
-      await backend.sendFile(chatId, file,
-          localId: localId, localPath: file.path, mime: 'image/gif');
+      await backend.sendFile(
+        chatId,
+        file,
+        localId: localId,
+        localPath: file.path,
+        mime: 'image/gif',
+      );
       _armUndo(localId);
     } catch (_) {
       final i = messages.indexWhere((m) => m.localId == localId);
@@ -741,15 +798,18 @@ class ChatController extends ChangeNotifier {
     AttachmentData attach,
   ) async {
     final localId = 'a${DateTime.now().microsecondsSinceEpoch}';
-    messages.insert(0, ChatMsg(
-      type: type,
-      incoming: false,
-      time: _now(),
-      status: MsgStatus.sending,
-      localId: localId,
-      date: DateTime.now(),
-      attachment: attach,
-    ));
+    messages.insert(
+      0,
+      ChatMsg(
+        type: type,
+        incoming: false,
+        time: _now(),
+        status: MsgStatus.sending,
+        localId: localId,
+        date: DateTime.now(),
+        attachment: attach,
+      ),
+    );
     notifyListeners();
     try {
       await backend.sendText(chatId, json, localId: localId);
@@ -777,7 +837,11 @@ class ChatController extends ChangeNotifier {
 
   // ─── Действия над сообщениями ───
 
+  /// Последняя использованная реакция (TG: double-tap повторяет её).
+  String _lastQuickReaction = '❤️';
+
   void addReaction(int i, String emoji) {
+    _lastQuickReaction = emoji;
     final serverId = messages[i].serverId;
     if (serverId != null) {
       backend.setReaction(chatId, serverId, emoji);
@@ -797,21 +861,26 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void heartReact(int i) {
+  /// Double-tap quick reaction (TG: повторяет последнюю использованную).
+  /// Возвращает emoji реакции (для burst-анимации) или null, если
+  /// реакция была снята.
+  String? heartReact(int i) {
+    final emoji = _lastQuickReaction;
     final m = messages[i];
-    final has = m.reactions.any((r) => r.emoji == '❤️');
+    final has = m.reactions.any((r) => r.emoji == emoji);
     if (has) {
       if (m.serverId != null) {
-        backend.setReaction(chatId, m.serverId!, '❤️');
+        backend.setReaction(chatId, m.serverId!, emoji);
       }
       messages[i] = m.copyWith(
-        reactions: m.reactions.where((r) => r.emoji != '❤️').toList(),
+        reactions: m.reactions.where((r) => r.emoji != emoji).toList(),
       );
     } else {
-      addReaction(i, '❤️');
-      return;
+      addReaction(i, emoji);
+      return emoji;
     }
     notifyListeners();
+    return null;
   }
 
   void replyToMsg(int i) {
@@ -873,7 +942,7 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Bulk forward selected messages (V4.1).
-  Future<void> forwardSelected(String targetChatId) async {
+  Future<void> forwardSelected(String targetChatId, {bool hideSender = false}) async {
     final selected = selectedMessages.toList();
     final backend = VibeBackend.instance;
     for (final msg in selected) {
@@ -891,9 +960,9 @@ class ChatController extends ChangeNotifier {
         incoming: msg.incoming,
         status: MsgStatus.sent,
         stickerEmoji: msg.stickerEmoji,
-        forwardedFrom: msg.forwardedFrom,
+        forwardedFrom: hideSender ? null : msg.forwardedFrom,
       );
-      await backend.forwardMessage(targetChatId, vibeMsg);
+      await backend.forwardMessage(targetChatId, vibeMsg, hideSender: hideSender);
     }
     clearSelection();
   }
@@ -918,6 +987,10 @@ class ChatController extends ChangeNotifier {
     }
     if (pins.contains(serverId)) {
       await unpin(serverId);
+      return;
+    }
+    if (pins.length >= 10) {
+      onError('Закреплено максимум 10 сообщений');
       return;
     }
     _pinsTouchedLocally = true;
@@ -994,6 +1067,46 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ─── Reply-jump (Telegram: тап по цитате ответа → прыжок к сообщению) ───
+
+  /// serverId/localId сообщения, к которому только что прыгнули по ответу.
+  String? replyFlashId;
+  Timer? _replyTimer;
+
+  /// Прыжок к сообщению-ответу: сообщение временно поднимается к низу экрана
+  /// с подсветкой (как в Telegram), через 3 секунды возвращается.
+  void jumpToReplyIndex(int i) {
+    if (i < 0 || i >= messages.length) return;
+    final msg = messages[i];
+    final sameId = msg.localId ?? msg.serverId;
+    _replyTimer?.cancel();
+    messages.removeAt(i);
+    messages.insert(0, msg);
+    replyFlashId = sameId;
+    _replyTimer = Timer(const Duration(seconds: 3), () {
+      if (_disposed) return;
+      final j = messages.indexWhere((m) => (m.localId ?? m.serverId) == sameId);
+      if (j == 0) {
+        messages.removeAt(0);
+        messages.insert(i > 0 ? i : 0, msg);
+      }
+      replyFlashId = null;
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  void jumpToReplyId(String replyTo) {
+    final idx = messages.indexWhere((m) => m.serverId == replyTo || m.localId == replyTo);
+    if (idx >= 0) {
+      jumpToReplyIndex(idx);
+    } else {
+      // Кросс-девайс: сообщения нет в RAM — пробуем догрузить older и повторить
+      // Деградация: пока просто игнорируем, UI покажет превью без прыжка.
+      // В full-версии: await loadMessages(before: ...) + retry.
+    }
+  }
+
   void setGroupTitle(String title) {
     groupTitle = title;
     notifyListeners();
@@ -1050,6 +1163,9 @@ class ChatController extends ChangeNotifier {
       voiceUrl: m.voicePath,
       photoUrl: m.photoPath,
       videoUrl: m.videoPath,
+      replyTo: m.replyTo,
+      replyText: m.replyText,
+      replyAuthor: m.replyAuthor,
       status: m.status,
       localId: m.localId,
       edited: m.edited,
@@ -1142,6 +1258,7 @@ class ChatController extends ChangeNotifier {
     _typingSub?.cancel();
     _typingReset?.cancel();
     _pinTimer?.cancel();
+    _replyTimer?.cancel();
     super.dispose();
   }
 }

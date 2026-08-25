@@ -1,6 +1,11 @@
+// ignore_for_file: use_build_context_synchronously
 
-import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'dart:async';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
+import 'dart:async';
 import 'dart:io';
+
+import 'group_call_screen.dart';
+import 'photo_editor_screen.dart';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:camera/camera.dart';
@@ -295,111 +300,126 @@ class _ChatScreenState extends State<ChatScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetCtx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            VibeSpacing.xl,
-            VibeSpacing.xs,
-            VibeSpacing.xl,
-            VibeSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l.scheduleTitle,
-                style: VibeTypography.subtitle.copyWith(
-                  color: context.vibeTextPrimary,
-                ),
+      builder: (sheetCtx) {
+        bool silent = false;
+        return StatefulBuilder(
+          builder: (ctx2, setSheetState) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                VibeSpacing.xl,
+                VibeSpacing.xs,
+                VibeSpacing.xl,
+                VibeSpacing.lg,
               ),
-              const SizedBox(height: VibeSpacing.xs),
-              Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: VibeTypography.caption.copyWith(
-                  color: context.vibeTextTertiary,
-                ),
-              ),
-              const SizedBox(height: VibeSpacing.sm),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  VibeIcons.clock,
-                  color: context.vibePrimary,
-                ),
-                title: Text(l.scheduleIn1Hour),
-                onTap: () => _applySchedule(
-                  sheetCtx,
-                  text,
-                  DateTime.now().add(const Duration(hours: 1)),
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  VibeIcons.clock,
-                  color: context.vibePrimary,
-                ),
-                title: Text(l.scheduleTomorrow9am),
-                onTap: () => _applySchedule(
-                  sheetCtx,
-                  text,
-                  DateTime.now()
-                      .add(const Duration(days: 1))
-                      .copyWith(
-                        hour: 9,
-                        minute: 0,
-                        second: 0,
-                        millisecond: 0,
-                        microsecond: 0,
-                      ),
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.event_rounded, color: context.vibePrimary),
-                title: Text(l.schedulePickDatetime),
-                onTap: () async {
-                  Navigator.of(sheetCtx).pop();
-                  final now = DateTime.now();
-                  final day = await showDatePicker(
-                    context: context,
-                    initialDate: now,
-                    firstDate: now,
-                    lastDate: now.add(const Duration(days: 365)),
-                  );
-                  if (day == null || !mounted) return;
-                  final time = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.now(),
-                  );
-                  if (time == null || !mounted) return;
-                  _applySchedule(
-                    context,
-                    text,
-                    DateTime(
-                      day.year,
-                      day.month,
-                      day.day,
-                      time.hour,
-                      time.minute,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l.scheduleTitle,
+                    style: VibeTypography.subtitle.copyWith(
+                      color: context.vibeTextPrimary,
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: VibeSpacing.xs),
+                  Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: VibeTypography.caption.copyWith(
+                      color: context.vibeTextTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: VibeSpacing.sm),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      VibeIcons.clock,
+                      color: context.vibePrimary,
+                    ),
+                    title: Text(l.scheduleIn1Hour),
+                    onTap: () => _applySchedule(
+                      sheetCtx,
+                      text,
+                      DateTime.now().add(const Duration(hours: 1)),
+                      silent: silent,
+                    ),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      VibeIcons.clock,
+                      color: context.vibePrimary,
+                    ),
+                    title: Text(l.scheduleTomorrow9am),
+                    onTap: () => _applySchedule(
+                      sheetCtx,
+                      text,
+                      DateTime.now()
+                          .add(const Duration(days: 1))
+                          .copyWith(
+                            hour: 9,
+                            minute: 0,
+                            second: 0,
+                            millisecond: 0,
+                            microsecond: 0,
+                          ),
+                      silent: silent,
+                    ),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.event_rounded, color: context.vibePrimary),
+                    title: Text(l.schedulePickDatetime),
+                    onTap: () async {
+                      Navigator.of(sheetCtx).pop();
+                      final now = DateTime.now();
+                      final day = await showDatePicker(
+                        context: context,
+                        initialDate: now,
+                        firstDate: now,
+                        lastDate: now.add(const Duration(days: 365)),
+                      );
+                      if (day == null || !mounted) return;
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (time == null || !mounted) return;
+                      _applySchedule(
+                        context,
+                        text,
+                        DateTime(
+                          day.year,
+                          day.month,
+                          day.day,
+                          time.hour,
+                          time.minute,
+                        ),
+                        silent: silent,
+                      );
+                    },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Без звука'),
+                    subtitle: const Text('Получатель не получит уведомление', style: TextStyle(fontSize: 12)),
+                    value: silent,
+                    onChanged: (v) => setSheetState(() => silent = v),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  void _applySchedule(BuildContext sheetCtx, String text, DateTime when) {
+  void _applySchedule(BuildContext sheetCtx, String text, DateTime when, {bool silent = false}) {
     Navigator.of(sheetCtx).pop();
     if (!mounted) return;
-    ScheduledService.instance.schedule(widget.chat.id, text, when);
+    ScheduledService.instance.schedule(widget.chat.id, text, when, silent: silent);
     _input.clear();
     _chat.saveDraft('');
     setState(() {});
@@ -509,8 +529,16 @@ class _ChatScreenState extends State<ChatScreen> {
       imageQuality: 88,
     );
     if (picked == null || !mounted) return;
-    final bytes = await picked.readAsBytes();
-    await _chat.sendPhoto(bytes);
+    final file = File(picked.path);
+    final result = await Navigator.of(context).push<PhotoEditResult>(
+      MaterialPageRoute(builder: (_) => PhotoEditorScreen(file: file)),
+    );
+    if (result == null || !mounted) return;
+    await _chat.sendPhoto(result.bytes);
+    if (result.caption != null && result.caption!.isNotEmpty) {
+      // Подпись — отдельным сообщением (деградация, пока нет photo+caption в одном).
+      await _chat.send(result.caption!);
+    }
   }
 
   Future<void> _startRecording() async {
@@ -771,8 +799,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   /// Выбор способа звонка — как в TG: жмём «трубку», появляется
-  /// аккуратный лист с аудио- и видеозвонком.
+  /// аккуратный лист с аудио- и видеозвонком. Для групп — сразу групповой звонок.
   void _chooseCall(BuildContext context) {
+    if (widget.chat.kind == 'group') {
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupCallScreen(chat: widget.chat)));
+      return;
+    }
     final l = VibeLocalizations.of(context);
     final peerId = widget.chat.peerId ?? '';
     final callId = widget.chat.id;
@@ -1249,6 +1282,22 @@ class _ChatScreenState extends State<ChatScreen> {
         : const Color(0xFFEBE9F4);
   }
 
+  BoxDecoration? _wallpaperDecoration() {
+    final s = SettingsService.instance;
+    if (s.wallpaperType == 'gradient') {
+      return BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(s.wallpaperColor), Color(s.wallpaperEndColor)],
+        ),
+      );
+    } else if (s.wallpaperType == 'color') {
+      return BoxDecoration(color: Color(s.wallpaperColor));
+    }
+    return null;
+  }
+
   void _openGifSearch() {
     showModalBottomSheet<String>(
       context: context,
@@ -1278,6 +1327,10 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) {
+        bool anonymous = true;
+        bool multiple = false;
+        bool quiz = false;
+        int? correct;
         return StatefulBuilder(
           builder: (ctx, setSheetState) => AlertDialog(
             title: Text(l.pollTitle),
@@ -1303,7 +1356,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    if (optionCtrls.length < 4)
+                    if (optionCtrls.length < 10)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
@@ -1316,6 +1369,38 @@ class _ChatScreenState extends State<ChatScreen> {
                           label: Text(l.pollAddOption),
                         ),
                       ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      title: const Text('Анонимный опрос'),
+                      value: anonymous,
+                      onChanged: (v) => setSheetState(() => anonymous = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Несколько ответов'),
+                      value: multiple,
+                      onChanged: (v) => setSheetState(() => multiple = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Викторина'),
+                      value: quiz,
+                      onChanged: (v) => setSheetState(() => quiz = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    if (quiz) ...[
+                      const SizedBox(height: 8),
+                      DropdownButton<int>(
+                        value: correct,
+                        hint: const Text('Правильный вариант'),
+                        isExpanded: true,
+                        items: [
+                          for (var i = 0; i < optionCtrls.length; i++)
+                            DropdownMenuItem(value: i, child: Text('Вариант ${i + 1}')),
+                        ],
+                        onChanged: (v) => setSheetState(() => correct = v),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1341,12 +1426,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     kind: AttachmentKind.poll,
                     question: q,
                     options: options,
+                    anonymous: anonymous,
+                    multiple: multiple,
+                    quiz: quiz,
+                    correctOption: correct,
                   );
                   _chat.sendAttachmentJson(
                     AttachmentData.encode(
                       kind: AttachmentKind.poll,
                       question: q,
                       options: options,
+                      anonymous: anonymous,
+                      multiple: multiple,
+                      quiz: quiz,
+                      correctOption: correct,
                     ),
                     MsgType.poll,
                     attach,
@@ -1520,14 +1613,15 @@ class _ChatScreenState extends State<ChatScreen> {
               _snack(l.msgLinkCopied);
             },
           ),
-        ActionTile(
-          icon: Icons.reply_all_rounded,
-          label: l.msgForward,
-          onTap: () {
-            Navigator.of(context).pop();
-            _openForward(msg);
-          },
-        ),
+        if (!_isV2Encrypted(msg))
+          ActionTile(
+            icon: Icons.reply_all_rounded,
+            label: l.msgForward,
+            onTap: () {
+              Navigator.of(context).pop();
+              _openForward(msg);
+            },
+          ),
         ActionTile(
           icon: Icons.bookmark_add_outlined,
           label: l.msgSaveToSaved,
@@ -1572,7 +1666,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _chat.setPin(msg.serverId);
             },
           ),
-        if (isMy && msg.type == MsgType.text && hasText)
+        if (isMy && msg.type == MsgType.text && hasText && !_isV2Encrypted(msg))
           ActionTile(
             icon: VibeIcons.edit,
             label: l.msgEdit,
@@ -1611,6 +1705,12 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     );
   }
+
+  bool _isV2Encrypted(ChatMsg msg) =>
+      msg.text == 'Зашифрованное сообщение недоступно' ||
+      msg.text == 'Не удалось расшифровать сообщение' ||
+      msg.text == '[зашифровано]' ||
+      msg.text == 'Неподдерживаемая версия шифрования';
 
   Future<void> _saveToSaved(ChatMsg msg) async {
     final backend = _backend;
@@ -1774,6 +1874,37 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Future<bool?> _pickForwardMode() {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: context.vibeSurface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 36, height: 4, decoration: BoxDecoration(color: context.vibeDivider, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: Icon(VibeIcons.bubble, color: context.vibePrimary),
+              title: const Text('С именем автора'),
+              subtitle: const Text('Покажет от кого переслано', style: TextStyle(fontSize: 12)),
+              onTap: () => Navigator.of(ctx).pop(false),
+            ),
+            ListTile(
+              leading: Icon(Icons.visibility_off_rounded, color: context.vibePrimary),
+              title: const Text('Анонимно'),
+              subtitle: const Text('Скроет имя автора', style: TextStyle(fontSize: 12)),
+              onTap: () => Navigator.of(ctx).pop(true),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openForward(ChatMsg msg) async {
     HapticFeedback.mediumImpact();
     final backend = _backend;
@@ -1797,10 +1928,36 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     final ids = targets;
     if (ids == null || ids.isEmpty || !mounted) return;
+    final hide = await _pickForwardMode();
+    if (hide == null || !mounted) return;
     var ok = 0;
     for (final chatId in ids) {
       try {
-        final m = await backend.forwardMessage(chatId, _msgToBackend(msg));
+        final base = _msgToBackend(msg);
+        final author = msg.forwardedFrom ?? (msg.incoming ? widget.chat.title : (VibeBackend.myProfileNotifier.value?.displayName ?? 'Я'));
+        final toSend = hide
+            ? VibeMessage(
+                id: base.id,
+                chatId: base.chatId,
+                senderId: base.senderId,
+                senderName: '',
+                senderAvatar: base.senderAvatar,
+                text: base.text,
+                voicePath: base.voicePath,
+                photoPath: base.photoPath,
+                videoPath: base.videoPath,
+                created: base.created,
+                incoming: base.incoming,
+                status: base.status,
+                localId: base.localId,
+                replyText: base.replyText,
+                replyAuthor: base.replyAuthor,
+                edited: base.edited,
+                forwardedFrom: null,
+                reactions: base.reactions,
+              )
+            : (base.forwardedFrom != null ? base : base.copyWith(senderName: author, forwardedFrom: author));
+        final m = await backend.forwardMessage(chatId, toSend, hideSender: hide);
         if (m != null) ok++;
       } catch (_) {}
     }
@@ -1828,11 +1985,14 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-    if (targets == null || targets.isEmpty || !mounted) return;
+    final ids = targets;
+    if (ids == null || ids.isEmpty || !mounted) return;
+    final hide = await _pickForwardMode();
+    if (hide == null || !mounted) return;
     var ok = 0;
-    for (final chatId in targets) {
+    for (final chatId in ids) {
       try {
-        await _chat.forwardSelected(chatId);
+        await _chat.forwardSelected(chatId, hideSender: hide);
         ok++;
       } catch (_) {}
     }
@@ -1841,9 +2001,28 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openUrl(String raw) async {
-    final uri = raw.startsWith('www.')
-        ? Uri.parse('https://$raw')
-        : Uri.parse(raw);
+    if (raw.startsWith('spoiler:')) {
+      if (!mounted) return;
+      VibeToast.show(context, raw.substring(8));
+      return;
+    }
+    if (raw.startsWith('@')) {
+      if (!mounted) return;
+      VibeToast.show(context, '$raw — профиль (в v2)');
+      return;
+    }
+    if (raw.startsWith('#')) {
+      if (!mounted) return;
+      VibeToast.show(context, 'Поиск по $raw');
+      return;
+    }
+    if (raw.startsWith('tel:')) {
+      final uri = Uri.parse(raw);
+      final ok = await launchUrl(uri);
+      if (!ok && mounted) _snack(VibeLocalizations.of(context).errorOpenLinkFailed);
+      return;
+    }
+    final uri = raw.startsWith('www.') ? Uri.parse('https://$raw') : Uri.parse(raw);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok) _snack(VibeLocalizations.of(context).errorOpenLinkFailed);
   }
@@ -1952,6 +2131,8 @@ class _ChatScreenState extends State<ChatScreen> {
           }
           return Stack(
             children: [
+              if (_wallpaperDecoration() != null)
+                Positioned.fill(child: Container(decoration: _wallpaperDecoration())),
               Column(
                 children: [
                   Expanded(
@@ -2064,10 +2245,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                               _chat.visibleMessages,
                                               i,
                                             ),
+                                        isGroup: widget.chat.kind == 'group',
                                         onHeart: () => _chat.heartReact(i),
                                         onLongPress: () =>
                                             _showMessageActions(i),
                                         onReply: () => _replyToMsg(i),
+                                        onReplyTap: _chat.visibleMessages[i].replyTo != null
+                                            ? () => _chat.jumpToReplyId(_chat.visibleMessages[i].replyTo!)
+                                            : null,
                                         onOpenUrl: _openUrl,
                                         scrollController: _scroll,
                                         player: _player,
@@ -2197,7 +2382,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         chat: widget.chat,
                         groupTitle: _chat.groupTitle,
                         peerTyping: _chat.peerTyping,
-                        onBack: () => Navigator.of(context).pop(),
+                            typingUsers: _chat.typingUsers,
+                            onBack: () => Navigator.of(context).pop(),
                         onOpenProfile: _openProfile,
                         onOpenGroupInfo: _openGroupInfo,
                         onOpenSearch: _openSearch,

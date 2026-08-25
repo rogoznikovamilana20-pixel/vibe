@@ -61,10 +61,12 @@ int? myPollVote(List<ChatMsg> messages, String pollId) {
   return null;
 }
 
-/// Разбивает текст на спаны, делая URL-ссылки кликабельными (как в TG).
-final _urlPattern = RegExp(
-  r'(?:(?:https?|ftp)://|www\.)[^\s<>"(){}]+',
+/// Разбивает текст на спаны, делая URL, @mentions, #hashtags, ||spoiler||,
+/// `code`, >quote и телефоны кликабельными (как в TG: URLSpan + spoiler/code).
+final _linkPattern = RegExp(
+  r'\|\|[^|]+\|\||`[^`]+`|```[^`]+```|(?:(?:https?|ftp)://|www\.)[^\s<>"(){}]+|@[A-Za-z0-9_\.]+|#[\w\u0400-\u04FF]+|\+?[0-9][0-9 \-\(\)]{8,}',
   caseSensitive: false,
+  unicode: true,
 );
 
 List<InlineSpan> buildLinkSpans(
@@ -72,24 +74,85 @@ List<InlineSpan> buildLinkSpans(
   Color linkColor,
   ValueChanged<String> onTap,
 ) {
+  // Quote-блоки (строки, начинающиеся с > ) — рендерим как WidgetSpan с левой полосой.
+  if (text.split('\n').any((l) => l.startsWith('> '))) {
+    final lines = text.split('\n');
+    final spans = <InlineSpan>[];
+    for (var li = 0; li < lines.length; li++) {
+      final line = lines[li];
+      if (line.startsWith('> ')) {
+        final quoteText = line.substring(2);
+        spans.add(WidgetSpan(
+          child: Container(
+            margin: const EdgeInsets.only(left: 4, bottom: 2),
+            padding: const EdgeInsets.only(left: 8, top: 2, bottom: 2, right: 4),
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: linkColor, width: 3)),
+              color: linkColor.withValues(alpha: 0.08),
+            ),
+            child: Text(quoteText, style: TextStyle(color: linkColor.withValues(alpha: 0.9), fontStyle: FontStyle.italic)),
+          ),
+        ));
+      } else {
+        spans.addAll(buildLinkSpans(line, linkColor, onTap));
+      }
+      if (li < lines.length - 1) spans.add(const TextSpan(text: '\n'));
+    }
+    return spans;
+  }
+
   final spans = <InlineSpan>[];
   var cursor = 0;
-  for (final match in _urlPattern.allMatches(text)) {
+  for (final match in _linkPattern.allMatches(text)) {
     if (match.start > cursor) {
       spans.add(TextSpan(text: text.substring(cursor, match.start)));
     }
     final url = text.substring(match.start, match.end);
-    spans.add(
-      TextSpan(
-        text: url,
-        style: TextStyle(
-          color: linkColor,
-          decoration: TextDecoration.underline,
-          decorationColor: linkColor.withValues(alpha: 0.5),
+    // Spoiler ||...|| — скрытый, тап раскрывает тостом (деградация без стейта)
+    if (url.startsWith('||') && url.endsWith('||')) {
+      final inner = url.substring(2, url.length - 2);
+      spans.add(
+        TextSpan(
+          text: '█' * inner.length,
+          style: TextStyle(backgroundColor: linkColor.withValues(alpha: 0.35), color: Colors.transparent),
+          recognizer: TapGestureRecognizer()..onTap = () => onTap('spoiler:$inner'),
         ),
-        recognizer: TapGestureRecognizer()..onTap = () => onTap(url),
-      ),
-    );
+      );
+    } else if ((url.startsWith('`') && url.endsWith('`')) || (url.startsWith('```') && url.endsWith('```'))) {
+      final code = url.replaceAll('`', '');
+      spans.add(
+        TextSpan(
+          text: code,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            backgroundColor: linkColor.withValues(alpha: 0.12),
+            color: linkColor,
+            fontSize: 13,
+          ),
+        ),
+      );
+    } else if (RegExp(r'^\+?[0-9][0-9 \-\(\)]{8,}$').hasMatch(url) && url.contains(RegExp(r'[0-9]')) && !url.contains('@') && !url.contains('http')) {
+      // Телефон — тап набирает номер
+      spans.add(
+        TextSpan(
+          text: url,
+          style: TextStyle(color: linkColor, decoration: TextDecoration.underline),
+          recognizer: TapGestureRecognizer()..onTap = () => onTap('tel:$url'),
+        ),
+      );
+    } else {
+      spans.add(
+        TextSpan(
+          text: url,
+          style: TextStyle(
+            color: linkColor,
+            decoration: TextDecoration.underline,
+            decorationColor: linkColor.withValues(alpha: 0.5),
+          ),
+          recognizer: TapGestureRecognizer()..onTap = () => onTap(url),
+        ),
+      );
+    }
     cursor = match.end;
   }
   if (cursor < text.length) {
@@ -116,9 +179,11 @@ class ChatMsg {
     this.voicePath,
     this.voiceUrl,
     this.photoUrl,
+    this.photoPath,
     this.videoPath,
     this.videoUrl,
     this.reactions = const [],
+    this.replyTo,
     this.replyText,
     this.replyAuthor,
     this.status = MsgStatus.sent,
@@ -157,6 +222,8 @@ class ChatMsg {
   /// Сетевой URL фото (входящее сообщение).
   final String? photoUrl;
 
+  final String? photoPath;
+
   /// Локальный файл записанного видеокружка.
   final String? videoPath;
 
@@ -166,6 +233,7 @@ class ChatMsg {
   final List<ChatReaction> reactions;
 
   // Ответ/цитата.
+  final String? replyTo;
   final String? replyText;
   final String? replyAuthor;
 
@@ -195,6 +263,8 @@ class ChatMsg {
     String? serverId,
     String? stickerEmoji,
     AttachmentData? attachment,
+    String? replyTo,
+    String? photoUrl,
   }) {
     return ChatMsg(
       type: type,
@@ -209,6 +279,7 @@ class ChatMsg {
       videoPath: videoPath,
       videoUrl: videoUrl,
       reactions: reactions ?? this.reactions,
+      replyTo: replyTo ?? this.replyTo,
       replyText: replyText,
       replyAuthor: replyAuthor,
       status: status ?? this.status,

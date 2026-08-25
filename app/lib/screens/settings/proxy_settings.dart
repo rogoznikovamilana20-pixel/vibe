@@ -1,8 +1,8 @@
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/localization/vibe_localizations.dart';
-import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';

@@ -194,10 +194,9 @@ serve(async (req) => {
 
     // 4. Send FCM to all recipients (parallel).
     const title = sender_name || "Vibe";
-    const preview =
-      typeof text === "string" && text.length > 100
-        ? text.substring(0, 100) + "..."
-        : text || "Новое сообщение";
+    // Используем обобщённое уведомление вместо plaintext — клиент расшифрует
+    // и покажет содержимое через in-app баннер. Это критично для E2EE.
+    const preview = "Новое сообщение";
 
     const fcmData: Record<string, string> = {
       type: "chat",

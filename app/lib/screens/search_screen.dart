@@ -21,17 +21,30 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen>
+    with SingleTickerProviderStateMixin {
   String _query = '';
   final _controller = TextEditingController();
   List<VibeProfile> _results = [];
+  List<VibeChat> _chatResults = [];
   bool _loading = false;
   Timer? _debounce;
+  late final AnimationController _fieldAnim = AnimationController(
+    vsync: this,
+    duration: VibeAnimations.fadeIn,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _fieldAnim.forward();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     _debounce?.cancel();
+    _fieldAnim.dispose();
     super.dispose();
   }
 
@@ -41,22 +54,40 @@ class _SearchScreenState extends State<SearchScreen> {
       _query = v;
       if (v.isEmpty) {
         _results = [];
+        _chatResults = [];
         _loading = false;
         return;
       }
       // Сразу показываем индикатор, а не «Ничего не найдено»:
       // результат появится через короткий дебаунс.
       _results = [];
+      _chatResults = [];
       _loading = true;
     });
 
     if (v.isEmpty) return;
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       if (_query.isEmpty || !mounted) return;
+      final needle = _query.trim().toLowerCase();
       try {
+        // Секция «Чаты» — фильтр локального списка (как в Telegram).
+        List<VibeChat> chats = [];
+        try {
+          chats = await VibeBackend.instance.listChats();
+        } catch (_) {
+          chats = await VibeBackend.instance.getOfflineChats();
+        }
+        final chatMatches = chats
+            .where(
+              (c) =>
+                  c.title.toLowerCase().contains(needle) ||
+                  (c.peerName?.toLowerCase().contains(needle) ?? false),
+            )
+            .toList();
         final users = await VibeBackend.instance.searchUsers(_query);
         if (!mounted) return;
         setState(() {
+          _chatResults = chatMatches;
           _results = users;
           _loading = false;
         });
@@ -97,10 +128,14 @@ class _SearchScreenState extends State<SearchScreen> {
               title: _buildSearchField(context, VibeTypography.body),
             ),
           ),
-          if (_query.isEmpty) ..._buildSuggestions() 
-          else if (_loading) 
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
-          else ..._buildResults(_results),
+          if (_query.isEmpty)
+            ..._buildSuggestions()
+          else if (_loading)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
+            ..._buildResults(_results),
         ],
         collapsedBarBuilder: (_, progress) => VibeCollapsedTopBar(
           progress: progress,
@@ -127,24 +162,37 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchField(BuildContext context, TextStyle style) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.md),
-      decoration: BoxDecoration(
-        color: context.vibeSurfaceVariant,
-        borderRadius: BorderRadius.circular(VibeRadius.input),
-      ),
-      child: TextField(
-        controller: _controller,
-        textAlignVertical: TextAlignVertical.center,
-        onChanged: _onQueryChanged,
-        style: style.copyWith(color: context.vibeTextPrimary),
-        cursorColor: context.vibePrimary,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          isCollapsed: true,
-          hintText: VibeLocalizations.of(context).searchByNickHint,
-          hintStyle: style.copyWith(color: context.vibeTextTertiary, fontSize: 13),
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: _fieldAnim, curve: Curves.easeOut),
+      child: ScaleTransition(
+        scale: Tween<double>(
+          begin: 0.96,
+          end: 1,
+        ).animate(CurvedAnimation(parent: _fieldAnim, curve: Curves.easeOut)),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.md),
+          decoration: BoxDecoration(
+            color: context.vibeSurfaceVariant,
+            borderRadius: BorderRadius.circular(VibeRadius.input),
+          ),
+          child: TextField(
+            controller: _controller,
+            autofocus: true,
+            textAlignVertical: TextAlignVertical.center,
+            onChanged: _onQueryChanged,
+            style: style.copyWith(color: context.vibeTextPrimary),
+            cursorColor: context.vibePrimary,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isCollapsed: true,
+              hintText: VibeLocalizations.of(context).searchByNickHint,
+              hintStyle: style.copyWith(
+                color: context.vibeTextTertiary,
+                fontSize: 13,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -153,13 +201,17 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Widget> _buildSuggestions() {
     return [
       const SliverToBoxAdapter(child: SizedBox(height: VibeSpacing.sm)),
-      SliverToBoxAdapter(child: _SectionTitle(VibeLocalizations.of(context).searchGlobalTitle)),
+      SliverToBoxAdapter(
+        child: _SectionTitle(VibeLocalizations.of(context).searchGlobalTitle),
+      ),
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.all(VibeSpacing.lg),
           child: Text(
             VibeLocalizations.of(context).searchGlobalSubtitle,
-            style: VibeTypography.caption.copyWith(color: context.vibeTextSecondary),
+            style: VibeTypography.caption.copyWith(
+              color: context.vibeTextSecondary,
+            ),
           ),
         ),
       ),
@@ -167,16 +219,26 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<Widget> _buildResults(List<VibeProfile> results) {
-    if (results.isEmpty) {
+    final l = VibeLocalizations.of(context);
+    if (_chatResults.isEmpty && results.isEmpty) {
       return [
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: VibeSpacing.xxl * 2),
             child: Column(
               children: [
-                Icon(Icons.search_off_rounded, size: 56, color: context.vibeTextTertiary),
+                Icon(
+                  Icons.search_off_rounded,
+                  size: 56,
+                  color: context.vibeTextTertiary,
+                ),
                 const SizedBox(height: VibeSpacing.md),
-                Text(VibeLocalizations.of(context).searchNothingFound, style: VibeTypography.subtitle.copyWith(color: context.vibeTextSecondary)),
+                Text(
+                  VibeLocalizations.of(context).searchNothingFound,
+                  style: VibeTypography.subtitle.copyWith(
+                    color: context.vibeTextSecondary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -184,14 +246,54 @@ class _SearchScreenState extends State<SearchScreen> {
       ];
     }
     return [
-      SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, i) => _ContactTile(profile: results[i]),
-          childCount: results.length,
+      if (_chatResults.isNotEmpty) ...[
+        SliverToBoxAdapter(child: _SectionTitle(l.searchChats)),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) => _ChatTile(chat: _chatResults[i]),
+            childCount: _chatResults.length,
+          ),
         ),
-      ),
+      ],
+      if (results.isNotEmpty) ...[
+        SliverToBoxAdapter(child: _SectionTitle(l.searchPeople)),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) => _ContactTile(profile: results[i]),
+            childCount: results.length,
+          ),
+        ),
+      ],
     ];
   }
+}
+
+/// Переход в чат (единый для всех плиток поиска).
+void _openChatScreen(BuildContext context, VibeChat chat) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      pageBuilder: (_, _, _) => ChatScreen(chat: chat),
+      transitionsBuilder: (_, animation, _, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position:
+                Tween<Offset>(
+                  begin: const Offset(0.3, 0),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: VibeAnimations.standard,
+                  ),
+                ),
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: VibeAnimations.fadeIn,
+    ),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -202,8 +304,58 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(VibeSpacing.lg, VibeSpacing.md, VibeSpacing.lg, VibeSpacing.xs),
-      child: Text(title.toUpperCase(), style: VibeTypography.caption.copyWith(color: context.vibeTextTertiary, letterSpacing: 0.6)),
+      padding: const EdgeInsets.fromLTRB(
+        VibeSpacing.lg,
+        VibeSpacing.md,
+        VibeSpacing.lg,
+        VibeSpacing.xs,
+      ),
+      child: Text(
+        title.toUpperCase(),
+        style: VibeTypography.caption.copyWith(
+          color: context.vibeTextTertiary,
+          letterSpacing: 0.6,
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatTile extends StatelessWidget {
+  const _ChatTile({required this.chat});
+
+  final VibeChat chat;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: VibeAvatar(
+        name: chat.title,
+        size: VibeSizes.avatarMd,
+        online: chat.peerOnline,
+        photoUrl: chat.peerAvatar,
+      ),
+      title: Text(
+        chat.title,
+        style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary),
+      ),
+      subtitle: Text(
+        chat.lastMessage,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: VibeTypography.body.copyWith(
+          color: context.vibeTextSecondary,
+          fontSize: 13,
+        ),
+      ),
+      trailing: Text(
+        chat.lastTime,
+        style: VibeTypography.caption.copyWith(
+          color: context.vibeTextTertiary,
+          fontSize: 11,
+        ),
+      ),
+      onTap: () => _openChatScreen(context, chat),
     );
   }
 }
@@ -222,8 +374,17 @@ class _ContactTile extends StatelessWidget {
         online: profile.online,
         photoUrl: profile.avatar,
       ),
-      title: Text(profile.displayName, style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
-      subtitle: Text('@${profile.username}', style: VibeTypography.body.copyWith(color: context.vibeTextSecondary, fontSize: 13)),
+      title: Text(
+        profile.displayName,
+        style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary),
+      ),
+      subtitle: Text(
+        '@${profile.username}',
+        style: VibeTypography.body.copyWith(
+          color: context.vibeTextSecondary,
+          fontSize: 13,
+        ),
+      ),
       onTap: () async {
         // Логика перехода в чат
         final chatId = await VibeBackend.instance.ensurePmChat(profile.id);
@@ -238,29 +399,7 @@ class _ContactTile extends StatelessWidget {
             peerName: profile.displayName,
             peerAvatar: profile.avatar,
           );
-          Navigator.of(context).push(
-            PageRouteBuilder(
-              pageBuilder: (_, _, _) => ChatScreen(chat: chat),
-              transitionsBuilder: (_, animation, _, child) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.3, 0),
-                      end: Offset.zero,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: animation,
-                        curve: VibeAnimations.standard,
-                      ),
-                    ),
-                    child: child,
-                  ),
-                );
-              },
-              transitionDuration: VibeAnimations.fadeIn,
-            ),
-          );
+          _openChatScreen(context, chat);
         }
       },
     );

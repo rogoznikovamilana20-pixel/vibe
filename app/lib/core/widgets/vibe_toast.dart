@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../theme/vibe_animations.dart';
 import '../theme/vibe_colors.dart';
 import '../theme/vibe_spacing.dart';
+import '../theme/vibe_theme.dart';
 import '../theme/vibe_typography.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
@@ -21,13 +22,16 @@ class VibeToast {
   static int _seq = 0;
 
   /// Показать тост. [icon]/[iconColor] — необязательная иконка-акцент
-  /// (например, успех или ошибка).
+  /// (например, успех или ошибка). [actionLabel]/[onAction] — кнопка
+  /// действия (как UndoView в Telegram: «Отменить» после архивации).
   static void show(
     BuildContext context,
     String message, {
     IconData? icon,
     Color? iconColor,
     Duration duration = const Duration(milliseconds: 2200),
+    String? actionLabel,
+    VoidCallback? onAction,
   }) {
     final overlay = Overlay.of(context, rootOverlay: true);
     _seq++;
@@ -39,6 +43,8 @@ class VibeToast {
         message: message,
         icon: icon,
         iconColor: iconColor,
+        actionLabel: actionLabel,
+        onAction: onAction,
         onDone: () => _dismiss(seq),
       ),
     );
@@ -60,12 +66,16 @@ class _VibeToastHost extends StatefulWidget {
     required this.message,
     this.icon,
     this.iconColor,
+    this.actionLabel,
+    this.onAction,
     required this.onDone,
   });
 
   final String message;
   final IconData? icon;
   final Color? iconColor;
+  final String? actionLabel;
+  final VoidCallback? onAction;
   final VoidCallback onDone;
 
   @override
@@ -193,6 +203,23 @@ class _VibeToastHostState extends State<_VibeToastHost>
                             ),
                           ),
                         ),
+                        if (widget.actionLabel != null) ...[
+                          const SizedBox(width: VibeSpacing.sm + 4),
+                          GestureDetector(
+                            onTap: () {
+                              widget.onDone();
+                              widget.onAction?.call();
+                            },
+                            child: Text(
+                              widget.actionLabel!,
+                              style: VibeTypography.bodyMedium.copyWith(
+                                color: context.vibePrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -298,7 +298,7 @@ class _MemberTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: VibeTypography.bodyMedium.copyWith(
                         color: context.vibeTextPrimary,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     if (profile.username.isNotEmpty) ...[

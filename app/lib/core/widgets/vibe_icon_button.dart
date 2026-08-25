@@ -11,6 +11,7 @@ class VibeIconButton extends StatefulWidget {
     super.key,
     required this.icon,
     required this.onPressed,
+    this.onLongPress,
     this.tooltip,
     this.iconSize = 20,
     this.color,
@@ -21,6 +22,7 @@ class VibeIconButton extends StatefulWidget {
 
   final IconData icon;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
   final String? tooltip;
   final double iconSize;
   final Color? color;
@@ -58,6 +60,7 @@ class _VibeIconButtonState extends State<VibeIconButton> {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: enabled ? widget.onPressed : null,
+            onLongPress: widget.onLongPress,
             splashColor: context.vibePrimary.withValues(alpha: 0.16),
             highlightColor: Colors.transparent,
             onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,

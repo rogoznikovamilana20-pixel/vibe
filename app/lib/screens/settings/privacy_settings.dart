@@ -12,9 +12,7 @@ import '../../data/passcode_service.dart';
 import 'privacy/privacy_selector_screen.dart';
 import 'privacy/passcode_screen.dart';
 import 'privacy/devices_screen.dart';
-import 'privacy/e2ee_verification_screen.dart';
 import 'privacy/two_step_verification_screen.dart';
-import 'privacy/devices_screen.dart';
 import '../auth/otp_verification_screen.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 

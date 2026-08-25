@@ -28,7 +28,7 @@ class MessageDateDivider extends StatelessWidget {
             fmtDateLabel(context, date),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.vibeTextSecondary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
           ),
         ),

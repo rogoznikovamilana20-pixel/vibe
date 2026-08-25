@@ -30,7 +30,6 @@ class VibeRadius {
   static const input = 18.0;
   static const badge = 8.0;
   static const bottomSheet = 20.0;
-  static const bubble = 16.0;
   static const bubbleTail = 6.0;
   static const pill = 20.0;
   static const avatar = 20.0;
@@ -46,9 +45,8 @@ class VibeSizes {
   static const buttonSmall = 48.0;
   static const inputHeight = 52.0;
   static const bottomNavHeight = 76.0;
-  static const toolbarHeight = 52.0;
+  static const toolbarHeight = 56.0;
   static const tabBarHeight = 40.0;
-  static const rowHeight = 60.0;
   static const avatarXs = 24.0;
   static const avatarSm = 32.0;
   static const avatarMd = 44.0;

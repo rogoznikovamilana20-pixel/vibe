@@ -43,7 +43,7 @@ class VibeOfflineBanner extends StatelessWidget {
               'Нет сети — показаны кешированные данные',
               style: VibeTypography.caption.copyWith(
                 color: VibeColors.warning,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),

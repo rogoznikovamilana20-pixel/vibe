@@ -42,7 +42,7 @@ class UnreadPlank extends StatelessWidget {
               '${VibeLocalizations.of(context).unreadCount}: $count',
               style: VibeTypography.caption.copyWith(
                 color: context.vibeTextPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -80,7 +80,7 @@ class StickDatePlank extends StatelessWidget {
         label,
         style: VibeTypography.caption.copyWith(
           color: context.vibeTextPrimary,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

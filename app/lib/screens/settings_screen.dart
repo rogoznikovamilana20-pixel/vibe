@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/vibe_colors.dart';
@@ -18,6 +18,7 @@ import '../core/profile_avatar.dart';
 import '../data/backend.dart';
 import '../data/settings_service.dart';
 import 'settings/appearance_settings.dart';
+import 'settings/chat_settings.dart';
 import 'settings/notifications_settings.dart';
 import 'settings/privacy_settings.dart';
 import 'settings/data_settings.dart';
@@ -25,13 +26,11 @@ import 'settings/language_settings.dart';
 import 'settings/proxy_settings.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'folders_screen.dart';
 
 /// Настройки в стиле Telegram (вкладка «Настройки»).
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({
-    super.key,
-    this.onOpenProfile,
-  });
+  const SettingsScreen({super.key, this.onOpenProfile});
 
   final VoidCallback? onOpenProfile;
 
@@ -43,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: VibeCollapsibleScreen(
@@ -73,7 +72,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       iconColor: context.vibeError,
                       title: l.notifications,
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const NotificationsSettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsSettingsScreen(),
+                        ),
                       ),
                     ),
                     SettingsTile(
@@ -81,7 +82,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       iconColor: VibeColors.primary,
                       title: l.privacy,
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const PrivacySettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const PrivacySettingsScreen(),
+                        ),
                       ),
                     ),
                     SettingsTile(
@@ -89,7 +92,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       iconColor: VibeColors.primary,
                       title: l.data,
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const DataSettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const DataSettingsScreen(),
+                        ),
                       ),
                     ),
                     SettingsTile(
@@ -97,7 +102,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       iconColor: VibeColors.primary,
                       title: l.proxyTitle,
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ProxySettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const ProxySettingsScreen(),
+                        ),
+                      ),
+                    ),
+                    SettingsTile(
+                      icon: Icons.folder_outlined,
+                      iconColor: VibeColors.primary,
+                      title: l.foldersTitle,
+                      onTap: () => _openFolders(context),
+                    ),
+                    SettingsTile(
+                      icon: Icons.swipe_rounded,
+                      iconColor: VibeColors.primary,
+                      title: l.settingsSwipeTitle,
+                      trailing: Text(
+                        _swipeActionLabel(l),
+                        style: TextStyle(color: context.vibePrimary, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ChatSettingsScreen(),
+                        ),
                       ),
                     ),
                     _buildThemeToggleTile(context, l),
@@ -110,7 +138,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(color: context.vibePrimary),
                       ),
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LanguageSettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const LanguageSettingsScreen(),
+                        ),
                       ),
                     ),
                   ],
@@ -167,6 +197,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _swipeActionLabel(VibeLocalizations l) {
+    return switch (SettingsService.instance.chatSwipeAction) {
+      ChatSwipeAction.archive => l.settingsSwipeArchive,
+      ChatSwipeAction.read => l.settingsSwipeRead,
+      ChatSwipeAction.mute => l.settingsSwipeMute,
+      ChatSwipeAction.pin => l.settingsSwipePin,
+      ChatSwipeAction.delete => l.settingsSwipeDelete,
+    };
+  }
+
+  /// Папки (как в Telegram): экран управления из настроек.
+  Future<void> _openFolders(BuildContext context) async {
+    List<VibeChat> chats = [];
+    try {
+      chats = await VibeBackend.instance.listChats();
+    } catch (_) {
+      chats = await VibeBackend.instance.getOfflineChats();
+    }
+    if (!context.mounted) return;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => FoldersScreen(chats: chats)));
+  }
+
   void _confirmLogout(BuildContext context, VibeLocalizations l) {
     showDialog(
       context: context,
@@ -184,7 +238,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               await VibeBackend.instance.logout();
               await ProfileAvatar.remove();
               if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/', (route) => false);
               }
             },
             child: Text(l.logout, style: TextStyle(color: context.vibeError)),
@@ -231,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           name,
                           style: VibeTypography.bodyMedium.copyWith(
                             color: context.vibeTextPrimary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 1),
@@ -271,7 +327,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                dark ? (l.locale.languageCode == 'ru' ? 'Тёмное' : 'Dark') : (l.locale.languageCode == 'ru' ? 'Светлое' : 'Light'),
+                dark
+                    ? (l.locale.languageCode == 'ru' ? 'Тёмное' : 'Dark')
+                    : (l.locale.languageCode == 'ru' ? 'Светлое' : 'Light'),
                 style: TextStyle(color: context.vibeTextSecondary),
               ),
               const SizedBox(width: 8),
@@ -279,9 +337,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: dark,
                 onChanged: (v) {
                   HapticFeedback.selectionClick();
-                  VibeApp.themeModeNotifier.value =
-                      v ? ThemeMode.dark : ThemeMode.light;
-                  SettingsService.instance.setThemeMode(VibeApp.themeModeNotifier.value);
+                  VibeApp.themeModeNotifier.value = v
+                      ? ThemeMode.dark
+                      : ThemeMode.light;
+                  SettingsService.instance.setThemeMode(
+                    VibeApp.themeModeNotifier.value,
+                  );
                 },
                 activeTrackColor: context.vibePrimary.withValues(alpha: 0.3),
                 activeThumbColor: context.vibePrimary,
@@ -317,9 +378,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Отмена'),
           ),
-TextButton(
+          TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Отправить', style: TextStyle(color: VibeColors.primary)),
+            child: const Text(
+              'Отправить',
+              style: TextStyle(color: VibeColors.primary),
+            ),
           ),
         ],
       ),
@@ -331,10 +395,22 @@ TextButton(
 
   Future<void> _showFaq(BuildContext context, VibeLocalizations l) async {
     const faq = [
-      ('Как войти в Vibe?', 'Введите номер телефона и пароль на экране входа. Новый номер можно зарегистрировать там же.'),
-      ('Как найти друга?', 'Нажмите «Новое сообщение» и введите имя, никнейм или ID пользователя в поиске.'),
-      ('Меня нет в списке чатов?', 'Проверьте, что друг добавил вас в контакты, или напишите ему сначала вы.'),
-      ('Фото не синхронизируется?', 'Проверьте подключение к интернету — фото загружаются в облако автоматически.'),
+      (
+        'Как войти в Vibe?',
+        'Введите номер телефона и пароль на экране входа. Новый номер можно зарегистрировать там же.',
+      ),
+      (
+        'Как найти друга?',
+        'Нажмите «Новое сообщение» и введите имя, никнейм или ID пользователя в поиске.',
+      ),
+      (
+        'Меня нет в списке чатов?',
+        'Проверьте, что друг добавил вас в контакты, или напишите ему сначала вы.',
+      ),
+      (
+        'Фото не синхронизируется?',
+        'Проверьте подключение к интернету — фото загружаются в облако автоматически.',
+      ),
     ];
     showDialog(
       context: context,
@@ -345,16 +421,29 @@ TextButton(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final (q, a) in faq) ...[
-                Text(q, style: VibeTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  q,
+                  style: VibeTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(a, style: VibeTypography.body.copyWith(color: context.vibeTextSecondary)),
+                Text(
+                  a,
+                  style: VibeTypography.body.copyWith(
+                    color: context.vibeTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: VibeSpacing.md),
               ],
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Закрыть')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Закрыть'),
+          ),
         ],
       ),
     );
@@ -375,7 +464,10 @@ TextButton(
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Закрыть')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Закрыть'),
+          ),
         ],
       ),
     );

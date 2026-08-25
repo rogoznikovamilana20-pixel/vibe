@@ -16,6 +16,7 @@ class StoryCircle extends StatelessWidget {
     required this.item,
     required this.onTap,
     this.placeholder = false,
+    this.size = 44,
   });
 
   final StoryItem item;
@@ -23,17 +24,18 @@ class StoryCircle extends StatelessWidget {
 
   /// Пустой кружок «+» для «Моей истории» без контента.
   final bool placeholder;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(size / 2 + 8),
       child: Column(
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: size,
+            height: size,
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -56,14 +58,14 @@ class StoryCircle extends StatelessWidget {
                   ? Icon(
                       VibeIcons.plus,
                       color: context.vibePrimary,
-                      size: 26,
+                      size: size * 0.52,
                     )
                   : _preview(item, context),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 2),
           SizedBox(
-            width: 64,
+            width: size + 8,
             child: Text(
               item.author,
               overflow: TextOverflow.ellipsis,
@@ -72,6 +74,8 @@ class StoryCircle extends StatelessWidget {
                 color: item.seen
                     ? context.vibeTextTertiary
                     : context.vibeTextSecondary,
+                fontSize: 11,
+                height: 14 / 11,
               ),
             ),
           ),
@@ -84,16 +88,16 @@ class StoryCircle extends StatelessWidget {
     if (item.photo != null) {
       return Image.memory(
         item.photo!,
-        width: 50,
-        height: 50,
+        width: size - 4,
+        height: size - 4,
         fit: BoxFit.cover,
         gaplessPlayback: true,
       );
     }
     if (item.photoUrl != null) {
       return SizedBox(
-        width: 50,
-        height: 50,
+        width: size - 4,
+        height: size - 4,
         child: VibeNetImage(
           source: item.photoUrl,
           errorBuilder: (_, _, _) =>
@@ -101,6 +105,6 @@ class StoryCircle extends StatelessWidget {
         ),
       );
     }
-    return VibeAvatar(name: item.author, size: 50, storyRing: false);
+    return VibeAvatar(name: item.author, size: size - 4, storyRing: false);
   }
 }

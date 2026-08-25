@@ -411,9 +411,7 @@ class V2Ratchet {
 
     // If no ratchet key pair yet (first message), generate one
     var currentKeyPair = state.sendingRatchetKeyPair;
-    if (currentKeyPair == null) {
-      currentKeyPair = await x25519.newKeyPair();
-    }
+    currentKeyPair ??= await x25519.newKeyPair();
 
     // 1. Update receiving chain
     final dh1 = await x25519.sharedSecretKey(

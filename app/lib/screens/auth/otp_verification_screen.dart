@@ -1,20 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:pinput/pinput.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/env_config.dart';
-import '../../core/localization/vibe_localizations.dart';
 import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_backdrop.dart';
 import '../../core/widgets/vibe_button.dart';
 import '../../core/widgets/vibe_toast.dart';
-import '../../data/backend.dart';
 
 /// Экран ввода OTP-кода, подтверждённого по SMS.
 class OtpVerificationScreen extends StatefulWidget {
@@ -122,8 +119,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l = VibeLocalizations.of(context);
-
     return Scaffold(
       body: Stack(
         children: [
@@ -200,7 +195,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   if (_resendSeconds > 0)
                     Center(
                       child: Text(
-                        'Отправить повторно через ${_resendSeconds}с',
+                        'Отправить повторно через $_resendSecondsс',
                         style: VibeTypography.body.copyWith(
                           color: context.vibeTextSecondary,
                         ),
@@ -214,7 +209,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                           _sending ? 'Отправка...' : 'Отправить повторно',
                           style: VibeTypography.body.copyWith(
                             color: context.vibePrimary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
