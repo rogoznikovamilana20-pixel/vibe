@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/vibe_animations.dart';
 import '../theme/vibe_colors.dart';
 import '../theme/vibe_spacing.dart';
 import '../theme/vibe_theme.dart';
@@ -27,9 +26,7 @@ class VibeIsland extends StatelessWidget {
         horizontal: VibeSpacing.lg,
         vertical: VibeSpacing.xs,
       ),
-      child: AnimatedContainer(
-        duration: VibeAnimations.pulse,
-        curve: VibeAnimations.springy,
+      child: Container(
         decoration: BoxDecoration(
           color: selected
               ? context.vibePrimary.withValues(alpha: 0.12)
