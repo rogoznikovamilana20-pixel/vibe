@@ -10,6 +10,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/services/scheduled_service.dart';
 import 'core/env_config.dart';
 import 'core/profile_avatar.dart';
+import 'data/message_cache.dart';
+import 'core/di/service_locator.dart';
 import 'core/theme/vibe_theme.dart';
 import 'core/localization/vibe_localizations.dart';
 import 'data/account_service.dart';
@@ -22,15 +24,9 @@ import 'screens/lock_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Глобальный обработчик ошибок Flutter framework > Crashlytics.
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-  // Перехват необработанных async-ошибок > Crashlytics.
-  runZonedGuarded(() {}, (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-  });
-  
   try {
     await Firebase.initializeApp();
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
   } catch (e) {
     debugPrint('Firebase init error: $e');
   }
@@ -42,6 +38,16 @@ void main() async {
     url: EnvConfig.supabaseUrl,
     publishableKey: EnvConfig.supabaseAnonKey,
   );
+
+  // Шифрованный Hive-кеш до остальных сервисов (персистент офлайна)
+  try {
+    await VibeMessageCache.instance.init();
+  } catch (_) {}
+
+  // DI-контейнер (ChatRepository/MessageRepository) для Android+Desktop параллельно
+  try {
+    await setupServiceLocator();
+  } catch (_) {}
 
   await Future.wait([
     SettingsService.instance.init(),

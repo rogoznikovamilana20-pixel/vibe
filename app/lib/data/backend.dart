@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'offline_queue_service.dart';
+import 'message_cache.dart';
 import 'message_encryption_state.dart';
 import 'v2_message_storage.dart';
 import 'v2_media_outgoing.dart';
@@ -571,6 +572,8 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     if (accountId.isNotEmpty) {
       unawaited(OfflineQueueService.instance.load(accountId));
     }
+    // Шифрованный Hive-кеш (для gap-recovery, офлайна).
+    unawaited(VibeMessageCache.instance.init(accountId: backend.myProfileId));
 
     backend.subscribeMessages();
     backend.startNetworkMonitor();
@@ -942,6 +945,26 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   }
 
   static Future<void> _writeCache(String name, Object data) async {
+    // Шифрованный Hive (приоритет) + файловый fallback для миграции
+    try {
+      if (VibeMessageCache.instance.isReady) {
+        await VibeMessageCache.instance.putRaw(name, data);
+        // Обновляем курсор для gap-recovery, если это кеш сообщений
+        if (name.contains('msgs_') && data is List && data.isNotEmpty) {
+          String? maxTs;
+          for (final e in data) {
+            if (e is Map && e['created_at'] is String) {
+              final ts = e['created_at'] as String;
+              if (maxTs == null || ts.compareTo(maxTs) > 0) maxTs = ts;
+            }
+          }
+          if (maxTs != null) {
+            final chatId = name.split('_').last;
+            await VibeMessageCache.instance.setCursor(chatId, maxTs);
+          }
+        }
+      }
+    } catch (_) {}
     try {
       final c = await _cacheDir();
       await File('${c.path}${Platform.pathSeparator}$name.json')
@@ -950,6 +973,12 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
   }
 
   static Future<dynamic> _readCache(String name) async {
+    try {
+      if (VibeMessageCache.instance.isReady) {
+        final hive = VibeMessageCache.instance.getRaw(name);
+        if (hive != null) return hive;
+      }
+    } catch (_) {}
     try {
       final c = await _cacheDir();
       final f = File('${c.path}${Platform.pathSeparator}$name.json');
@@ -3595,15 +3624,41 @@ _personal = _client.channel('u_$myId')
     await _processOfflineQueue();
   }
 
-  /// Refresh-based recovery after foreground resume.
-  /// NOT gap-based event recovery — does not detect specific missed messages.
-  /// Reloads chat list (unread, previews, order) and marks active chat as read.
-  /// Full gap-based recovery requires BACKEND SYNC API (cursor/sequence).
+  /// Gap-based recovery via Hive курсоры (created_at).
+  /// Для каждого чата берём cursor из VibeMessageCache, фетчим сообщения новее
+  /// курсора и триггерим обновление чатов, если есть пропущенные.
   Future<void> recoverMissedEvents() async {
     if (!_networkAvailable) return;
-    // Обновить список чатов (unread, превью, порядок).
+    // Курсоры → пропущенные сообщения
+    try {
+      if (VibeMessageCache.instance.isReady) {
+        final chats = await getOfflineChats();
+        for (final chat in chats.take(20)) {
+          final cursor = VibeMessageCache.instance.getCursor(chat.id);
+          if (cursor == null) continue;
+          final dt = DateTime.tryParse(cursor);
+          if (dt == null) continue;
+          try {
+            final newer = await _client
+                .from('messages')
+                .select('id, created_at')
+                .eq('chat_id', chat.id)
+                .gt('created_at', dt.toUtc().toIso8601String())
+                .order('created_at', ascending: true)
+                .limit(10)
+                .timeout(const Duration(seconds: 4)) as List;
+            if (newer.isNotEmpty) {
+              // Есть пропущенные — триггерим перезагрузку чатов/сообщений
+              if (!_chatsController.isClosed) _chatsController.add(null);
+              // Курсор продвинется при следующем listMessages → _writeCache
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    // Fallback: обновить список чатов и активный чат
     if (!_chatsController.isClosed) _chatsController.add(null);
-    // Обновить активный чат (если есть непрочитанные).
     final activeChat = NotificationService.instance.activeChatId;
     if (activeChat != null) {
       markChatRead(activeChat);
