@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +42,12 @@ void main() {
     expect(find.text('Настройки'), findsOneWidget,
         reason: 'заголовок экрана — единственный «Настройки»');
     expect(find.text('ОСНОВНЫЕ НАСТРОЙКИ'), findsOneWidget);
+    expect(find.text('Папки'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('ПОДДЕРЖКА'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('ПОДДЕРЖКА'), findsOneWidget);
   });
 
@@ -50,6 +57,11 @@ void main() {
     expect(find.text('Settings'), findsOneWidget,
         reason: 'заголовок экрана — единственный «Settings»');
     expect(find.text('GENERAL SETTINGS'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('SUPPORT'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('SUPPORT'), findsOneWidget);
   });
 }

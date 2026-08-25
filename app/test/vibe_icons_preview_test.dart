@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 

@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibe_app/chat/models.dart';
 import 'package:vibe_app/data/backend.dart';

@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,10 +32,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await SettingsService.instance.init();
     fake = FakeVibeBackend();
-    controller = ChatListController(
-      onSnack: snacks.add,
-      backend: fake,
-    );
+    controller = ChatListController(onSnack: snacks.add, backend: fake);
     snacks.clear();
   });
 
@@ -43,11 +41,9 @@ void main() {
     fake.close();
   });
 
-  Future<void> pump() =>
-      Future<void>.delayed(const Duration(milliseconds: 10));
+  Future<void> pump() => Future<void>.delayed(const Duration(milliseconds: 10));
 
-  test('load(): статусы из настроек + облака, первая загрузка ленты',
-      () async {
+  test('load(): статусы из настроек + облака, первая загрузка ленты', () async {
     SharedPreferences.setMockInitialValues({
       'vibe_pinned_chats': ['c2'],
       'vibe_muted_chats': ['c3'],
@@ -65,6 +61,36 @@ void main() {
     expect(controller.chats.map((c) => c.id), ['c1', 'c2']);
   });
 
+  test('typingEvents: isTyping включается и гаснет через 6 секунд', () async {
+    fake.chatList = [chat('c1'), chat('c2')];
+    await controller.load();
+
+    expect(controller.isTyping('c1'), isFalse);
+
+    fake.typingCtrl.add(TypingEvent(chatId: 'c1', userId: 'u1'));
+    await pump();
+    expect(controller.isTyping('c1'), isTrue);
+    expect(controller.isTyping('c2'), isFalse);
+
+    await Future<void>.delayed(const Duration(milliseconds: 6100));
+    expect(controller.isTyping('c1'), isFalse);
+  });
+
+  test('typingEvents: два чата печатают независимо', () async {
+    fake.chatList = [chat('c1'), chat('c2')];
+    await controller.load();
+
+    fake.typingCtrl.add(TypingEvent(chatId: 'c1', userId: 'u1'));
+    fake.typingCtrl.add(TypingEvent(chatId: 'c2', userId: 'u2'));
+    await pump();
+    expect(controller.isTyping('c1'), isTrue);
+    expect(controller.isTyping('c2'), isTrue);
+
+    await Future<void>.delayed(const Duration(milliseconds: 6100));
+    expect(controller.isTyping('c1'), isFalse);
+    expect(controller.isTyping('c2'), isFalse);
+  });
+
   test('loadChats(): сначала кэш, затем свежие данные', () async {
     fake.offlineCache = [chat('cached')];
     fake.chatList = [chat('fresh1'), chat('fresh2')];
@@ -77,33 +103,37 @@ void main() {
     expect(fake.calls, contains('listChats'));
   });
 
-  test('applyLivePreview: чат поднимается наверх с превью и временем',
-      () async {
-    fake.chatList = [
-      chat('c1', unread: 3),
-      chat('c2', unread: 1, lastMessage: 'старое'),
-    ];
-    await controller.load();
+  test(
+    'applyLivePreview: чат поднимается наверх с превью и временем',
+    () async {
+      fake.chatList = [
+        chat('c1', unread: 3),
+        chat('c2', unread: 1, lastMessage: 'старое'),
+      ];
+      await controller.load();
 
-    fake.streamCtrl.add(VibeMessage(
-      id: 'in1',
-      chatId: 'c2',
-      senderId: 'peer',
-      senderName: 'Пир',
-      senderAvatar: null,
-      text: 'новое превью',
-      voicePath: null,
-      photoPath: null,
-      videoPath: null,
-      created: DateTime.now(),
-      incoming: true,
-    ));
-    await pump();
+      fake.streamCtrl.add(
+        VibeMessage(
+          id: 'in1',
+          chatId: 'c2',
+          senderId: 'peer',
+          senderName: 'Пир',
+          senderAvatar: null,
+          text: 'новое превью',
+          voicePath: null,
+          photoPath: null,
+          videoPath: null,
+          created: DateTime.now(),
+          incoming: true,
+        ),
+      );
+      await pump();
 
-    expect(controller.chats.first.id, 'c2');
-    expect(controller.chats.first.lastMessage, 'новое превью');
-    expect(controller.chats.first.lastTime, isNotEmpty);
-  });
+      expect(controller.chats.first.id, 'c2');
+      expect(controller.chats.first.lastMessage, 'новое превью');
+      expect(controller.chats.first.lastTime, isNotEmpty);
+    },
+  );
 
   test('unreadOf: локальная пометка «прочитано» зануляет счётчик', () {
     controller.read.add('c1');
@@ -153,23 +183,23 @@ void main() {
       expect(snacks.single, startsWith('Скрыто'));
     });
 
-    test('скрытие персистится: новый контроллер восстанавливает список',
-        () async {
-      controller.toggleSelect('c1');
-      controller.markHidden();
-      await pump();
+    test(
+      'скрытие персистится: новый контроллер восстанавливает список',
+      () async {
+        controller.toggleSelect('c1');
+        controller.markHidden();
+        await pump();
 
-      final restored = ChatListController(
-        onSnack: (_) {},
-        backend: fake,
-      );
-      await restored.load();
-      await pump();
+        final restored = ChatListController(onSnack: (_) {}, backend: fake);
+        await restored.load();
+        await pump();
 
-      expect(restored.hidden, {'c1'},
-          reason: 'скрытые чаты сохраняются между сессиями');
-      restored.dispose();
-    });
+        expect(restored.hidden, {
+          'c1',
+        }, reason: 'скрытые чаты сохраняются между сессиями');
+        restored.dispose();
+      },
+    );
 
     test('setHidden: скрыть/показать один чат + персистентность', () async {
       controller.setHidden('c1', hiddenNow: true);
@@ -236,34 +266,38 @@ void main() {
       ]);
     });
 
-    test('toggleArchived: архив вкл/выкл + setChatArchived на сервер',
-        () async {
-      controller.toggleArchived('c1');
-      await pump();
-      expect(controller.archived, {'c1'});
-      expect(fake.setArchivedCalls, [(id: 'c1', archived: true)]);
+    test(
+      'toggleArchived: архив вкл/выкл + setChatArchived на сервер',
+      () async {
+        controller.toggleArchived('c1');
+        await pump();
+        expect(controller.archived, {'c1'});
+        expect(fake.setArchivedCalls, [(id: 'c1', archived: true)]);
 
-      controller.toggleArchived('c1');
-      await pump();
-      expect(controller.archived, isEmpty);
-      expect(fake.setArchivedCalls, [
-        (id: 'c1', archived: true),
-        (id: 'c1', archived: false),
-      ]);
-    });
+        controller.toggleArchived('c1');
+        await pump();
+        expect(controller.archived, isEmpty);
+        expect(fake.setArchivedCalls, [
+          (id: 'c1', archived: true),
+          (id: 'c1', archived: false),
+        ]);
+      },
+    );
 
     test('markChatRead: точечная пометка из меню чата', () async {
       controller.markChatRead('c1');
       expect(controller.read, {'c1'});
     });
 
-    test('syncCloudMuted: облачный DND переносится в локальный + настройки',
-        () async {
-      fake.mutedNotifier.value = {'x1', 'x2'};
-      controller.syncCloudMuted();
-      expect(controller.dnd, {'x1', 'x2'});
-      expect(SettingsService.instance.mutedChats, containsAll(['x1', 'x2']));
-    });
+    test(
+      'syncCloudMuted: облачный DND переносится в локальный + настройки',
+      () async {
+        fake.mutedNotifier.value = {'x1', 'x2'};
+        controller.syncCloudMuted();
+        expect(controller.dnd, {'x1', 'x2'});
+        expect(SettingsService.instance.mutedChats, containsAll(['x1', 'x2']));
+      },
+    );
 
     test('syncCloudArchive: облачный архив переносится локально', () async {
       fake.archivedNotifier.value = {'a1'};
@@ -273,45 +307,48 @@ void main() {
   });
 
   group('presence-троттлинг (5.2)', () {
-    int listChatsCalls() =>
-        fake.calls.where((c) => c == 'listChats').length;
+    int listChatsCalls() => fake.calls.where((c) => c == 'listChats').length;
 
-    test('шквал presence-событий: 1 мгновенная перезагрузка + хвост через паузу',
-        () async {
-      fake.chatList = [chat('c1')];
-      await controller.load();
-      expect(listChatsCalls(), 1);
+    test(
+      'шквал presence-событий: 1 мгновенная перезагрузка + хвост через паузу',
+      () async {
+        fake.chatList = [chat('c1')];
+        await controller.load();
+        expect(listChatsCalls(), 1);
 
-      for (var i = 0; i < 5; i++) {
+        for (var i = 0; i < 5; i++) {
+          fake.presenceNotifier.value++;
+        }
+        await pump();
+        expect(listChatsCalls(), 2);
+
+        await Future<void>.delayed(const Duration(milliseconds: 2500));
+        expect(listChatsCalls(), 3);
+
+        await Future<void>.delayed(const Duration(milliseconds: 3000));
+        expect(listChatsCalls(), 3);
+      },
+    );
+
+    test(
+      'событие после паузы дольше интервала — мгновенная перезагрузка',
+      () async {
+        await controller.load();
+        expect(listChatsCalls(), 1);
+
         fake.presenceNotifier.value++;
-      }
-      await pump();
-      expect(listChatsCalls(), 2);
+        await pump();
+        expect(listChatsCalls(), 2);
 
-      await Future<void>.delayed(const Duration(milliseconds: 2500));
-      expect(listChatsCalls(), 3);
+        await Future<void>.delayed(const Duration(milliseconds: 2200));
+        fake.presenceNotifier.value++;
+        await pump();
+        expect(listChatsCalls(), 3);
 
-      await Future<void>.delayed(const Duration(milliseconds: 3000));
-      expect(listChatsCalls(), 3);
-    });
-
-    test('событие после паузы дольше интервала — мгновенная перезагрузка',
-        () async {
-      await controller.load();
-      expect(listChatsCalls(), 1);
-
-      fake.presenceNotifier.value++;
-      await pump();
-      expect(listChatsCalls(), 2);
-
-      await Future<void>.delayed(const Duration(milliseconds: 2200));
-      fake.presenceNotifier.value++;
-      await pump();
-      expect(listChatsCalls(), 3);
-
-      await Future<void>.delayed(const Duration(milliseconds: 2500));
-      expect(listChatsCalls(), 3);
-    });
+        await Future<void>.delayed(const Duration(milliseconds: 2500));
+        expect(listChatsCalls(), 3);
+      },
+    );
   });
 
   group('дельта-обновление ленты (5.8)', () {
@@ -328,8 +365,7 @@ void main() {
       expect(controller.chats[1].id, 'c2');
     });
 
-    test('изменение одной карточки — один notify со свежими данными',
-        () async {
+    test('изменение одной карточки — один notify со свежими данными', () async {
       var notifies = 0;
       controller.addListener(() => notifies++);
       fake.chatList = [chat('c1'), chat('c2')];
@@ -356,8 +392,7 @@ void main() {
     });
   });
 
-  test('8.3.2: удалённый для себя чат исчезает из ленты и из кэша',
-      () async {
+  test('8.3.2: удалённый для себя чат исчезает из ленты и из кэша', () async {
     fake.chatList = [chat('c1'), chat('c2')];
     await controller.load();
     expect(controller.chats.map((c) => c.id), ['c1', 'c2']);
@@ -366,26 +401,34 @@ void main() {
     await SettingsService.instance.setDeletedChats(ids);
     await controller.loadChats();
 
-    expect(controller.chats.map((c) => c.id), ['c1'],
-        reason: 'удалённый чат не возвращается при перезагрузке ленты');
+    expect(
+      controller.chats.map((c) => c.id),
+      ['c1'],
+      reason: 'удалённый чат не возвращается при перезагрузке ленты',
+    );
   });
 
-  test('markArchived: архивирует ТОЛЬКО выбранные, не все ранее архивированные',
-      () async {
-    // Pre-populate archived with c5.
-    fake.archivedNotifier.value = {'c5'};
-    await controller.load();
-    expect(controller.archived, {'c5'});
+  test(
+    'markArchived: архивирует ТОЛЬКО выбранные, не все ранее архивированные',
+    () async {
+      // Pre-populate archived with c5.
+      fake.archivedNotifier.value = {'c5'};
+      await controller.load();
+      expect(controller.archived, {'c5'});
 
-    // Select only c1 and archive.
-    controller.toggleSelect('c1');
-    controller.markArchived();
+      // Select only c1 and archive.
+      controller.toggleSelect('c1');
+      controller.markArchived();
 
-    // c5 must remain archived; c1 must be added; c2 must NOT be archived.
-    expect(controller.archived, contains('c1'));
-    expect(controller.archived, contains('c5'));
-    expect(controller.archived.length, 2,
-        reason: 'only c1 and c5 should be archived, not c2');
-    expect(fake.setArchivedCalls, [(id: 'c1', archived: true)]);
-  });
+      // c5 must remain archived; c1 must be added; c2 must NOT be archived.
+      expect(controller.archived, contains('c1'));
+      expect(controller.archived, contains('c5'));
+      expect(
+        controller.archived.length,
+        2,
+        reason: 'only c1 and c5 should be archived, not c2',
+      );
+      expect(fake.setArchivedCalls, [(id: 'c1', archived: true)]);
+    },
+  );
 }

@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';

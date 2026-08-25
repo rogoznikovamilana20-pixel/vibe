@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 // Рендерит иконки приложения Vibe в PNG через Flutter (CustomPainter).
 // Запуск: flutter test test/icon_render_test.dart
 // Пишет файлы прямо в android/app/src/main/res/mipmap-*/

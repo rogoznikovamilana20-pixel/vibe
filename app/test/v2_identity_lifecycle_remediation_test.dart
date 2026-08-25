@@ -1,15 +1,12 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:vibe_app/data/e2e_v2_service.dart';
 import 'package:vibe_app/data/e2e_v2_identity_verification.dart';
 import 'package:vibe_app/data/v2_media_crypto.dart';
-import 'package:vibe_app/data/v2_media_storage.dart';
-import 'package:vibe_app/data/v2_session_registry.dart';
 
 /// PHASE 12D.7 REMEDIATION — Adversarial Security Tests
 ///

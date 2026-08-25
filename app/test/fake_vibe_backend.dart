@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'dart:async';
 import 'dart:io';
 
@@ -13,7 +14,7 @@ import 'package:vibe_app/data/backend_api.dart';
 class FakeVibeBackend implements VibeBackendApi {
   final streamCtrl = StreamController<VibeMessage>.broadcast();
   final msgEventsCtrl = StreamController<VibeMsgEvent>.broadcast();
-  final typingCtrl = StreamController<String>.broadcast();
+  final typingCtrl = StreamController<TypingEvent>.broadcast();
   final chatEventsCtrl = StreamController<void>.broadcast();
   final pinEventsCtrl = StreamController<PinChanged>.broadcast();
 
@@ -107,6 +108,24 @@ class FakeVibeBackend implements VibeBackendApi {
     savedPrivacy.add(settings);
   }
 
+  // ─── Черновики (как в TG messages.saveDraft) ───
+  final Map<String, String> drafts = {};
+  @override
+  Future<void> saveDraft(String chatId, String? text) async {
+    calls.add('saveDraft($chatId)');
+    if (text == null || text.trim().isEmpty) {
+      drafts.remove(chatId);
+    } else {
+      drafts[chatId] = text;
+    }
+  }
+
+  @override
+  Future<String?> fetchDraft(String chatId) async {
+    calls.add('fetchDraft($chatId)');
+    return drafts[chatId];
+  }
+
   /// Если true — `sendText` эмитит подтверждённое сообщение в `stream`
   /// (как живой бэкенд). Выключите, чтобы проверить оптимистичный статус.
   bool emitOnSend = true;
@@ -118,7 +137,7 @@ class FakeVibeBackend implements VibeBackendApi {
   Stream<VibeMsgEvent> get msgEvents => msgEventsCtrl.stream;
 
   @override
-  Stream<String> get typingEvents => typingCtrl.stream;
+  Stream<TypingEvent> get typingEvents => typingCtrl.stream;
 
   @override
   Stream<void> get chatEvents => chatEventsCtrl.stream;
@@ -191,8 +210,10 @@ class FakeVibeBackend implements VibeBackendApi {
     String chatId,
     String text, {
     String? localId,
+    String? replyTo,
     String? replyText,
     String? replyAuthor,
+    bool silent = false,
   }) async {
     if (throwOnSendText) {
       calls.add('sendText($chatId)');
@@ -382,14 +403,15 @@ class FakeVibeBackend implements VibeBackendApi {
   @override
   Future<VibeMessage?> forwardMessage(
     String targetChatId,
-    VibeMessage original,
-  ) async {
+    VibeMessage original, {
+    bool hideSender = false,
+  }) async {
     calls.add('forwardMessage($targetChatId)');
     forwardCalls.add((chatId: targetChatId, text: original.text ?? ''));
     return _sent(
       targetChatId,
       text: original.text,
-      forwardedFrom: original.senderName,
+      forwardedFrom: hideSender ? null : original.senderName,
     );
   }
 
@@ -467,7 +489,7 @@ class FakeVibeBackend implements VibeBackendApi {
   }
 
   @override
-  Future<void> sendTyping(String chatId) async {
+  Future<void> sendTyping(String chatId, {String action = 'typing'}) async {
     sendTypingCalls++;
   }
 

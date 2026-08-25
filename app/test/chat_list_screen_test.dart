@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -158,14 +159,14 @@ void main() {
     expect(find.text('старое'), findsNothing);
   });
 
-  testWidgets('свайп вправо по чату → архив (setChatArchived)', (tester) async {
+  testWidgets('свайп влево по чату → архив (setChatArchived)', (tester) async {
     fake.chatList = [
       chatX(id: 'c1', title: 'Иван', lastMessage: 'Привет!'),
     ];
 
     await pumpList(tester);
 
-    await tester.drag(find.text('Иван'), const Offset(500, 0));
+    await tester.drag(find.text('Иван'), const Offset(-500, 0));
     await tester.pumpAndSettle();
 
     expect(fake.setArchivedCalls, isNotEmpty);
@@ -173,6 +174,44 @@ void main() {
     expect(fake.setArchivedCalls.first.archived, isTrue);
 
     await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('свайп влево (delete) → диалог → чат удалён', (tester) async {
+    fake.chatList = [
+      chatX(id: 'c1', title: 'Иван', lastMessage: 'Привет!'),
+    ];
+    await SettingsService.instance.setChatSwipeAction(ChatSwipeAction.delete);
+
+    await pumpList(tester);
+
+    await tester.drag(find.text('Иван'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Удалить чат?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Удалить'));
+    await tester.pumpAndSettle();
+    expect(find.text('Иван'), findsNothing);
+
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('vibe_deleted_chats') ?? const [];
+    expect(deleted, contains('c1'));
+
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('свайп влево (read) → прочитано', (tester) async {
+    fake.chatList = [
+      chatX(id: 'c1', title: 'Иван', lastMessage: 'Привет!', unread: 2),
+    ];
+    await SettingsService.instance.setChatSwipeAction(ChatSwipeAction.read);
+
+    await pumpList(tester);
+
+    await tester.drag(find.text('Иван'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+
+    // Прочитано: бейдж непрочитанных исчез.
+    expect(find.text('2'), findsNothing);
   });
 
   testWidgets('длинное нажатие → меню → «Выбрать чаты» → режим выбора',

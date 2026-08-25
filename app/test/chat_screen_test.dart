@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -388,6 +389,9 @@ void main() {
     await tester.tap(find.text('Мария'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Отправить'));
+    await tester.pumpAndSettle();
+    // Новый шаг: выбор режима пересылки (с именем / анонимно)
+    await tester.tap(find.text('С именем автора'));
     await tester.pumpAndSettle();
 
     expect(fake.forwardCalls, [(chatId: 'c2', text: 'перешли меня')]);

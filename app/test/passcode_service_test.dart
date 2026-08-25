@@ -1,4 +1,5 @@
-﻿import 'package:flutter/services.dart';
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -39,8 +40,7 @@ void main() {
     fake.close();
   });
 
-  Future<void> pump() =>
-      Future<void>.delayed(const Duration(milliseconds: 10));
+  Future<void> pump() => Future<void>.delayed(const Duration(milliseconds: 10));
 
   VibeMessage seed({
     required String id,
@@ -71,54 +71,101 @@ void main() {
   }
 
   group('ChatController — загрузка и пагинация', () {
-    test('load(): лента из бэкенда + markChatRead + refreshChatReactions',
-        () async {
-      final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm2', created: t.add(const Duration(minutes: 1)), text: 'новое'),
-        seed(id: 'm1', created: t, text: 'старое'),
-      ];
-
-      await controller.load();
-
-      expect(controller.messages.length, 2);
-      expect(controller.messages.first.serverId, 'm2');
-      expect(controller.messages.first.text, 'новое');
-      expect(fake.markReadCalls, 1);
-      expect(fake.refreshReactionsCalls, 1);
-      expect(fake.calls, contains('listMessages(c1)'));
-    });
-
-    test('loadOlderIfNeeded(): подгружает старше и выключает hasMoreOlder',
-        () async {
-      final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm2', created: t.add(const Duration(minutes: 1))),
-        seed(id: 'm1', created: t),
-      ];
-      await controller.load();
-
-      final older = [
-        for (var i = 0; i < 30; i++)
+    test(
+      'load(): лента из бэкенда + markChatRead + refreshChatReactions',
+      () async {
+        final t = DateTime(2026, 8, 12, 10, 0);
+        fake.messagesByChat['c1'] = [
           seed(
-            id: 'old-$i',
-            created: t.subtract(Duration(minutes: 10 + i)),
+            id: 'm2',
+            created: t.add(const Duration(minutes: 1)),
+            text: 'новое',
           ),
-      ];
-      fake.messagesByChat['c1'] = [
-        ...fake.messagesByChat['c1']!,
-        ...older,
-      ];
+          seed(id: 'm1', created: t, text: 'старое'),
+        ];
 
-      await controller.loadOlderIfNeeded();
+        await controller.load();
 
-      expect(controller.messages.length, 32);
-      expect(controller.hasMoreOlder, isFalse);
-      expect(controller.loadingOlder, isFalse);
+        expect(controller.messages.length, 2);
+        expect(controller.messages.first.serverId, 'm2');
+        expect(controller.messages.first.text, 'новое');
+        expect(fake.markReadCalls, 1);
+        expect(fake.refreshReactionsCalls, 1);
+        expect(fake.calls, contains('listMessages(c1)'));
+      },
+    );
 
-      final before = controller.messages.length;
-      await controller.loadOlderIfNeeded();
-      expect(controller.messages.length, before);
+    test(
+      'loadOlderIfNeeded(): подгружает старше и выключает hasMoreOlder',
+      () async {
+        final t = DateTime(2026, 8, 12, 10, 0);
+        fake.messagesByChat['c1'] = [
+          seed(id: 'm2', created: t.add(const Duration(minutes: 1))),
+          seed(id: 'm1', created: t),
+        ];
+        await controller.load();
+
+        final older = [
+          for (var i = 0; i < 30; i++)
+            seed(
+              id: 'old-$i',
+              created: t.subtract(Duration(minutes: 10 + i)),
+            ),
+        ];
+        fake.messagesByChat['c1'] = [...fake.messagesByChat['c1']!, ...older];
+
+        await controller.loadOlderIfNeeded();
+
+        expect(controller.messages.length, 32);
+        expect(controller.hasMoreOlder, isFalse);
+        expect(controller.loadingOlder, isFalse);
+
+        final before = controller.messages.length;
+        await controller.loadOlderIfNeeded();
+        expect(controller.messages.length, before);
+      },
+    );
+
+    test(
+      'jumpToReplyIndex(): цель к низу с подсветкой и возврат через 3с (G4)',
+      () {
+        fakeAsync((async) async {
+          final t = DateTime(2026, 8, 12, 10, 0);
+          fake.messagesByChat['c1'] = [
+            seed(id: 'm3', created: t.add(const Duration(minutes: 2))),
+            seed(id: 'm2', created: t.add(const Duration(minutes: 1))),
+            seed(id: 'm1', created: t),
+          ];
+          await controller.load();
+          expect(controller.messages.first.serverId, 'm3');
+
+          controller.jumpToReplyIndex(2);
+          expect(controller.messages.first.serverId, 'm1');
+          expect(controller.replyFlashId, 'm1');
+          expect(controller.messages.length, 3);
+
+          async.elapse(const Duration(seconds: 4));
+          expect(controller.replyFlashId, isNull);
+          expect(controller.messages.first.serverId, 'm3');
+          expect(controller.messages[2].serverId, 'm1');
+        });
+      },
+    );
+
+    test('jumpToReplyIndex(): невалидный индекс не ломает ленту', () {
+      fakeAsync((async) async {
+        final t = DateTime(2026, 8, 12, 10, 0);
+        fake.messagesByChat['c1'] = [
+          seed(id: 'm2', created: t.add(const Duration(minutes: 1))),
+          seed(id: 'm1', created: t),
+        ];
+        await controller.load();
+
+        controller.jumpToReplyIndex(-1);
+        controller.jumpToReplyIndex(5);
+        expect(controller.replyFlashId, isNull);
+        expect(controller.messages.length, 2);
+      });
     });
   });
 
@@ -133,13 +180,15 @@ void main() {
       expect(controller.messages.first.localId, isNotNull);
 
       final localId = controller.messages.first.localId;
-      fake.streamCtrl.add(seed(
-        id: 'server-1',
-        created: DateTime.now(),
-        text: 'привет',
-        incoming: false,
-        localId: localId,
-      ));
+      fake.streamCtrl.add(
+        seed(
+          id: 'server-1',
+          created: DateTime.now(),
+          text: 'привет',
+          incoming: false,
+          localId: localId,
+        ),
+      );
       await pump();
       expect(controller.messages.first.status, MsgStatus.sent);
       expect(fake.lastTextSent, 'привет');
@@ -159,12 +208,9 @@ void main() {
       expect(fake.calls.where((c) => c.startsWith('sendText')), isEmpty);
     });
 
-    test('send(): ответ — replyText/replyAuthor передаются в бэкенд',
-        () async {
+    test('send(): ответ — replyText/replyAuthor передаются в бэкенд', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t, text: 'цитата'),
-      ];
+      fake.messagesByChat['c1'] = [seed(id: 'm1', created: t, text: 'цитата')];
       await controller.load();
 
       controller.replyToMsg(0);
@@ -176,35 +222,43 @@ void main() {
       expect(controller.replyTo, isNull);
     });
 
-    test('send(): правка — updateMessage, текст обновлён, edited=true',
-        () async {
-      final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t, text: 'старое', incoming: false),
-      ];
-      await controller.load();
+    test(
+      'send(): правка — updateMessage, текст обновлён, edited=true',
+      () async {
+        final t = DateTime(2026, 8, 12, 10, 0);
+        fake.messagesByChat['c1'] = [
+          seed(id: 'm1', created: t, text: 'старое', incoming: false),
+        ];
+        await controller.load();
 
-      controller.startEdit(0);
-      expect(controller.editingIdx, 0);
+        controller.startEdit(0);
+        expect(controller.editingIdx, 0);
 
-      await controller.send('новое');
-      expect(fake.lastUpdatedMessageId, 'm1');
-      expect(fake.lastUpdatedText, 'новое');
-      expect(controller.messages.first.text, 'новое');
-      expect(controller.messages.first.edited, isTrue);
-      expect(controller.editingIdx, isNull);
-    });
+        await controller.send('новое');
+        expect(fake.lastUpdatedMessageId, 'm1');
+        expect(fake.lastUpdatedText, 'новое');
+        expect(controller.messages.first.text, 'новое');
+        expect(controller.messages.first.edited, isTrue);
+        expect(controller.editingIdx, isNull);
+      },
+    );
 
-    test('send(): ошибка бэкенда — onError + статус failed (реальный поток)', () async {
-      await controller.load();
-      fake.throwOnSendText = true;
+    test(
+      'send(): ошибка бэкенда — onError + статус failed (реальный поток)',
+      () async {
+        await controller.load();
+        fake.throwOnSendText = true;
 
-      await controller.send('привет');
-      expect(errors, ['Не удалось отправить сообщение']);
-      expect(controller.messages.first.text, 'привет');
-      expect(controller.messages.first.status, MsgStatus.failed,
-          reason: 'сбой сети должен помечать исходящее failed (не sending)');
-    });
+        await controller.send('привет');
+        expect(errors, ['Не удалось отправить сообщение']);
+        expect(controller.messages.first.text, 'привет');
+        expect(
+          controller.messages.first.status,
+          MsgStatus.failed,
+          reason: 'сбой сети должен помечать исходящее failed (не sending)',
+        );
+      },
+    );
 
     test('sendSticker(): эмодзи-стикер уходит и подтверждается', () async {
       await controller.load();
@@ -251,7 +305,7 @@ void main() {
         async.flushMicrotasks();
         expect(loaded, isTrue);
 
-        fake.typingCtrl.add('c1');
+        fake.typingCtrl.add(TypingEvent(chatId: 'c1', userId: 'u1'));
         async.flushMicrotasks();
         expect(controller.peerTyping, isTrue);
 
@@ -262,17 +316,17 @@ void main() {
 
     test('msgEvents.edited: текст обновляется и помечается', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t, text: 'было'),
-      ];
+      fake.messagesByChat['c1'] = [seed(id: 'm1', created: t, text: 'было')];
       await controller.load();
 
-      fake.msgEventsCtrl.add(VibeMsgEvent(
-        type: VibeMsgEventType.edited,
-        chatId: 'c1',
-        messageId: 'm1',
-        updated: seed(id: 'm1', created: t, text: 'стало'),
-      ));
+      fake.msgEventsCtrl.add(
+        VibeMsgEvent(
+          type: VibeMsgEventType.edited,
+          chatId: 'c1',
+          messageId: 'm1',
+          updated: seed(id: 'm1', created: t, text: 'стало'),
+        ),
+      );
       await pump();
 
       expect(controller.messages.first.text, 'стало');
@@ -287,11 +341,13 @@ void main() {
       ];
       await controller.load();
 
-      fake.msgEventsCtrl.add(const VibeMsgEvent(
-        type: VibeMsgEventType.deleted,
-        chatId: 'c1',
-        messageId: 'm1',
-      ));
+      fake.msgEventsCtrl.add(
+        const VibeMsgEvent(
+          type: VibeMsgEventType.deleted,
+          chatId: 'c1',
+          messageId: 'm1',
+        ),
+      );
       await pump();
 
       expect(controller.messages.length, 1);
@@ -300,22 +356,26 @@ void main() {
 
     test('msgEvents.reactions: счётчики заменяются с сервера', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t),
-      ];
+      fake.messagesByChat['c1'] = [seed(id: 'm1', created: t)];
       await controller.load();
 
-      fake.msgEventsCtrl.add(const VibeMsgEvent(
-        type: VibeMsgEventType.reactions,
-        chatId: 'c1',
-        messageId: 'm1',
-        reactions: {'🔥': 3, '❤️': 1},
-      ));
+      fake.msgEventsCtrl.add(
+        const VibeMsgEvent(
+          type: VibeMsgEventType.reactions,
+          chatId: 'c1',
+          messageId: 'm1',
+          reactions: {'🔥': 3, '❤️': 1},
+        ),
+      );
       await pump();
 
       expect(controller.messages.first.reactions.length, 2);
-      expect(controller.messages.first.reactions.any((r) =>
-          r.emoji == '🔥' && r.count == 3), isTrue);
+      expect(
+        controller.messages.first.reactions.any(
+          (r) => r.emoji == '🔥' && r.count == 3,
+        ),
+        isTrue,
+      );
     });
   });
 
@@ -371,7 +431,11 @@ void main() {
       final t = DateTime(2026, 8, 12, 10, 0);
       fake.messagesByChat['c1'] = [
         for (var i = 0; i < 10; i++)
-          seed(id: 'm$i', created: t.add(Duration(minutes: i)), text: 'm$i'),
+          seed(
+            id: 'm$i',
+            created: t.add(Duration(minutes: i)),
+            text: 'm$i',
+          ),
       ];
       controller.dispose();
       controller = ChatController(
@@ -392,7 +456,11 @@ void main() {
         final t = DateTime(2026, 8, 12, 10, 0);
         fake.messagesByChat['c1'] = [
           for (var i = 0; i < 10; i++)
-            seed(id: 'm$i', created: t.add(Duration(minutes: i)), text: 'm$i'),
+            seed(
+              id: 'm$i',
+              created: t.add(Duration(minutes: i)),
+              text: 'm$i',
+            ),
         ];
         controller.dispose();
         controller = ChatController(
@@ -421,12 +489,9 @@ void main() {
   });
 
   group('ChatController — реакции', () {
-    test('addReaction: включает и выключает эмодзи + вызов бэкенда',
-        () async {
+    test('addReaction: включает и выключает эмодзи + вызов бэкенда', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t),
-      ];
+      fake.messagesByChat['c1'] = [seed(id: 'm1', created: t)];
       await controller.load();
 
       controller.addReaction(0, '🔥');
@@ -440,9 +505,7 @@ void main() {
 
     test('heartReact: добавляет ❤️, повторно — убирает', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t),
-      ];
+      fake.messagesByChat['c1'] = [seed(id: 'm1', created: t)];
       await controller.load();
 
       controller.heartReact(0);
@@ -451,14 +514,31 @@ void main() {
       controller.heartReact(0);
       expect(controller.messages.first.reactions, isEmpty);
     });
+
+    test(
+      'heartReact: повторяет последнюю использованную реакцию (TG)',
+      () async {
+        final t = DateTime(2026, 8, 12, 10, 0);
+        fake.messagesByChat['c1'] = [seed(id: 'm1', created: t)];
+        await controller.load();
+
+        controller.addReaction(0, '🔥');
+        expect(controller.messages.first.reactions.single.emoji, '🔥');
+        controller.addReaction(0, '🔥');
+        expect(controller.messages.first.reactions, isEmpty);
+
+        controller.heartReact(0);
+        expect(controller.messages.first.reactions.single.emoji, '🔥');
+        controller.heartReact(0);
+        expect(controller.messages.first.reactions, isEmpty);
+      },
+    );
   });
 
   group('ChatController — действия', () {
     test('deleteMessage(everyone: true): сервер + локально', () async {
       final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t, incoming: false),
-      ];
+      fake.messagesByChat['c1'] = [seed(id: 'm1', created: t, incoming: false)];
       await controller.load();
 
       await controller.deleteMessage(controller.messages.first, everyone: true);
@@ -466,33 +546,44 @@ void main() {
       expect(fake.deleteCalls, ['m1']);
     });
 
-    test('deleteMessage(everyone: false): локально + серверная пометка', () async {
-      final t = DateTime(2026, 8, 12, 10, 0);
-      fake.messagesByChat['c1'] = [
-        seed(id: 'm1', created: t, incoming: false),
-      ];
-      await controller.load();
+    test(
+      'deleteMessage(everyone: false): локально + серверная пометка',
+      () async {
+        final t = DateTime(2026, 8, 12, 10, 0);
+        fake.messagesByChat['c1'] = [
+          seed(id: 'm1', created: t, incoming: false),
+        ];
+        await controller.load();
 
-      await controller.deleteMessage(controller.messages.first, everyone: false);
-      expect(controller.messages, isEmpty);
-      expect(fake.deleteCalls, isEmpty);
-      expect(fake.hiddenMessageIds, ['m1'],
-          reason: '«удалить для меня» помечает сообщение на сервере');
-    });
+        await controller.deleteMessage(
+          controller.messages.first,
+          everyone: false,
+        );
+        expect(controller.messages, isEmpty);
+        expect(fake.deleteCalls, isEmpty);
+        expect(
+          fake.hiddenMessageIds,
+          ['m1'],
+          reason: '«удалить для меня» помечает сообщение на сервере',
+        );
+      },
+    );
 
-    test('setPin: множественные закрепы, новый сверху, синхрон в облако',
-        () async {
-      await controller.load();
-      await controller.setPin('m1');
-      await controller.setPin('m2');
-      expect(controller.pins, ['m2', 'm1']);
-      expect(controller.pinMsgId, 'm2');
-      expect(SettingsService.instance.pinnedMessageIds('c1'), ['m2', 'm1']);
-      expect(fake.pinCalls, [
-        (chatId: 'c1', messageId: 'm1'),
-        (chatId: 'c1', messageId: 'm2'),
-      ]);
-    });
+    test(
+      'setPin: множественные закрепы, новый сверху, синхрон в облако',
+      () async {
+        await controller.load();
+        await controller.setPin('m1');
+        await controller.setPin('m2');
+        expect(controller.pins, ['m2', 'm1']);
+        expect(controller.pinMsgId, 'm2');
+        expect(SettingsService.instance.pinnedMessageIds('c1'), ['m2', 'm1']);
+        expect(fake.pinCalls, [
+          (chatId: 'c1', messageId: 'm1'),
+          (chatId: 'c1', messageId: 'm2'),
+        ]);
+      },
+    );
 
     test('setPin: повторный пин — открепить; null — снять верхний', () async {
       await controller.load();
@@ -505,6 +596,18 @@ void main() {
       await controller.setPin(null);
       expect(controller.pins, isEmpty);
       expect(fake.unpinCalls.length, 2);
+    });
+
+    test('setPin: лимит 10 — 11-й не закрепляется', () async {
+      await controller.load();
+      for (var i = 0; i < 10; i++) {
+        await controller.setPin('m$i');
+      }
+      expect(controller.pins.length, 10);
+      await controller.setPin('m10');
+      expect(controller.pins.length, 10);
+      expect(errors.last, 'Закреплено максимум 10 сообщений');
+      expect(fake.pinCalls.length, 10);
     });
 
     test('загрузка: облачные закрепы заменяют локальный кеш', () async {
@@ -523,19 +626,23 @@ void main() {
       expect(controller.pins, ['m1']);
     });
 
-    test('pinEvents: чужой пин и откреп применяются в реальном времени',
-        () async {
-      await controller.load();
-      fake.pinEventsCtrl
-          .add(PinChanged(chatId: 'c1', messageId: 'm7', pinned: true));
-      await pump();
-      expect(controller.pins, ['m7']);
+    test(
+      'pinEvents: чужой пин и откреп применяются в реальном времени',
+      () async {
+        await controller.load();
+        fake.pinEventsCtrl.add(
+          PinChanged(chatId: 'c1', messageId: 'm7', pinned: true),
+        );
+        await pump();
+        expect(controller.pins, ['m7']);
 
-      fake.pinEventsCtrl
-          .add(PinChanged(chatId: 'c1', messageId: 'm7', pinned: false));
-      await pump();
-      expect(controller.pins, isEmpty);
-    });
+        fake.pinEventsCtrl.add(
+          PinChanged(chatId: 'c1', messageId: 'm7', pinned: false),
+        );
+        await pump();
+        expect(controller.pins, isEmpty);
+      },
+    );
 
     test('отправка открывает окно отмены на 5 секунд', () {
       fakeAsync((async) {
@@ -546,32 +653,44 @@ void main() {
         expect(controller.undoAvailable, isTrue);
         expect(controller.undoMessageId, isNotNull);
 
-        async.elapse(ChatController.undoWindow +
-            const Duration(milliseconds: 1));
-        expect(controller.undoAvailable, isFalse,
-            reason: 'окно отмены закрылось через 5 секунд');
+        async.elapse(
+          ChatController.undoWindow + const Duration(milliseconds: 1),
+        );
+        expect(
+          controller.undoAvailable,
+          isFalse,
+          reason: 'окно отмены закрылось через 5 секунд',
+        );
       });
     });
 
-    test('undoLastSend: удаляет для всех, возвращает текст в черновик',
-        () async {
-      await controller.load();
-      await controller.send('ошибочный текст');
-      await pump();
-      expect(controller.undoAvailable, isTrue);
-      final serverId = controller.messages.first.serverId;
-      expect(serverId, isNotNull,
-          reason: 'эхо отправки приносит серверный id');
+    test(
+      'undoLastSend: удаляет для всех, возвращает текст в черновик',
+      () async {
+        await controller.load();
+        await controller.send('ошибочный текст');
+        await pump();
+        expect(controller.undoAvailable, isTrue);
+        final serverId = controller.messages.first.serverId;
+        expect(
+          serverId,
+          isNotNull,
+          reason: 'эхо отправки приносит серверный id',
+        );
 
-      await controller.undoLastSend();
+        await controller.undoLastSend();
 
-      expect(controller.messages, isEmpty);
-      expect(fake.deleteCalls, [serverId]);
-      expect(controller.draft, 'ошибочный текст',
-          reason: 'текст возвращается в поле ввода');
-      expect(controller.draftRestoreVersion, 1);
-      expect(controller.undoAvailable, isFalse);
-    });
+        expect(controller.messages, isEmpty);
+        expect(fake.deleteCalls, [serverId]);
+        expect(
+          controller.draft,
+          'ошибочный текст',
+          reason: 'текст возвращается в поле ввода',
+        );
+        expect(controller.draftRestoreVersion, 1);
+        expect(controller.undoAvailable, isFalse);
+      },
+    );
 
     test('undoLastSend без окна — ничего не делает', () async {
       await controller.load();
@@ -579,15 +698,17 @@ void main() {
       expect(fake.deleteCalls, isEmpty);
     });
 
-    test('notifyTyping: троттлинг 2.5с и пустая строка не отправляются',
-        () async {
-      controller.notifyTyping('a');
-      expect(fake.sendTypingCalls, 1);
-      controller.notifyTyping('ab');
-      expect(fake.sendTypingCalls, 1);
-      controller.notifyTyping('   ');
-      expect(fake.sendTypingCalls, 1);
-    });
+    test(
+      'notifyTyping: троттлинг 2.5с и пустая строка не отправляются',
+      () async {
+        controller.notifyTyping('a');
+        expect(fake.sendTypingCalls, 1);
+        controller.notifyTyping('ab');
+        expect(fake.sendTypingCalls, 1);
+        controller.notifyTyping('   ');
+        expect(fake.sendTypingCalls, 1);
+      },
+    );
   });
 
   group('Свёртка цепочек (3.10)', () {
@@ -597,18 +718,16 @@ void main() {
       bool incoming, {
       DateTime? date,
       MsgStatus status = MsgStatus.delivered,
-    }) =>
-        ChatMsg(
-          type: MsgType.text,
-          incoming: incoming,
-          time: '12:00',
-          text: 'm',
-          date: date ?? t0,
-          status: status,
-        );
+    }) => ChatMsg(
+      type: MsgType.text,
+      incoming: incoming,
+      time: '12:00',
+      text: 'm',
+      date: date ?? t0,
+      status: status,
+    );
 
-    test('inSameGroup: один автор и разница до 7 минут — одна группа',
-        () {
+    test('inSameGroup: один автор и разница до 7 минут — одна группа', () {
       expect(
         ChatController.inSameGroup(
           chatMsg(true, date: t0),
@@ -643,17 +762,29 @@ void main() {
         chatMsg(false, date: t0.subtract(const Duration(minutes: 1))),
       ];
       expect(ChatController.isFirstInGroup(msgs, 0), isFalse);
-      expect(ChatController.isLastInGroup(msgs, 0), isTrue,
-          reason: 'нижнее сообщение группы — последнее');
+      expect(
+        ChatController.isLastInGroup(msgs, 0),
+        isTrue,
+        reason: 'нижнее сообщение группы — последнее',
+      );
       expect(ChatController.isFirstInGroup(msgs, 1), isFalse);
-      expect(ChatController.isLastInGroup(msgs, 1), isFalse,
-          reason: 'середина группы — не край');
-      expect(ChatController.isFirstInGroup(msgs, 2), isTrue,
-          reason: 'верхнее сообщение группы — первое');
+      expect(
+        ChatController.isLastInGroup(msgs, 1),
+        isFalse,
+        reason: 'середина группы — не край',
+      );
+      expect(
+        ChatController.isFirstInGroup(msgs, 2),
+        isTrue,
+        reason: 'верхнее сообщение группы — первое',
+      );
       expect(ChatController.isLastInGroup(msgs, 2), isFalse);
       expect(ChatController.isFirstInGroup(msgs, 3), isTrue);
-      expect(ChatController.isLastInGroup(msgs, 3), isTrue,
-          reason: 'одиночное сообщение — и первое, и последнее');
+      expect(
+        ChatController.isLastInGroup(msgs, 3),
+        isTrue,
+        reason: 'одиночное сообщение — и первое, и последнее',
+      );
     });
 
     test('одиночные сообщения и стык авторов дают корректные флаги', () {
@@ -664,12 +795,48 @@ void main() {
       ];
       expect(ChatController.isFirstInGroup(msgs, 0), isTrue);
       expect(ChatController.isLastInGroup(msgs, 0), isTrue);
-      expect(ChatController.isFirstInGroup(msgs, 1), isFalse,
-          reason: 'группа исходящих: верхнее (старое) сообщение — индекс 2');
-      expect(ChatController.isLastInGroup(msgs, 1), isTrue,
-          reason: 'нижнее (новое) исходящее — последнее в группе');
+      expect(
+        ChatController.isFirstInGroup(msgs, 1),
+        isFalse,
+        reason: 'группа исходящих: верхнее (старое) сообщение — индекс 2',
+      );
+      expect(
+        ChatController.isLastInGroup(msgs, 1),
+        isTrue,
+        reason: 'нижнее (новое) исходящее — последнее в группе',
+      );
       expect(ChatController.isFirstInGroup(msgs, 2), isTrue);
       expect(ChatController.isLastInGroup(msgs, 2), isFalse);
+    });
+  });
+
+  group('draft sync', () {
+    test('saveDraft пишет в prefs и на сервер (debounce 400ms)', () async {
+      SharedPreferences.setMockInitialValues({});
+      await SettingsService.instance.init();
+      final fake = FakeVibeBackend();
+      final c = ChatController(chatId: 'c1', chatTitle: 'Test', onError: (_) {}, backend: fake);
+      c.saveDraft('hello draft');
+      await Future.delayed(const Duration(milliseconds: 550));
+      expect(SettingsService.instance.draftFor('c1'), 'hello draft');
+      expect(fake.drafts['c1'], 'hello draft');
+      c.dispose();
+      fake.close();
+    });
+
+    test('clearDraft удаляет из prefs и сервера', () async {
+      SharedPreferences.setMockInitialValues({});
+      await SettingsService.instance.init();
+      final fake = FakeVibeBackend();
+      fake.drafts['c1'] = 'old';
+      await SettingsService.instance.setDraft('c1', 'old');
+      final c = ChatController(chatId: 'c1', chatTitle: 'Test', onError: (_) {}, backend: fake);
+      c.clearDraft();
+      await Future.delayed(const Duration(milliseconds: 100));
+      expect(SettingsService.instance.draftFor('c1'), isNull);
+      expect(fake.drafts.containsKey('c1'), isFalse);
+      c.dispose();
+      fake.close();
     });
   });
 }

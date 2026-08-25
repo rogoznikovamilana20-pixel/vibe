@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, unnecessary_null_comparison, unused_element
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -52,7 +53,7 @@ void main() {
       );
 
       fake.streamCtrl.add(msg(id: 'm1', incoming: true));
-      fake.typingCtrl.add('c1');
+      fake.typingCtrl.add(TypingEvent(chatId: 'c1', userId: 'u1'));
       fake.msgEventsCtrl.add(VibeMsgEvent(
         type: VibeMsgEventType.edited,
         chatId: 'c1',
@@ -64,7 +65,7 @@ void main() {
       c.dispose();
 
       fake.streamCtrl.add(msg(id: 'm2', incoming: true));
-      fake.typingCtrl.add('c1');
+      fake.typingCtrl.add(TypingEvent(chatId: 'c1', userId: 'u1'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(errors, isEmpty);
