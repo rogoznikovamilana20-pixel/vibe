@@ -16,13 +16,16 @@ import '../core/widgets/vibe_glass_surface.dart';
 import '../core/widgets/vibe_push_banner.dart';
 import '../core/profile_avatar.dart';
 import '../data/backend.dart';
+import 'aurion_screen.dart';
 import 'chat_list_screen.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'incoming_call_screen.dart';
+import 'package:vibe_app/core/services/back_history_service.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Оболочка приложения: стеклянная нижняя навигация
 /// Чаты / Контакты / Настройки / Профиль — как в Telegram.
@@ -40,6 +43,7 @@ class _RootShellState extends State<RootShell>
     with SingleTickerProviderStateMixin {
   int _index = 0;
   StreamSubscription<VibePushEvent>? _pushSub;
+  double? _edgeStartX;
 
   VibePushEvent? _activePush;
   Timer? _pushTimer;
@@ -111,6 +115,7 @@ class _RootShellState extends State<RootShell>
   Future<void> _openChatById(String chatId) async {
     final chat = await VibeBackend.instance.chatById(chatId);
     if (chat == null || !mounted) return;
+    BackHistoryService.instance.pushChat(chatId: chatId, title: chat.title);
     await Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (_, _, _) => ChatScreen(chat: chat),
@@ -175,10 +180,34 @@ class _RootShellState extends State<RootShell>
     if (i != _index) {
       HapticFeedback.selectionClick();
       setState(() => _index = i);
+      const titles = ['Чаты', 'Контакты', 'Настройки', 'Профиль'];
+      if (i >= 0 && i < titles.length) {
+        BackHistoryService.instance.pushTab(i, titles[i]);
+      }
       // Без пересоздания экранов: короткий плавный вспышка-фейд контента.
       _tabFade
         ..duration = VibeAnimations.fadeIn
         ..forward(from: 0.4);
+    }
+  }
+
+  void _onEdgeDragStart(DragStartDetails d) {
+    _edgeStartX = d.globalPosition.dx;
+  }
+
+  void _onEdgeDragEnd(DragEndDetails d) {
+    final startX = _edgeStartX;
+    _edgeStartX = null;
+    if (startX == null) return;
+    final width = MediaQuery.sizeOf(context).width;
+    final fromRightEdge = startX > width - 32;
+    final velocity = d.primaryVelocity ?? 0;
+    final isLeftSwipe = velocity < -500;
+    if (fromRightEdge && isLeftSwipe) {
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AurionScreen(userName: widget.userName)),
+      );
     }
   }
 
@@ -188,7 +217,6 @@ class _RootShellState extends State<RootShell>
       canPop: _index == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          // Predictive back: switch to first tab with haptic feedback.
           HapticFeedback.lightImpact();
           _openTab(0);
         }
@@ -196,7 +224,16 @@ class _RootShellState extends State<RootShell>
       child: Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
-      body: Stack(
+      drawer: _VibeDrawer(
+        userName: widget.userName,
+        userEmoji: widget.userEmoji,
+        onSelect: _openTab,
+        selectedIndex: _index,
+      ),
+      body: GestureDetector(
+        onHorizontalDragStart: _onEdgeDragStart,
+        onHorizontalDragEnd: _onEdgeDragEnd,
+        child: Stack(
         children: [
           const Positioned.fill(child: VibeBackdrop()),
           Positioned.fill(
@@ -260,6 +297,7 @@ class _RootShellState extends State<RootShell>
             ),
           ),
         ],
+      ),
       ),
       ),
     );
@@ -513,6 +551,123 @@ class _NavAvatar extends StatelessWidget {
           fallbackIcon: VibeIcons.user,
         ),
       ),
+    );
+  }
+}
+
+/// Боковая шторка как в TG Desktop — профиль сверху + разделы.
+class _VibeDrawer extends StatelessWidget {
+  const _VibeDrawer({
+    required this.userName,
+    required this.userEmoji,
+    required this.onSelect,
+    required this.selectedIndex,
+  });
+
+  final String userName;
+  final String? userEmoji;
+  final ValueChanged<int> onSelect;
+  final int selectedIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = VibeBackend.myProfileNotifier.value;
+    final name = profile?.displayName.isNotEmpty == true
+        ? profile!.displayName
+        : userName;
+    return Drawer(
+      width: 320,
+      backgroundColor: context.vibeSurface,
+      child: Column(
+        children: [
+          // Header как в TG Desktop: градиент + аватар 64 + имя + телефон/юзернейм
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              right: 16,
+              bottom: 16,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: VibeColors.brandGradient,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ValueListenableBuilder<Uint8List?>(
+                  valueListenable: ProfileAvatar.myPhoto,
+                  builder: (ctx, photo, _) => VibeAvatar(
+                    name: name,
+                    size: 64,
+                    emoji: userEmoji ?? profile?.emoji,
+                    photo: photo,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(name,
+                    style: VibeTypography.title.copyWith(
+                        color: Colors.white, fontSize: 16)),
+                const SizedBox(height: 2),
+                Text(
+                  profile?.username.isNotEmpty == true
+                      ? '@${profile!.username}'
+                      : profile?.phone ?? '',
+                  style: VibeTypography.caption
+                      .copyWith(color: Colors.white.withValues(alpha: 0.85)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                _drawerTile(context, icon: Icons.chat_bubble_outline, label: 'Чаты', selected: selectedIndex == 0, onTap: () { Navigator.pop(context); onSelect(0); }),
+                _drawerTile(context, icon: Icons.people_outline, label: 'Контакты', selected: selectedIndex == 1, onTap: () { Navigator.pop(context); onSelect(1); }),
+                _drawerTile(context, icon: Icons.call_outlined, label: 'Звонки', selected: false, onTap: () { Navigator.pop(context); VibeToast.show(context, 'Звонки — скоро'); }),
+                const Divider(height: 16),
+                _drawerTile(context, icon: Icons.settings_outlined, label: 'Настройки', selected: selectedIndex == 2, onTap: () { Navigator.pop(context); onSelect(2); }),
+                _drawerTile(context, icon: VibeIcons.user, label: 'Профиль', selected: selectedIndex == 3, onTap: () { Navigator.pop(context); onSelect(3); }),
+                _drawerTile(context, icon: Icons.bookmark_border, label: 'Избранное', selected: false, onTap: () async { Navigator.pop(context); onSelect(0); final id = await VibeBackend.instance.ensureSavedChat(); final chat = await VibeBackend.instance.chatById(id); if (chat != null && context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(chat: chat))); }),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text('Vibe  •  TG-parity build',
+                style: VibeTypography.caption
+                    .copyWith(color: context.vibeTextTertiary, fontSize: 11)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _drawerTile(BuildContext context,
+      {required IconData icon,
+      required String label,
+      required bool selected,
+      required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon,
+          color: selected ? context.vibePrimary : context.vibeTextSecondary),
+      title: Text(label,
+          style: VibeTypography.body.copyWith(
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+              color: selected
+                  ? context.vibePrimary
+                  : context.vibeTextPrimary)),
+      selected: selected,
+      selectedTileColor: context.vibePrimary.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      onTap: onTap,
     );
   }
 }

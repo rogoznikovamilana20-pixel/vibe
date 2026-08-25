@@ -7,12 +7,14 @@ import '../../core/theme/vibe_spacing.dart';
 import '../../core/theme/vibe_theme.dart';
 import '../../core/theme/vibe_typography.dart';
 import '../../core/widgets/vibe_avatar.dart';
-import '../../core/widgets/vibe_island.dart';
 import '../../data/backend.dart';
+import '../../data/settings_service.dart';
+import 'full_swipe.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
 
 /// Плитка чата в ленте: аватар, имя, превью, время-пилюля, pin, DND,
-/// unread-бейдж, свайпы (архив / не беспокоить) и мультивыбор.
+/// unread-бейдж, полный свайп (одно действие, как в Telegram) и
+/// мультивыбор.
 ///
 /// Контракт: все данные и callbacks приходят снаружи (screen/controller);
 /// сам виджет не знает про backend.
@@ -27,10 +29,13 @@ class ChatListItem extends StatelessWidget {
     required this.unread,
     required this.selectionMode,
     required this.density,
+    required this.swipeAction,
     required this.onTap,
     required this.onLongPress,
-    required this.onDismissed,
+    required this.onSwipeLeft,
+    required this.onSwipeRight,
     this.draft,
+    this.typing = false,
   });
 
   final VibeChat chat;
@@ -44,42 +49,134 @@ class ChatListItem extends StatelessWidget {
   /// 0 — компактно, 1 — просторно.
   final double density;
 
+  /// Действие свайпа влево (настраивается, как в TG).
+  final ChatSwipeAction swipeAction;
+
   /// Черновик чата («Черновик: …» вместо превью, как в Telegram).
   final String? draft;
 
+  /// Собеседник печатает (как в Telegram): «печатает…» вместо превью.
+  final bool typing;
+
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final void Function(DismissDirection direction) onDismissed;
+
+  /// Свайп влево → выбранное действие (архив/прочитано/мут/закреп/удалить).
+  final VoidCallback onSwipeLeft;
+
+  /// Свайп вправо → вернуть из архива (как в Telegram).
+  final VoidCallback onSwipeRight;
+
+  /// Цвет/иконка действия свайпа влево (TG: archiveBackground для всех,
+  /// dialogSwipeRemove — для удаления).
+  ({Color color, IconData icon}) _swipeStyle(BuildContext context) {
+    switch (swipeAction) {
+      case ChatSwipeAction.delete:
+        return (color: VibeColors.error, icon: Icons.delete_outline_rounded);
+      case ChatSwipeAction.read:
+        return (
+          color: context.vibePrimary,
+          icon: unread > 0
+              ? Icons.mark_chat_read_rounded
+              : Icons.mark_chat_unread_rounded,
+        );
+      case ChatSwipeAction.mute:
+        return (
+          color: context.vibePrimary,
+          icon: isDnd
+              ? Icons.notifications_active_rounded
+              : Icons.notifications_off_rounded,
+        );
+      case ChatSwipeAction.pin:
+        return (color: context.vibePrimary, icon: VibeIcons.pin);
+      case ChatSwipeAction.archive:
+        return (color: context.vibePrimary, icon: VibeIcons.archive);
+    }
+  }
+
+  String _swipeLabel(BuildContext context) {
+    final l = VibeLocalizations.of(context);
+    return switch (swipeAction) {
+      ChatSwipeAction.delete => l.dialogDelete,
+      ChatSwipeAction.read =>
+        unread > 0 ? l.chatMarkRead : l.chatMarkUnread,
+      ChatSwipeAction.mute =>
+        isDnd ? l.chatEnableNotifications : l.chatDoNotDisturb,
+      ChatSwipeAction.pin => pinned ? l.chatUnpinChat : l.chatPinChat,
+      ChatSwipeAction.archive =>
+        isArchived ? l.chatSwipeFromArchive : l.chatSwipeArchive,
+    };
+  }
+
+  Widget _swipeBackground({
+    required BuildContext context,
+    required Color color,
+    required IconData icon,
+    required String label,
+  }) {
+    return ColoredBox(
+      color: color,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.lg),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(width: VibeSpacing.sm),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: VibeTypography.bodyMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
+    final style = _swipeStyle(context);
     return RepaintBoundary(
-      child: VibeIsland(
-        selected: selected,
-        child: Dismissible(
-          key: ValueKey('chat_${chat.id}'),
-          direction: selectionMode
-              ? DismissDirection.none
-              : DismissDirection.horizontal,
-          confirmDismiss: (_) async {
-            if (selectionMode) return false;
-            HapticFeedback.mediumImpact();
-            return true;
-          },
-          onDismissed: onDismissed,
-          secondaryBackground: _swipeBackground(
-            context: context,
-            color: pinned ? context.vibeSurfaceElevated : context.vibePrimary,
-            icon: pinned ? VibeIcons.pin : VibeIcons.archive,
-            label: pinned ? l.chatSwipeUnpin : l.chatSwipeArchive,
-          ),
-          background: _swipeBackground(
-            context: context,
-            color: isArchived ? context.vibePrimary : VibeColors.warning,
-            icon: isArchived ? VibeIcons.archive : Icons.notifications_off_rounded,
-            label: isArchived ? l.chatSwipeFromArchive : l.chatSwipeDnd,
-          ),
+      child: FullSwipe(
+        enabled: !selectionMode,
+        onSwipeLeft: () {
+          HapticFeedback.mediumImpact();
+          onSwipeLeft();
+        },
+        leftBackground: _swipeBackground(
+          context: context,
+          color: style.color,
+          icon: style.icon,
+          label: _swipeLabel(context),
+        ),
+        onSwipeRight: () {
+          HapticFeedback.mediumImpact();
+          onSwipeRight();
+        },
+        rightBackground: _swipeBackground(
+          context: context,
+          color: context.vibePrimary,
+          icon: VibeIcons.archive,
+          label: l.chatSwipeFromArchive,
+        ),
+        onTileTap: onTap,
+        onTileLongPress: () {
+          HapticFeedback.mediumImpact();
+          onLongPress();
+        },
+        child: Material(
+          color: selected
+              ? context.vibePrimary.withValues(alpha: 0.12)
+              : Colors.transparent,
           child: Stack(
             children: [
               _tile(context),
@@ -104,19 +201,20 @@ class ChatListItem extends StatelessWidget {
   Widget _tile(BuildContext context) {
     final l = VibeLocalizations.of(context);
     final name = chat.title;
-    final vPad = 1.0 + density * 2.0;
+    // TG exact: 72dp row, 52dp avatar, tighter vertical.
+    final vPad = density == 0 ? 5.0 : 7.0;
 
     return Padding(
         padding: EdgeInsets.symmetric(vertical: vPad),
         child: ListTile(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          contentPadding: const EdgeInsets.only(left: 68, right: 8),
+          minVerticalPadding: 8,
+          minTileHeight: 72,
+          contentPadding: const EdgeInsets.only(left: 68, right: 10),
           leading: Hero(
             tag: 'avatar_${chat.id}',
             child: VibeAvatar(
               name: name,
-              size: 48,
+              size: 52,
               online: chat.peerOnline,
               photoUrl: chat.peerAvatar,
             ),
@@ -129,7 +227,8 @@ class ChatListItem extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: VibeTypography.subtitle.copyWith(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
+                    height: 20 / 16,
                     color: isDnd
                         ? context.vibeTextSecondary
                         : context.vibeTextPrimary,
@@ -154,7 +253,19 @@ class ChatListItem extends StatelessWidget {
               ],
             ],
           ),
-          subtitle: draft != null && draft!.isNotEmpty
+          subtitle: typing
+              ? Text(
+                  l.chatTyping,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: VibeTypography.body.copyWith(
+                    color: context.vibePrimary,
+                    fontSize: 14,
+                    height: 18 / 14,
+                    fontStyle: FontStyle.italic,
+                  ),
+                )
+              : draft != null && draft!.isNotEmpty
               ? Text.rich(
                   TextSpan(
                     children: [
@@ -163,15 +274,17 @@ class ChatListItem extends StatelessWidget {
                         style: VibeTypography.body.copyWith(
                           color: context.vibePrimary,
                           fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                          height: 18 / 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       TextSpan(
                         text: draft,
                         style: VibeTypography.body.copyWith(
-                          color: context.vibePrimary,
+                          color: context.vibeTextSecondary,
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          height: 18 / 14,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
@@ -186,6 +299,8 @@ class ChatListItem extends StatelessWidget {
                   style: VibeTypography.body.copyWith(
                     color: context.vibeTextSecondary,
                     fontSize: 14,
+                    height: 18 / 14,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
           trailing: Column(
@@ -207,94 +322,36 @@ class ChatListItem extends StatelessWidget {
                     const Icon(Icons.circle, size: 6, color: VibeColors.vivid),
                     const SizedBox(width: 4),
                   ],
-                  // Мини-пилюля со временем/датой последнего сообщения (как в TG).
-                  // На светлой теме — тёмная рамка и заметный фон, иначе
-                  // пилюля сливается с белым рядом. Если сообщений ещё нет —
-                  // пустой пузырь не рисуем, вместо него деликатная метка «Новый».
+                  // TG exact: flat time 12sp, no pill, tertiary / accent when unread.
                   if (chat.lastTime.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.isDarkMode
-                            ? context.vibeSurfaceElevated
-                            : context.vibeSurfaceVariant,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: context.isDarkMode
-                              ? context.vibeBorder.withValues(alpha: 0.6)
-                              : context.vibeBorder,
-                        ),
-                      ),
-                      child: Text(
-                        chat.lastTime,
-                        style: VibeTypography.caption.copyWith(
-                          fontSize: 10.5,
-                          fontWeight: unread > 0
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: unread > 0
-                              ? VibeColors.vivid
-                              : context.vibeTextSecondary,
-                        ),
+                    Text(
+                      chat.lastTime,
+                      style: VibeTypography.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight:
+                            unread > 0 ? FontWeight.w500 : FontWeight.w400,
+                        color: unread > 0
+                            ? context.vibePrimary
+                            : context.vibeTextTertiary,
                       ),
                     )
                   else if (unread == 0 && !isArchived)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: VibeColors.vivid.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        l.chatNew,
-                        style: VibeTypography.caption.copyWith(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: VibeColors.vivid,
-                        ),
+                    Text(
+                      l.chatNew,
+                      style: VibeTypography.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: context.vibePrimary,
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               if (unread > 0)
                 VibeUnreadBadge(count: unread, muted: isDnd),
             ],
           ),
         ),
-    );
-  }
-
-  Widget _swipeBackground({
-    required BuildContext context,
-    required Color color,
-    required IconData icon,
-    required String label,
-  }) {
-    return Container(
-      color: color,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.xl),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 24),
-          const SizedBox(width: VibeSpacing.sm),
-          Text(
-            label,
-            style: VibeTypography.bodyMedium.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
