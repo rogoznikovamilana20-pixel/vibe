@@ -1502,10 +1502,10 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     try {
       final res = await _client
           .from('chats')
-          .select('*, messages!messages_chat_id_fkey(text, created_at)')
+          .select('*')
           .inFilter('kind', ['pm', 'group'])
           .contains('members', [myProfileId])
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 15));
 
       // ОПТИМИЗАЦИЯ: Собираем все ID участников одним списком, чтобы не делать 100 запросов
       final allMemberIds = <String>{};
@@ -1852,33 +1852,36 @@ peerName: peer?.displayName,
         if (peerId == null) {
           throw const V2OutgoingException('PM peer not found for V2');
         }
+        if (peerId == myProfileId) {
+          // Self-chat (Избранное) — skip V2, plaintext
+        } else {
+          // Resolve recipient device ID
+          final recipientDeviceId = await _resolveRecipientDeviceId(peerId);
+          if (recipientDeviceId == null) {
+            throw const V2OutgoingException('Recipient V2 device not found');
+          }
 
-        // Resolve recipient device ID
-        final recipientDeviceId = await _resolveRecipientDeviceId(peerId);
-        if (recipientDeviceId == null) {
-          throw const V2OutgoingException('Recipient V2 device not found');
+          // Bootstrap session (X3DH if needed, or find existing)
+          final sessionId = await V2Outgoing.instance.bootstrapSession(
+            peerId: peerId,
+            recipientDeviceId: recipientDeviceId,
+          );
+
+          // Encrypt with V2 (serialized per session)
+          final v2Result = await V2Outgoing.instance.encryptSerialized(
+            sessionId: sessionId,
+            plaintext: text,
+            recipientDeviceId: recipientDeviceId,
+          );
+
+          // Build V2 storage payload
+          final payload = v2Result.payload;
+          payload['chat_id'] = chatId;
+          payload['sender_id'] = myProfileId;
+          encryptedJson = payload['encrypted_content'] as String;
+          isEncrypted = true;
+          e2eeVersion = 2;
         }
-
-        // Bootstrap session (X3DH if needed, or find existing)
-        final sessionId = await V2Outgoing.instance.bootstrapSession(
-          peerId: peerId,
-          recipientDeviceId: recipientDeviceId,
-        );
-
-        // Encrypt with V2 (serialized per session)
-        final v2Result = await V2Outgoing.instance.encryptSerialized(
-          sessionId: sessionId,
-          plaintext: text,
-          recipientDeviceId: recipientDeviceId,
-        );
-
-        // Build V2 storage payload
-        final payload = v2Result.payload;
-        payload['chat_id'] = chatId;
-        payload['sender_id'] = myProfileId;
-        encryptedJson = payload['encrypted_content'] as String;
-        isEncrypted = true;
-        e2eeVersion = 2;
       } else {
         // --- V1 path (existing) ---
         final e2e = E2eService.instance;
