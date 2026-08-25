@@ -204,7 +204,10 @@ class ChatListItem extends StatelessWidget {
     // TG exact: 72dp row, 52dp avatar, tighter vertical.
     final vPad = density == 0 ? 5.0 : 7.0;
 
-    return Padding(
+    return Semantics(
+      button: true,
+      label: '$name, ${typing ? l.chatTyping : (draft != null && draft!.isNotEmpty ? '${l.chatDraftLabel} $draft' : chat.lastMessage)}${unread > 0 ? ', непрочитано $unread' : ''}${pinned ? ', закреплён' : ''}${isDnd ? ', без звука' : ''}',
+      child: Padding(
         padding: EdgeInsets.symmetric(vertical: vPad),
         child: ListTile(
           minVerticalPadding: 8,
@@ -352,6 +355,7 @@ class ChatListItem extends StatelessWidget {
             ],
           ),
         ),
+      ),
     );
   }
 
