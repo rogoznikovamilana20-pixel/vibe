@@ -49,8 +49,8 @@ class _RootShellState extends State<RootShell>
   VibePushEvent? _activePush;
   Timer? _pushTimer;
 
-  // Desktop TG: выбранный чат в правой панели (как в TG Desktop).
-  VibeChat? _desktopSelectedChat;
+  // Desktop TG: выбранный чат в правой панели (как в TG Desktop) — ValueNotifier чтобы не перерисовывать список.
+  final ValueNotifier<VibeChat?> _desktopSelectedChat = ValueNotifier(null);
 
   late final List<Widget> _screens;
 
@@ -108,6 +108,7 @@ class _RootShellState extends State<RootShell>
 
   @override
   void dispose() {
+    _desktopSelectedChat.dispose();
     _tabFade.dispose();
     _pushSub?.cancel();
     _pushTimer?.cancel();
@@ -220,70 +221,38 @@ class _RootShellState extends State<RootShell>
     final isDesktop = (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ||
         MediaQuery.sizeOf(context).width >= 900;
     if (isDesktop) {
-      // TG Desktop референс: левая панель 380-420 (список чатов) + правая панель чат.
+      // TG Desktop референс: левая панель 420 (список чатов) + правая панель чат — без дубль-хедера.
       return Scaffold(
         backgroundColor: context.vibeBackground,
         body: Row(
           children: [
-            // Левая панель — список чатов (TG Desktop: 420px, search + папки + чаты)
-            Container(
-              width: 380,
-              decoration: BoxDecoration(
-                color: context.vibeSurface,
-                border: Border(right: BorderSide(color: context.vibeDivider, width: 1)),
-              ),
-              child: Column(
-                children: [
-                  // Хедер как в TG Desktop: аватар + поиск + меню
-                  Container(
-                    height: 56,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: context.vibeSurface,
-                      border: Border(bottom: BorderSide(color: context.vibeDivider)),
-                    ),
-                    child: Row(
-                      children: [
-                        Builder(
-                          builder: (ctx) => IconButton(
-                            icon: const Icon(Icons.menu),
-                            onPressed: () => Scaffold.of(ctx).openDrawer(),
-                            tooltip: 'Меню',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text('Vibe',
-                              style: VibeTypography.title.copyWith(fontSize: 16)),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.search),
-                          onPressed: () => _openTab(0),
-                          tooltip: 'Поиск',
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ChatListScreen(
-                      userName: widget.userName,
-                      userEmoji: widget.userEmoji,
-                      onOpenTab: _openTab,
-                      onChatSelected: (chat) =>
-                          setState(() => _desktopSelectedChat = chat),
-                    ),
-                  ),
-                ],
+            // Левая панель — список чатов (TG Desktop: 420px)
+            SizedBox(
+              width: 420,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: context.vibeSurface,
+                  border: Border(right: BorderSide(color: context.vibeDivider, width: 1)),
+                ),
+                child: ChatListScreen(
+                  userName: widget.userName,
+                  userEmoji: widget.userEmoji,
+                  onOpenTab: _openTab,
+                  onChatSelected: (chat) => _desktopSelectedChat.value = chat,
+                ),
               ),
             ),
             // Правая панель — чат или плейсхолдер (как в TG Desktop)
             Expanded(
-              child: _desktopSelectedChat == null
-                  ? _DesktopPlaceholder(userName: widget.userName)
-                  : ChatScreen(
-                      key: ValueKey(_desktopSelectedChat!.id),
-                      chat: _desktopSelectedChat!,
-                    ),
+              child: ValueListenableBuilder<VibeChat?>(
+                valueListenable: _desktopSelectedChat,
+                builder: (context, chat, _) => chat == null
+                    ? _DesktopPlaceholder(userName: widget.userName)
+                    : ChatScreen(
+                        key: ValueKey(chat.id),
+                        chat: chat,
+                      ),
+              ),
             ),
           ],
         ),

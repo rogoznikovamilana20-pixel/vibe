@@ -546,10 +546,14 @@ class _ChatListScreenState extends State<ChatListScreen>
                           await _chat.loadChats();
                         },
                         child: CustomScrollView(
-                          physics: const BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                            decelerationRate: ScrollDecelerationRate.normal,
-                          ),
+                          physics: MediaQuery.sizeOf(context).width >= 900
+                              ? const ClampingScrollPhysics(
+                                  parent: AlwaysScrollableScrollPhysics(),
+                                )
+                              : const BouncingScrollPhysics(
+                                  parent: AlwaysScrollableScrollPhysics(),
+                                  decelerationRate: ScrollDecelerationRate.normal,
+                                ),
                           slivers: [
                           SliverToBoxAdapter(
                             child: ValueListenableBuilder<double>(
@@ -652,16 +656,20 @@ class _ChatListScreenState extends State<ChatListScreen>
                                   ),
                                 );
                               },
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: true,
+                              addSemanticIndexes: false,
                               childCount: visible.length +
                                   savedExtra +
                                   pinExtra +
                                   archiveExtra,
                             ),
                           ),
-                          const SliverToBoxAdapter(
+                          SliverToBoxAdapter(
                             child: SizedBox(
-                              height:
-                                  VibeSizes.bottomNavHeight + VibeSpacing.lg,
+                              height: MediaQuery.sizeOf(context).width >= 900
+                                  ? 16
+                                  : VibeSizes.bottomNavHeight + VibeSpacing.lg,
                             ),
                           ),
                           // 8.4.7: пустое состояние с призывом (CTA) —
@@ -1720,8 +1728,10 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _buildSavedTile(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    return VibeIsland(
-      child: ListTile(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: VibeIsland(
+        child: ListTile(
         onTap: _openSaved,
         leading: Container(
           width: VibeSizes.avatarLg,
@@ -1745,6 +1755,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             fontSize: 14,
           ),
         ),
+      ),
       ),
     );
   }
@@ -1780,8 +1791,10 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _buildArchiveTile(BuildContext context) {
     final l = VibeLocalizations.of(context);
-    return VibeIsland(
-      child: ListTile(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: VibeIsland(
+        child: ListTile(
         onTap: () => setState(() => _showArchive = true),
         leading: Container(
           width: VibeSizes.avatarLg,
@@ -1822,6 +1835,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
           ),
         ),
+      ),
       ),
     );
   }
