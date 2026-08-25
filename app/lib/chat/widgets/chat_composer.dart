@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/localization/vibe_localizations.dart';
 import '../../core/theme/vibe_animations.dart';
 import '../../core/theme/vibe_colors.dart';
 import '../../core/theme/vibe_spacing.dart';
@@ -352,15 +353,15 @@ class _RollingPillState extends State<RollingPill> {
             style: VibeTypography.bodyMedium.copyWith(
               color: context.vibeTextPrimary,
               fontFeatures: const [FontFeature.tabularFigures()],
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: VibeSpacing.sm),
           Expanded(
             child: Text(
               locked
-                  ? 'Зафиксировано — тап по кнопке: отправить'
-                  : 'Свайп вверх — зафиксировать · влево — отменить',
+                  ? VibeLocalizations.of(context).voiceRecorderLockedHint
+                  : VibeLocalizations.of(context).voiceRecorderSwipeHint,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: VibeTypography.caption.copyWith(
@@ -372,14 +373,14 @@ class _RollingPillState extends State<RollingPill> {
             onPressed: widget.onCancel,
             icon: const Icon(VibeIcons.close, size: 22),
             color: context.vibeError,
-            tooltip: 'Отмена',
+            tooltip: VibeLocalizations.of(context).tooltipCancel,
           ),
           if (locked)
             IconButton(
               onPressed: widget.onSend,
               icon: const Icon(VibeIcons.send, size: 24),
               color: context.vibePrimary,
-              tooltip: 'Отправить',
+              tooltip: VibeLocalizations.of(context).actionSend,
             ),
         ],
       ),
@@ -473,7 +474,7 @@ class _VideoRollPillState extends State<VideoRollPill> {
             style: VibeTypography.bodyMedium.copyWith(
               color: context.vibeTextPrimary,
               fontFeatures: const [FontFeature.tabularFigures()],
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: VibeSpacing.sm),
