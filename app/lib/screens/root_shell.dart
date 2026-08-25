@@ -22,6 +22,7 @@ import 'chat_list_screen.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'profile_screen.dart';
+import '../data/settings_service.dart';
 import 'settings_screen.dart';
 import 'incoming_call_screen.dart';
 import 'package:vibe_app/core/services/back_history_service.dart';
@@ -324,29 +325,29 @@ class _RootShellState extends State<RootShell>
               ),
             ),
           ),
-          // Нижняя стеклянная капсула — чистый оверлей поверх контента:
-          // ничего под ней не «обрезается», контент плавно уходит под блюр.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: VibeSpacing.md),
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: VibeBackend.instance.chatsUnreadTotal,
-                    builder: (context, unread, _) => _VibeBottomNav(
-                      index: _index,
-                      onChanged: _openTab,
-                      chatsUnread: unread,
+          // Нижняя стеклянная капсула — AyuGram: показывать только при navigationStyle==bottom
+          if (SettingsService.instance.navigationStyle == 'bottom')
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: VibeSpacing.md),
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: VibeBackend.instance.chatsUnreadTotal,
+                      builder: (context, unread, _) => _VibeBottomNav(
+                        index: _index,
+                        onChanged: _openTab,
+                        chatsUnread: unread,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
       ),

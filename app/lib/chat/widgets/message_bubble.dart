@@ -312,8 +312,7 @@ class _MessageBubbleState extends State<MessageBubble>
                           clipBehavior: Clip.antiAlias,
                           child: _bubbleContent(context, msg, isIncoming),
                         ),
-                        // Telegram-?????: ?????? ????? ? ?????????? ? ??????.
-                        if (widget.isLastInGroup)
+                        if (widget.isLastInGroup && SettingsService.instance.bubbleTail)
                           Positioned(
                             right: isIncoming ? null : 0,
                             left: isIncoming ? 0 : null,
@@ -471,7 +470,7 @@ class _MessageBubbleState extends State<MessageBubble>
               widget.onOpenUrl,
             ),
             style: VibeTypography.body.copyWith(
-              fontSize: 15 + SettingsService.instance.fontSizeDelta,
+              fontSize: SettingsService.instance.messageFontSize + SettingsService.instance.fontSizeDelta,
               color: isIncoming ? context.vibeTextPrimary : Colors.white,
             ),
           ),
@@ -515,7 +514,8 @@ class _MessageBubbleState extends State<MessageBubble>
             ),
             if (!isIncoming) ...[
               const SizedBox(width: 4),
-              MessageStatusTick(status: widget.isGroup && (msg.status == MsgStatus.delivered || msg.status == MsgStatus.read) ? MsgStatus.sent : msg.status),
+              if (SettingsService.instance.showTicks)
+                MessageStatusTick(status: widget.isGroup && (msg.status == MsgStatus.delivered || msg.status == MsgStatus.read) ? MsgStatus.sent : msg.status),
             ],
           ],
         ),

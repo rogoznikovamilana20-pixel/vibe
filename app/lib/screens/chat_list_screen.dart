@@ -767,11 +767,11 @@ class _ChatListScreenState extends State<ChatListScreen>
                   child: ValueListenableBuilder<bool>(
                     valueListenable: _fabVisible,
                     builder: (context, visible, child) => AnimatedScale(
-                      scale: visible ? 1.0 : 0.0,
+                      scale: (visible && SettingsService.instance.fabVisible) ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOut,
                       child: AnimatedOpacity(
-                        opacity: visible ? 1.0 : 0.0,
+                        opacity: (visible && SettingsService.instance.fabVisible) ? 1.0 : 0.0,
                         duration: const Duration(milliseconds: 200),
                         child: child,
                       ),

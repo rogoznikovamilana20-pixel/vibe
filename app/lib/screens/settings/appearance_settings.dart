@@ -28,6 +28,14 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
   late bool _autoNightEnabled;
   late int _autoNightStart;
   late int _autoNightEnd;
+  late bool _animationsEnabled;
+  late double _bubbleOpacity;
+  late double _avatarSize;
+  late int _previewLines;
+  late bool _showDate;
+  late bool _showStatus;
+  late bool _bubbleTail;
+  late bool _showTicks;
 
   @override
   void initState() {
@@ -41,6 +49,14 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
     _autoNightEnabled = s.autoNightEnabled;
     _autoNightStart = s.autoNightStart;
     _autoNightEnd = s.autoNightEnd;
+    _animationsEnabled = s.animationsEnabled;
+    _bubbleOpacity = s.bubbleOpacity;
+    _avatarSize = s.avatarSize;
+    _previewLines = s.previewLines;
+    _showDate = s.showDate;
+    _showStatus = s.showStatus;
+    _bubbleTail = s.bubbleTail;
+    _showTicks = s.showTicks;
   }
 
   void _setTheme(ThemeMode mode) {
@@ -184,6 +200,55 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
     );
   }
 
+  Widget _buildPreview(BuildContext context) {
+    final accent = Color(SettingsService.instance.accentColorValue);
+    return Container(
+      padding: const EdgeInsets.all(VibeSpacing.md),
+      decoration: BoxDecoration(
+        color: context.vibeSurface,
+        borderRadius: BorderRadius.circular(VibeRadius.card),
+        border: Border.all(color: context.vibeDivider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Превью', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+          const SizedBox(height: VibeSpacing.sm),
+          // Превью пузыря — отражает bubbleRadius/fontSizeDelta/bubbleOpacity
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: SettingsService.instance.bubbleOpacity),
+                borderRadius: BorderRadius.circular(_bubbleRadius),
+              ),
+              child: Text('Привет! Это превью пузыря',
+                  style: VibeTypography.body.copyWith(
+                      color: Colors.white, fontSize: 14 + _fontSizeDelta)),
+            ),
+          ),
+          const SizedBox(height: VibeSpacing.sm),
+          // Превью чата — отражает listDensity/fontSizeDelta
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 4 + _listDensity * 4),
+            decoration: BoxDecoration(
+              color: context.vibeSurfaceVariant,
+              borderRadius: BorderRadius.circular(VibeRadius.sm),
+            ),
+            child: Row(
+              children: [
+                Container(width: 40 + _listDensity * 8, height: 40 + _listDensity * 8, decoration: BoxDecoration(shape: BoxShape.circle, color: accent)),
+                const SizedBox(width: VibeSpacing.sm),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Чаты', style: VibeTypography.subtitle.copyWith(fontSize: 14 + _fontSizeDelta)), Text('Превью сообщения', style: VibeTypography.body.copyWith(color: context.vibeTextSecondary, fontSize: 12 + _fontSizeDelta))])),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _resetDefaults() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -217,6 +282,14 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
         _autoNightEnabled = SettingsService.instance.autoNightEnabled;
         _autoNightStart = SettingsService.instance.autoNightStart;
         _autoNightEnd = SettingsService.instance.autoNightEnd;
+        _animationsEnabled = SettingsService.instance.animationsEnabled;
+        _bubbleOpacity = SettingsService.instance.bubbleOpacity;
+        _avatarSize = SettingsService.instance.avatarSize;
+        _previewLines = SettingsService.instance.previewLines;
+        _showDate = SettingsService.instance.showDate;
+        _showStatus = SettingsService.instance.showStatus;
+        _bubbleTail = SettingsService.instance.bubbleTail;
+        _showTicks = SettingsService.instance.showTicks;
       });
       VibeApp.themeModeNotifier.value = SettingsService.instance.themeMode;
       VibeToast.show(context, 'Настройки сброшены');
@@ -243,6 +316,9 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(VibeSpacing.lg),
         children: [
+          // Живой превью AyuGram-уровня: пузырь + чат-тайл + плотность
+          _buildPreview(context),
+          const SizedBox(height: VibeSpacing.lg),
           SettingsSection(
             title: l.theme,
             children: [
@@ -388,6 +464,228 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
           ),
           const SizedBox(height: VibeSpacing.lg),
           SettingsSection(
+            title: 'Анимации и эффекты',
+            children: [
+              _buildSwitchTile(
+                icon: Icons.animation_rounded,
+                color: context.vibePrimary,
+                title: 'Анимации интерфейса',
+                subtitle: _animationsEnabled ? 'Включены (плавные переходы)' : 'Выключены (мгновенно)',
+                value: _animationsEnabled,
+                onChanged: (v) {
+                  setState(() => _animationsEnabled = v);
+                  SettingsService.instance.setAnimationsEnabled(v);
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(VibeSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Прозрачность пузырей',
+                        style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)),
+                    const SizedBox(height: 8),
+                    Slider(
+                      value: _bubbleOpacity,
+                      min: 0.5,
+                      max: 1.0,
+                      divisions: 10,
+                      label: '${(_bubbleOpacity * 100).round()}%',
+                      onChanged: (v) {
+                        setState(() => _bubbleOpacity = v);
+                        SettingsService.instance.setBubbleOpacity(v);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          SettingsSection(
+            title: 'Список чатов',
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(VibeSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Размер аватара',
+                        style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)),
+                    Slider(
+                      value: _avatarSize,
+                      min: 32,
+                      max: 52,
+                      divisions: 10,
+                      label: '${_avatarSize.round()}',
+                      onChanged: (v) {
+                        setState(() => _avatarSize = v);
+                        SettingsService.instance.setAvatarSize(v);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(VibeSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Строк превью',
+                        style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)),
+                    Slider(
+                      value: _previewLines.toDouble(),
+                      min: 1,
+                      max: 3,
+                      divisions: 2,
+                      label: '$_previewLines',
+                      onChanged: (v) {
+                        setState(() => _previewLines = v.round());
+                        SettingsService.instance.setPreviewLines(v.round());
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              _buildSwitchTile(
+                icon: Icons.calendar_today_rounded,
+                color: context.vibePrimary,
+                title: 'Показывать дату/время',
+                value: _showDate,
+                onChanged: (v) {
+                  setState(() => _showDate = v);
+                  SettingsService.instance.setShowDate(v);
+                },
+              ),
+              _buildSwitchTile(
+                icon: Icons.done_all_rounded,
+                color: context.vibePrimary,
+                title: 'Показывать статус (прочитано)',
+                value: _showStatus,
+                onChanged: (v) {
+                  setState(() => _showStatus = v);
+                  SettingsService.instance.setShowStatus(v);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          SettingsSection(
+            title: 'Сообщения',
+            children: [
+              _buildSwitchTile(
+                icon: Icons.chat_bubble_outline_rounded,
+                color: context.vibePrimary,
+                title: 'Хвост пузыря',
+                subtitle: _bubbleTail ? 'Показывать хвост у последнего в группе' : 'Без хвоста (плоские)',
+                value: _bubbleTail,
+                onChanged: (v) {
+                  setState(() => _bubbleTail = v);
+                  SettingsService.instance.setBubbleTail(v);
+                },
+              ),
+              _buildSwitchTile(
+                icon: Icons.done_all_rounded,
+                color: context.vibePrimary,
+                title: 'Галочки статуса',
+                subtitle: _showTicks ? 'Показывать ✓✓' : 'Скрыты',
+                value: _showTicks,
+                onChanged: (v) {
+                  setState(() => _showTicks = v);
+                  SettingsService.instance.setShowTicks(v);
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(VibeSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Размер шрифта сообщений',
+                        style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)),
+                    Slider(
+                      value: SettingsService.instance.messageFontSize,
+                      min: 12,
+                      max: 18,
+                      divisions: 6,
+                      label: '${SettingsService.instance.messageFontSize.round()}',
+                      onChanged: (v) {
+                        SettingsService.instance.setMessageFontSize(v);
+                        setState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          SettingsSection(
+            title: 'Навигация',
+            children: [
+              SettingsTile(
+                icon: Icons.view_quilt_rounded,
+                iconColor: context.vibePrimary,
+                title: 'Стиль навигации',
+                subtitle: SettingsService.instance.navigationStyle == 'bottom'
+                    ? 'Снизу (капсула)'
+                    : SettingsService.instance.navigationStyle == 'drawer'
+                        ? 'Боковая шторка'
+                        : 'Вкладки сверху',
+                onTap: () async {
+                  final style = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => SimpleDialog(
+                      title: Text('Навигация', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+                      children: [
+                        SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop('bottom'), child: Text('Снизу (капсула)')),
+                        SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop('drawer'), child: Text('Боковая шторка')),
+                        SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop('tabs'), child: Text('Вкладки сверху')),
+                      ],
+                    ),
+                  );
+                  if (style != null) {
+                    await SettingsService.instance.setNavigationStyle(style);
+                    setState(() {});
+                  }
+                },
+              ),
+              _buildSwitchTile(
+                icon: Icons.add_circle_outline_rounded,
+                color: context.vibePrimary,
+                title: 'Кнопка создания чата (FAB)',
+                value: SettingsService.instance.fabVisible,
+                onChanged: (v) async {
+                  await SettingsService.instance.setFabVisible(v);
+                  setState(() {});
+                },
+              ),
+              SettingsTile(
+                icon: Icons.style_rounded,
+                iconColor: context.vibePrimary,
+                title: 'Пак иконок',
+                subtitle: SettingsService.instance.iconPack,
+                onTap: () async {
+                  final pack = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => SimpleDialog(
+                      title: Text('Иконки', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+                      children: [
+                        SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop('vibe'), child: Text('Vibe (по умолчанию)')),
+                        SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop('material'), child: Text('Material')),
+                        SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop('telegram'), child: Text('Telegram')),
+                      ],
+                    ),
+                  );
+                  if (pack != null) {
+                    await SettingsService.instance.setIconPack(pack);
+                    setState(() {});
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: VibeSpacing.lg),
+          SettingsSection(
             title: l.accentColor,
             children: [
               Padding(
@@ -409,6 +707,7 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
                       _buildColorCircle(Colors.pink, l),
                       _buildColorCircle(Colors.teal, l),
                       _buildColorCircle(Colors.purple, l),
+                      _buildCustomColorButton(context),
                     ],
                   ),
                 ),
@@ -479,6 +778,63 @@ class _AppearanceSettingsScreenState extends State<AppearanceSettingsScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomColorButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final controller = TextEditingController(
+            text: '#${SettingsService.instance.accentColorValue.toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}');
+        final hex = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: context.vibeSurface,
+            title: Text('HEX цвет', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+            content: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: '#8B4DFF',
+                hintStyle: VibeTypography.body.copyWith(color: context.vibeTextTertiary),
+              ),
+              style: VibeTypography.body.copyWith(color: context.vibeTextPrimary),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Отмена', style: TextStyle(color: context.vibePrimary))),
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+                  child: Text('ОК', style: TextStyle(color: context.vibePrimary))),
+            ],
+          ),
+        );
+        if (hex != null && hex.isNotEmpty) {
+          var clean = hex.trim().replaceAll('#', '');
+          if (clean.length == 6) clean = 'FF$clean';
+          final val = int.tryParse(clean, radix: 16);
+          if (val != null) {
+            HapticFeedback.selectionClick();
+            await SettingsService.instance.setAccentColor(val);
+            if (!mounted) return;
+            setState(() {});
+          } else {
+            if (!mounted) return;
+            // ignore: use_build_context_synchronously
+            VibeToast.show(context, 'Неверный HEX');
+          }
+        }
+      },
+      child: Container(
+        width: 40,
+        height: 40,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: context.vibeSurfaceVariant,
+          shape: BoxShape.circle,
+          border: Border.all(color: context.vibeDivider),
+        ),
+        child: Icon(Icons.colorize_rounded, color: context.vibeTextSecondary, size: 20),
       ),
     );
   }

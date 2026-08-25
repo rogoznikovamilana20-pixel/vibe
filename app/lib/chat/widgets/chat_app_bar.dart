@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -139,13 +137,7 @@ class ChatAppBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            if (!(() {
-              try {
-                return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-              } catch (_) {
-                return false;
-              }
-            })())
+            if (MediaQuery.sizeOf(context).width < 900)
               VibeIconButton(
                 icon: Icons.arrow_back_ios_new_rounded,
                 onPressed: onBack,

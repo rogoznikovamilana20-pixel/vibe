@@ -89,11 +89,15 @@ class SettingsService {
   static const _keyQuietHoursStart = 'vibe_quiet_hours_start';
   static const _keyQuietHoursEnd = 'vibe_quiet_hours_end';
 
-  // Внешний вид: отправка по Enter, авто-ночь
+  // Внешний вид: отправка по Enter, авто-ночь, анимации, шрифт, прозрачность
   static const _keySendByEnter = 'vibe_send_by_enter';
   static const _keyAutoNightEnabled = 'vibe_auto_night_enabled';
   static const _keyAutoNightStart = 'vibe_auto_night_start';
   static const _keyAutoNightEnd = 'vibe_auto_night_end';
+  static const _keyAnimationsEnabled = 'vibe_animations_enabled';
+  static const _keyMessageFontFamily = 'vibe_message_font_family';
+  static const _keyBubbleOpacity = 'vibe_bubble_opacity';
+  static const _keyChatBackgroundBlur = 'vibe_chat_background_blur';
 
   // Свайп по чату в списке (как TG: одно действие, настраивается в настройках)
   static const _keyChatSwipeAction = 'vibe_chat_swipe_action';
@@ -299,6 +303,107 @@ class SettingsService {
     } else {
       return now >= s || now < e;
     }
+  }
+
+  // AyuGram-глубина: анимации, шрифт сообщений, прозрачность пузырей
+  bool get animationsEnabled => _prefs.getBool(_keyAnimationsEnabled) ?? true;
+  Future<void> setAnimationsEnabled(bool v) async {
+    await _prefs.setBool(_keyAnimationsEnabled, v);
+    _bumpAppearance();
+  }
+
+  String get messageFontFamily => _prefs.getString(_keyMessageFontFamily) ?? 'Roboto';
+  Future<void> setMessageFontFamily(String v) async {
+    await _prefs.setString(_keyMessageFontFamily, v);
+    _bumpAppearance();
+  }
+
+  double get bubbleOpacity => _prefs.getDouble(_keyBubbleOpacity) ?? 1.0;
+  Future<void> setBubbleOpacity(double v) async {
+    await _prefs.setDouble(_keyBubbleOpacity, v.clamp(0.5, 1.0));
+    _bumpAppearance();
+  }
+
+  bool get chatBackgroundBlur => _prefs.getBool(_keyChatBackgroundBlur) ?? true;
+  Future<void> setChatBackgroundBlur(bool v) async {
+    await _prefs.setBool(_keyChatBackgroundBlur, v);
+    _bumpAppearance();
+  }
+
+  // AyuGram-глубина: ChatList
+  static const _keyAvatarSize = 'vibe_avatar_size';
+  static const _keyPreviewLines = 'vibe_preview_lines';
+  static const _keyShowDate = 'vibe_show_date';
+  static const _keyShowStatus = 'vibe_show_status';
+
+  double get avatarSize => _prefs.getDouble(_keyAvatarSize) ?? 52.0;
+  Future<void> setAvatarSize(double v) async {
+    await _prefs.setDouble(_keyAvatarSize, v.clamp(32, 52));
+    _bumpAppearance();
+  }
+
+  int get previewLines => _prefs.getInt(_keyPreviewLines) ?? 1;
+  Future<void> setPreviewLines(int v) async {
+    await _prefs.setInt(_keyPreviewLines, v.clamp(1, 3));
+    _bumpAppearance();
+  }
+
+  bool get showDate => _prefs.getBool(_keyShowDate) ?? true;
+  Future<void> setShowDate(bool v) async {
+    await _prefs.setBool(_keyShowDate, v);
+    _bumpAppearance();
+  }
+
+  bool get showStatus => _prefs.getBool(_keyShowStatus) ?? true;
+  Future<void> setShowStatus(bool v) async {
+    await _prefs.setBool(_keyShowStatus, v);
+    _bumpAppearance();
+  }
+
+  // AyuGram-глубина: Messages
+  static const _keyBubbleTail = 'vibe_bubble_tail';
+  static const _keyShowTicks = 'vibe_show_ticks';
+  static const _keyMessageFontSize = 'vibe_message_font_size';
+
+  bool get bubbleTail => _prefs.getBool(_keyBubbleTail) ?? true;
+  Future<void> setBubbleTail(bool v) async {
+    await _prefs.setBool(_keyBubbleTail, v);
+    _bumpAppearance();
+  }
+
+  bool get showTicks => _prefs.getBool(_keyShowTicks) ?? true;
+  Future<void> setShowTicks(bool v) async {
+    await _prefs.setBool(_keyShowTicks, v);
+    _bumpAppearance();
+  }
+
+  double get messageFontSize => _prefs.getDouble(_keyMessageFontSize) ?? 16.0;
+  Future<void> setMessageFontSize(double v) async {
+    await _prefs.setDouble(_keyMessageFontSize, v.clamp(12, 18));
+    _bumpAppearance();
+  }
+
+  // AyuGram-глубина: Navigation
+  static const _keyNavigationStyle = 'vibe_navigation_style';
+  static const _keyFabVisible = 'vibe_fab_visible';
+  static const _keyIconPack = 'vibe_icon_pack';
+
+  String get navigationStyle => _prefs.getString(_keyNavigationStyle) ?? 'bottom';
+  Future<void> setNavigationStyle(String v) async {
+    await _prefs.setString(_keyNavigationStyle, v);
+    _bumpAppearance();
+  }
+
+  bool get fabVisible => _prefs.getBool(_keyFabVisible) ?? true;
+  Future<void> setFabVisible(bool v) async {
+    await _prefs.setBool(_keyFabVisible, v);
+    _bumpAppearance();
+  }
+
+  String get iconPack => _prefs.getString(_keyIconPack) ?? 'vibe';
+  Future<void> setIconPack(String v) async {
+    await _prefs.setString(_keyIconPack, v);
+    _bumpAppearance();
   }
 
   // Приватность: голосовые, био, день рождения (0: Все, 1: Контакты, 2: Никто)

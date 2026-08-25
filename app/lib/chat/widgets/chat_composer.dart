@@ -359,9 +359,17 @@ class _RollingPillState extends State<RollingPill> {
           const SizedBox(width: VibeSpacing.sm),
           Expanded(
             child: Text(
-              locked
-                  ? VibeLocalizations.of(context).voiceRecorderLockedHint
-                  : VibeLocalizations.of(context).voiceRecorderSwipeHint,
+              (() {
+                try {
+                  return locked
+                      ? VibeLocalizations.of(context).voiceRecorderLockedHint
+                      : VibeLocalizations.of(context).voiceRecorderSwipeHint;
+                } catch (_) {
+                  return locked
+                      ? 'Зафиксировано — тап по кнопке: отправить'
+                      : 'Свайп вверх — зафиксировать · влево — отменить';
+                }
+              })(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: VibeTypography.caption.copyWith(
@@ -373,14 +381,26 @@ class _RollingPillState extends State<RollingPill> {
             onPressed: widget.onCancel,
             icon: const Icon(VibeIcons.close, size: 22),
             color: context.vibeError,
-            tooltip: VibeLocalizations.of(context).tooltipCancel,
+            tooltip: (() {
+              try {
+                return VibeLocalizations.of(context).tooltipCancel;
+              } catch (_) {
+                return 'Отмена';
+              }
+            })(),
           ),
           if (locked)
             IconButton(
               onPressed: widget.onSend,
               icon: const Icon(VibeIcons.send, size: 24),
               color: context.vibePrimary,
-              tooltip: VibeLocalizations.of(context).actionSend,
+              tooltip: (() {
+                try {
+                  return VibeLocalizations.of(context).actionSend;
+                } catch (_) {
+                  return 'Отправить';
+                }
+              })(),
             ),
         ],
       ),

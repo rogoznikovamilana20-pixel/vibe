@@ -221,7 +221,7 @@ class ChatListItem extends StatelessWidget {
             tag: 'avatar_${chat.id}',
             child: VibeAvatar(
               name: name,
-              size: 52,
+              size: SettingsService.instance.avatarSize,
               online: chat.peerOnline,
               photoUrl: chat.peerAvatar,
             ),
@@ -263,7 +263,7 @@ class ChatListItem extends StatelessWidget {
           subtitle: typing
               ? Text(
                   l.chatTyping,
-                  maxLines: 1,
+                  maxLines: SettingsService.instance.previewLines,
                   overflow: TextOverflow.ellipsis,
                   style: VibeTypography.body.copyWith(
                     color: context.vibePrimary,
@@ -296,12 +296,12 @@ class ChatListItem extends StatelessWidget {
                       ),
                     ],
                   ),
-                  maxLines: 1,
+                  maxLines: SettingsService.instance.previewLines,
                   overflow: TextOverflow.ellipsis,
                 )
               : Text(
                   isArchived ? l.chatInArchive : chat.lastMessage,
-                  maxLines: 1,
+                  maxLines: SettingsService.instance.previewLines,
                   overflow: TextOverflow.ellipsis,
                   style: VibeTypography.body.copyWith(
                     color: context.vibeTextSecondary,
@@ -310,7 +310,8 @@ class ChatListItem extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                   ),
                 ),
-          trailing: Column(
+          trailing: SettingsService.instance.showDate || SettingsService.instance.showStatus
+              ? Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -329,35 +330,39 @@ class ChatListItem extends StatelessWidget {
                     const Icon(Icons.circle, size: 6, color: VibeColors.vivid),
                     const SizedBox(width: 4),
                   ],
-                  // TG exact: flat time 12sp, no pill, tertiary / accent when unread.
-                  if (chat.lastTime.isNotEmpty)
-                    Text(
-                      chat.lastTime,
-                      style: VibeTypography.caption.copyWith(
-                        fontSize: 12,
-                        fontWeight:
-                            unread > 0 ? FontWeight.w500 : FontWeight.w400,
-                        color: unread > 0
-                            ? context.vibePrimary
-                            : context.vibeTextTertiary,
+                  if (SettingsService.instance.showDate) ...[
+                    // TG exact: flat time 12sp, no pill, tertiary / accent when unread.
+                    if (chat.lastTime.isNotEmpty)
+                      Text(
+                        chat.lastTime,
+                        style: VibeTypography.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight:
+                              unread > 0 ? FontWeight.w500 : FontWeight.w400,
+                          color: unread > 0
+                              ? context.vibePrimary
+                              : context.vibeTextTertiary,
+                        ),
+                      )
+                    else if (unread == 0 && !isArchived)
+                      Text(
+                        l.chatNew,
+                        style: VibeTypography.caption.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: context.vibePrimary,
+                        ),
                       ),
-                    )
-                  else if (unread == 0 && !isArchived)
-                    Text(
-                      l.chatNew,
-                      style: VibeTypography.caption.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: context.vibePrimary,
-                      ),
-                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 4),
-              if (unread > 0)
-                VibeUnreadBadge(count: unread, muted: isDnd),
+              if (SettingsService.instance.showStatus) ...[
+                const SizedBox(height: 4),
+                if (unread > 0)
+                  VibeUnreadBadge(count: unread, muted: isDnd),
+              ],
             ],
-          ),
+          ) : null,
         ),
       ),
     );
