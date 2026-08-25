@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 
 /// Telegram-style staggered entrance animation for chat list items.
@@ -74,7 +76,24 @@ class _StaggeredChatListItemState extends State<StaggeredChatListItem>
 
   @override
   Widget build(BuildContext context) {
-    // Временно отключаем stagger полностью для теста производительности (TG Desktop без анимации).
-    return widget.child;
+    final isDesktop = (() {
+      try {
+        return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+      } catch (_) {
+        return false;
+      }
+    })();
+    if (isDesktop) return widget.child;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Opacity(
+        opacity: _opacity.value,
+        child: Transform.translate(
+          offset: _slide.value * 24,
+          child: child,
+        ),
+      ),
+      child: widget.child,
+    );
   }
 }

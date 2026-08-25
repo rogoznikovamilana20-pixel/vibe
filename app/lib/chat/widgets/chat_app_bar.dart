@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -137,19 +139,26 @@ class ChatAppBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            VibeIconButton(
-              icon: Icons.arrow_back_ios_new_rounded,
-              onPressed: onBack,
-              onLongPress: onBackLongPress == null
-                  ? null
-                  : () {
-                      HapticFeedback.mediumImpact();
-                      onBackLongPress!.call();
-                    },
-              iconSize: 22,
-              tooltip: l.tooltipBack,
-              color: context.vibeTextPrimary,
-            ),
+            if (!(() {
+              try {
+                return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+              } catch (_) {
+                return false;
+              }
+            })())
+              VibeIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                onPressed: onBack,
+                onLongPress: onBackLongPress == null
+                    ? null
+                    : () {
+                        HapticFeedback.mediumImpact();
+                        onBackLongPress!.call();
+                      },
+                iconSize: 22,
+                tooltip: l.tooltipBack,
+                color: context.vibeTextPrimary,
+              ),
             Expanded(
               child: InkWell(
                 borderRadius: BorderRadius.circular(VibeRadius.sm),

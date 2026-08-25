@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:vibe_app/core/widgets/vibe_toast.dart';import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -866,6 +867,61 @@ class _ChatListScreenState extends State<ChatListScreen>
               onPressed: _chat.clearSelection,
               icon: const Icon(VibeIcons.check),
               tooltip: l.actionDone,
+            ),
+          ],
+        ),
+      );
+    }
+    final isDesktop = MediaQuery.sizeOf(context).width >= 900 ||
+        (bool.fromEnvironment('IS_DESKTOP', defaultValue: false));
+    // На Windows десктопе ширина left pane 420, но MediaQuery внутри 420 <900, поэтому чекаем Platform
+    final isDesktopPlatform = isDesktop ||
+        (() {
+          try {
+            return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+          } catch (_) {
+            return false;
+          }
+        })();
+    if (isDesktopPlatform) {
+      // TG Desktop: компактный поиск с гамбургером, без "Добрый день"
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: context.vibeSurface,
+          border: Border(bottom: BorderSide(color: context.vibeDivider)),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              tooltip: 'Меню',
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () => _openSearch(context),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: context.vibeSurfaceVariant,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search, size: 20, color: context.vibeTextTertiary),
+                      const SizedBox(width: 8),
+                      Text(l.tooltipSearch,
+                          style: VibeTypography.body.copyWith(
+                              color: context.vibeTextTertiary, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
