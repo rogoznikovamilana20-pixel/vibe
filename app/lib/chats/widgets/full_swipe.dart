@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/vibe_animations.dart';
@@ -67,7 +68,9 @@ class _FullSwipeState extends State<FullSwipe>
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (!widget.enabled) return;
-    final delta = details.primaryDelta ?? 0;
+    // Игнорируем вертикальный скролл, чтобы не мешать листу (чаты не должны хромать при вертикальном свайпе).
+    if (details.delta.dx.abs() < details.delta.dy.abs()) return;
+    final delta = details.primaryDelta ?? details.delta.dx;
     final next = (_offset.value - delta / _maxShift).clamp(-1.0, 1.0);
     _offset.value = next;
   }
@@ -129,6 +132,8 @@ class _FullSwipeState extends State<FullSwipe>
               );
             },
             child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              dragStartBehavior: DragStartBehavior.start,
               onHorizontalDragUpdate: enabled ? _onDragUpdate : null,
               onHorizontalDragEnd: enabled ? _onDragEnd : null,
               child: Material(

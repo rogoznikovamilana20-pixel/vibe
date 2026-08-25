@@ -113,30 +113,32 @@ class ChatListItem extends StatelessWidget {
     required Color color,
     required IconData icon,
     required String label,
+    Alignment alignment = Alignment.centerLeft,
   }) {
-    return ColoredBox(
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
       color: color,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.lg),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(width: VibeSpacing.sm),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: VibeTypography.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+      padding: const EdgeInsets.symmetric(horizontal: VibeSpacing.lg),
+      alignment: alignment,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 22),
+          const SizedBox(width: VibeSpacing.sm),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: VibeTypography.bodyMedium.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -157,6 +159,7 @@ class ChatListItem extends StatelessWidget {
           color: style.color,
           icon: style.icon,
           label: _swipeLabel(context),
+          alignment: Alignment.centerRight,
         ),
         onSwipeRight: () {
           HapticFeedback.mediumImpact();
@@ -167,6 +170,7 @@ class ChatListItem extends StatelessWidget {
           color: context.vibePrimary,
           icon: VibeIcons.archive,
           label: l.chatSwipeFromArchive,
+          alignment: Alignment.centerLeft,
         ),
         onTileTap: onTap,
         onTileLongPress: () {
@@ -176,7 +180,7 @@ class ChatListItem extends StatelessWidget {
         child: Material(
           color: selected
               ? context.vibePrimary.withValues(alpha: 0.12)
-              : Colors.transparent,
+              : context.vibeSurface,
           child: Stack(
             children: [
               _tile(context),
