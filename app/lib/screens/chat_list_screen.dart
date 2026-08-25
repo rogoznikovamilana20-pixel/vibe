@@ -51,6 +51,7 @@ class ChatListScreen extends StatefulWidget {
     required this.userName,
     this.userEmoji,
     this.onOpenTab,
+    this.onChatSelected,
     this.backend,
   });
 
@@ -62,6 +63,9 @@ class ChatListScreen extends StatefulWidget {
 
   /// Переход на вкладку нижнего бара (Aurion / Профиль) из боковой шторки.
   final ValueChanged<int>? onOpenTab;
+
+  /// Desktop: выбор чата в двухпанельном режиме (как TG Desktop) — вместо push.
+  final ValueChanged<VibeChat>? onChatSelected;
 
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
@@ -1072,7 +1076,12 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   /// Анимация перехода в чат: fade + slide (как в Telegram).
+  /// На Desktop (onChatSelected != null) — открываем в правой панели вместо push.
   Future<void> _openChat(BuildContext context, VibeChat chat) async {
+    if (widget.onChatSelected != null) {
+      widget.onChatSelected!(chat);
+      return;
+    }
     final index = _chat.chats.indexWhere((c) => c.id == chat.id);
     await Navigator.of(context).push(
       PageRouteBuilder(

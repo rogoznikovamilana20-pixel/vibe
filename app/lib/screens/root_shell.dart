@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,6 +48,9 @@ class _RootShellState extends State<RootShell>
 
   VibePushEvent? _activePush;
   Timer? _pushTimer;
+
+  // Desktop TG: выбранный чат в правой панели (как в TG Desktop).
+  VibeChat? _desktopSelectedChat;
 
   late final List<Widget> _screens;
 
@@ -213,6 +217,84 @@ class _RootShellState extends State<RootShell>
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ||
+        MediaQuery.sizeOf(context).width >= 900;
+    if (isDesktop) {
+      // TG Desktop референс: левая панель 380-420 (список чатов) + правая панель чат.
+      return Scaffold(
+        backgroundColor: context.vibeBackground,
+        body: Row(
+          children: [
+            // Левая панель — список чатов (TG Desktop: 420px, search + папки + чаты)
+            Container(
+              width: 380,
+              decoration: BoxDecoration(
+                color: context.vibeSurface,
+                border: Border(right: BorderSide(color: context.vibeDivider, width: 1)),
+              ),
+              child: Column(
+                children: [
+                  // Хедер как в TG Desktop: аватар + поиск + меню
+                  Container(
+                    height: 56,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: context.vibeSurface,
+                      border: Border(bottom: BorderSide(color: context.vibeDivider)),
+                    ),
+                    child: Row(
+                      children: [
+                        Builder(
+                          builder: (ctx) => IconButton(
+                            icon: const Icon(Icons.menu),
+                            onPressed: () => Scaffold.of(ctx).openDrawer(),
+                            tooltip: 'Меню',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Vibe',
+                              style: VibeTypography.title.copyWith(fontSize: 16)),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: () => _openTab(0),
+                          tooltip: 'Поиск',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ChatListScreen(
+                      userName: widget.userName,
+                      userEmoji: widget.userEmoji,
+                      onOpenTab: _openTab,
+                      onChatSelected: (chat) =>
+                          setState(() => _desktopSelectedChat = chat),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Правая панель — чат или плейсхолдер (как в TG Desktop)
+            Expanded(
+              child: _desktopSelectedChat == null
+                  ? _DesktopPlaceholder(userName: widget.userName)
+                  : ChatScreen(
+                      key: ValueKey(_desktopSelectedChat!.id),
+                      chat: _desktopSelectedChat!,
+                    ),
+            ),
+          ],
+        ),
+        drawer: _VibeDrawer(
+          userName: widget.userName,
+          userEmoji: widget.userEmoji,
+          onSelect: _openTab,
+          selectedIndex: _index,
+        ),
+      );
+    }
     return PopScope(
       canPop: _index == 0,
       onPopInvokedWithResult: (didPop, result) {
@@ -668,6 +750,50 @@ class _VibeDrawer extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       onTap: onTap,
+    );
+  }
+}
+
+/// Плейсхолдер правой панели TG Desktop — «Выберите чат».
+class _DesktopPlaceholder extends StatelessWidget {
+  const _DesktopPlaceholder({required this.userName});
+  final String userName;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: context.vibeBackground,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: VibeColors.brandGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 56),
+            ),
+            const SizedBox(height: 24),
+            Text('Выберите чат',
+                style: VibeTypography.title.copyWith(fontSize: 20)),
+            const SizedBox(height: 8),
+            Text('Откройте чат из списка слева\nчтобы начать общение',
+                textAlign: TextAlign.center,
+                style: VibeTypography.body.copyWith(
+                    color: context.vibeTextSecondary, height: 20 / 14)),
+            const SizedBox(height: 20),
+            Text('Vibe • TG Desktop parity',
+                style: VibeTypography.caption
+                    .copyWith(color: context.vibeTextTertiary)),
+          ],
+        ),
+      ),
     );
   }
 }
