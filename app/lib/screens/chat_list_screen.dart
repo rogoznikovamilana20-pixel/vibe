@@ -1729,7 +1729,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   Widget _buildSavedTile(BuildContext context) {
     final l = VibeLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: VibeIsland(
         child: ListTile(
         onTap: _openSaved,
@@ -1792,7 +1792,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   Widget _buildArchiveTile(BuildContext context) {
     final l = VibeLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: VibeIsland(
         child: ListTile(
         onTap: () => setState(() => _showArchive = true),

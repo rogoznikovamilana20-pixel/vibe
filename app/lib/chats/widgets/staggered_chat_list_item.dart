@@ -74,18 +74,7 @@ class _StaggeredChatListItemState extends State<StaggeredChatListItem>
 
   @override
   Widget build(BuildContext context) {
-    // Desktop: отключаем stagger для производительности (как в TG Desktop — без анимации входа).
-    if (MediaQuery.sizeOf(context).width >= 900) return widget.child;
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) => Opacity(
-        opacity: _opacity.value,
-        child: Transform.translate(
-          offset: _slide.value * 24,
-          child: child,
-        ),
-      ),
-      child: widget.child,
-    );
+    // Временно отключаем stagger полностью для теста производительности (TG Desktop без анимации).
+    return widget.child;
   }
 }
