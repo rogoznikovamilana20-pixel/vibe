@@ -216,7 +216,7 @@ class ChatListItem extends StatelessWidget {
         child: ListTile(
           minVerticalPadding: 8,
           minTileHeight: 72,
-          contentPadding: const EdgeInsets.only(left: 68, right: 10),
+          contentPadding: const EdgeInsets.only(left: 16, right: 10),
           leading: Hero(
             tag: 'avatar_${chat.id}',
             child: VibeAvatar(

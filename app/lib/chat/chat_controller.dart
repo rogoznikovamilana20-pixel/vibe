@@ -534,6 +534,12 @@ class ChatController extends ChangeNotifier {
         replyText: replyText,
         replyAuthor: replyAuthor,
       );
+      // Явный апдейт статуса на sent — не ждём только stream (надёжнее для Избранного)
+      final i2 = messages.indexWhere((m) => m.localId == localId);
+      if (i2 >= 0 && messages[i2].status == MsgStatus.sending) {
+        messages[i2] = messages[i2].copyWith(status: MsgStatus.sent);
+        notifyListeners();
+      }
       clearDraft();
       _armUndo(localId);
     } catch (_) {

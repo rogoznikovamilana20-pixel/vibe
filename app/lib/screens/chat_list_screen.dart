@@ -497,9 +497,18 @@ class _ChatListScreenState extends State<ChatListScreen>
           } else if (_showHidden) {
             visible = inFolder.where((c) => _chat.hidden.contains(c.id)).toList();
           } else {
+            // Убираем дубликат Избранного: savedExtra уже рисует _buildSavedTile,
+            // а в inFolder есть тот же pm [me,me] с title Избранное.
+            final myId = _backend.myProfileId;
             visible = inFolder
-                .where((c) =>
-                    !_chat.archived.contains(c.id) && !_chat.hidden.contains(c.id))
+                .where((c) {
+                  final isSaved = c.kind == 'pm' &&
+                      c.peerId == myId &&
+                      c.title == 'Избранное';
+                  return !_chat.archived.contains(c.id) &&
+                      !_chat.hidden.contains(c.id) &&
+                      !isSaved;
+                })
                 .toList();
           }
           _visible = visible;
@@ -1059,7 +1068,7 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   void _openSearch(BuildContext context) {
-    Navigator.of(context).push(
+    Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder(
         pageBuilder: (_, _, _) => const SearchScreen(),
         transitionsBuilder: (_, animation, _, child) {
@@ -1730,20 +1739,21 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _buildSavedTile(BuildContext context) {
     final l = VibeLocalizations.of(context);
+    final av = SettingsService.instance.avatarSize;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: VibeIsland(
         child: ListTile(
-        onTap: _openSaved,
-        leading: Container(
-          width: VibeSizes.avatarLg,
-          height: VibeSizes.avatarLg,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: VibeColors.brandGradient),
-            shape: BoxShape.circle,
+          onTap: _openSaved,
+          leading: Container(
+            width: av,
+            height: av,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: VibeColors.brandGradient),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.bookmark_rounded, color: Colors.white),
           ),
-          child: const Icon(Icons.bookmark_rounded, color: Colors.white),
-        ),
         title: Text(
           l.actionSaved,
           style: VibeTypography.subtitle.copyWith(
@@ -1793,23 +1803,24 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   Widget _buildArchiveTile(BuildContext context) {
     final l = VibeLocalizations.of(context);
+    final av = SettingsService.instance.avatarSize;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: VibeIsland(
         child: ListTile(
-        onTap: () => setState(() => _showArchive = true),
-        leading: Container(
-          width: VibeSizes.avatarLg,
-          height: VibeSizes.avatarLg,
-          decoration: BoxDecoration(
-            color: context.vibeSurfaceVariant,
-            shape: BoxShape.circle,
+          onTap: () => setState(() => _showArchive = true),
+          leading: Container(
+            width: av,
+            height: av,
+            decoration: BoxDecoration(
+              color: context.vibeSurfaceVariant,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              VibeIcons.archive,
+              color: context.vibeTextSecondary,
+            ),
           ),
-          child: Icon(
-            VibeIcons.archive,
-            color: context.vibeTextSecondary,
-          ),
-        ),
         title: Text(
           l.archiveTitle,
           style: VibeTypography.subtitle.copyWith(

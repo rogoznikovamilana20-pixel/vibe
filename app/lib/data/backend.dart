@@ -1502,7 +1502,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     try {
       final res = await _client
           .from('chats')
-          .select('*')
+          .select('*, messages!messages_chat_id_fkey(text, created_at)')
           .inFilter('kind', ['pm', 'group'])
           .contains('members', [myProfileId])
           .timeout(const Duration(seconds: 15));
