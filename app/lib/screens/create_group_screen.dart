@@ -34,6 +34,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   bool _loading = true;
   Timer? _debounce;
   final _searchController = TextEditingController();
+  final _titleController = TextEditingController();
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _titleController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
@@ -89,8 +91,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     if (_selected.isEmpty || _creating) return;
     HapticFeedback.lightImpact();
     setState(() => _creating = true);
-    final chatId =
-        await VibeBackend.instance.createGroupChat(_selected.toList());
+    final chatId = await VibeBackend.instance.createGroupChat(
+      _selected.toList(),
+      title: _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
+    );
     if (!mounted) return;
     if (chatId.isEmpty) {
       setState(() => _creating = false);
@@ -142,6 +146,21 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     tooltip: 'Назад',
                   ),
                   title: const VibeTopBarTitle('Новая группа'),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  VibeSpacing.lg,
+                  VibeSpacing.sm,
+                  VibeSpacing.lg,
+                  VibeSpacing.sm,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: VibeInput(
+                    controller: _titleController,
+                    hint: 'Название группы (необязательно)',
+                    prefixIcon: Icons.title_rounded,
+                  ),
                 ),
               ),
               SliverPadding(

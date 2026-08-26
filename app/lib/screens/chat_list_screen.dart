@@ -1020,6 +1020,25 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             ListTile(
               leading: Icon(
+                Icons.campaign_outlined,
+                color: context.vibePrimary,
+              ),
+              title: Text(
+                'Создать канал',
+                style: TextStyle(
+                  color: isDark
+                      ? VibeColors.textPrimaryDark
+                      : VibeColors.textPrimaryLight,
+                  fontSize: 16,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _showCreateChannelDialog(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(
                 Icons.bookmark_outline_rounded,
                 color: context.vibePrimary,
               ),
@@ -1056,6 +1075,44 @@ class _ChatListScreenState extends State<ChatListScreen>
     } finally {
       _openingSaved = false;
     }
+  }
+
+  Future<void> _showCreateChannelDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(ctx).colorScheme.surface,
+        title: const Text('Создать канал'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Название канала',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.trim().isEmpty) return;
+    final chatId = await VibeBackend.instance.createChannelChat(name.trim());
+    if (chatId.isEmpty) {
+      if (mounted) VibeToast.show(context, 'Не удалось создать канал');
+      return;
+    }
+    final chat = await VibeBackend.instance.chatById(chatId);
+    if (chat != null && mounted) await _openChat(context, chat);
   }
 
   String _greeting() {

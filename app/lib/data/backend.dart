@@ -1292,7 +1292,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
     return created['id'];
   }
 
-  Future<String> createGroupChat(List<String> memberIds) async {
+  Future<String> createGroupChat(List<String> memberIds, {String? title}) async {
     if (myProfileId == null) return '';
     try {
       final members = [
@@ -1302,6 +1302,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
       final created = await _client.from('chats').insert({
         'kind': 'group',
         'members': members,
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
       }).select().single();
       // Всем участникам — появился новый групповой чат.
       for (final m in members) {
@@ -1311,6 +1312,24 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
           'sender_id': myProfileId,
         }));
       }
+      _chatsController.add(null);
+      return created['id'];
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Создать канал (kind: channel) — как в TG: только админ пишет.
+  Future<String> createChannelChat(String title) async {
+    if (myProfileId == null) return '';
+    final t = title.trim();
+    if (t.isEmpty) return '';
+    try {
+      final created = await _client.from('chats').insert({
+        'kind': 'channel',
+        'members': [myProfileId!],
+        'title': t,
+      }).select().single();
       _chatsController.add(null);
       return created['id'];
     } catch (_) {
