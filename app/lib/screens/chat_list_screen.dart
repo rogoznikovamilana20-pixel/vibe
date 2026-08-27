@@ -33,6 +33,7 @@ import '../data/passcode_service.dart';
 import '../data/settings_service.dart';
 import '../../main.dart';
 import 'aurion_screen.dart';
+import 'business_space_screen.dart';
 import 'chat_screen.dart';
 import 'create_group_screen.dart';
 import 'folders_screen.dart';
@@ -1339,7 +1340,13 @@ class _ChatListScreenState extends State<ChatListScreen>
                 padding: const EdgeInsets.only(right: 24),
                 child: GestureDetector(
                   onTap: () {
-                    HapticFeedback.selectionClick(); // ТАКТИЛЬНЫЙ ОТКЛИК
+                    HapticFeedback.selectionClick();
+                    if (id == 'business') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const BusinessSpaceScreen()),
+                      );
+                      return;
+                    }
                     setState(() => _selectedTab = id);
                   },
                   child: Column(

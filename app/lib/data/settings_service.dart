@@ -795,6 +795,31 @@ class SettingsService {
       await _secureStorage.write(key: _keyProxyPassword, value: v);
   Future<void> setProxySocks5(bool v) async => _prefs.setBool(_keyProxySocks5, v);
 
+  // ── Бизнес (масштабируемо: Старт → Энтерпрайз) ──
+  static const _keyBusinessTier = 'vibe_business_tier';
+  String get businessTier => _prefs.getString(_keyBusinessTier) ?? 'start';
+  Future<void> setBusinessTier(String v) async {
+    await _prefs.setString(_keyBusinessTier, v);
+    _bumpAppearance();
+  }
+
+  /// Лимиты по тиру (витрины/товары/команда/чаты)
+  Map<String, int> get businessLimits {
+    switch (businessTier) {
+      case 'micro':
+        return {'showcases': 1, 'products': 50, 'members': 3, 'chats': 2000};
+      case 'growth':
+        return {'showcases': 5, 'products': 500, 'members': 10, 'chats': 15000};
+      case 'scale':
+        return {'showcases': 20, 'products': 5000, 'members': 50, 'chats': 100000};
+      case 'enterprise':
+        return {'showcases': 999999, 'products': 999999, 'members': 999999, 'chats': 999999};
+      case 'start':
+      default:
+        return {'showcases': 1, 'products': 10, 'members': 1, 'chats': 500};
+    }
+  }
+
   // ── Сброс всех настроек ──
   Future<void> resetAll() async {
     await _prefs.clear();
