@@ -1,5 +1,7 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import '../core/theme/vibe_animations.dart';
@@ -66,7 +68,44 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    final profile = backend.myProfile;
+    var profile = backend.myProfile;
+
+    // Offline-first: если профиля нет, но есть локальный кеш (файл/сессия) —
+    // считаем юзера оффлайн-авторизованным (как TG: кеш без сети).
+    if (profile == null) {
+      try {
+        final conn = await Connectivity().checkConnectivity();
+        final isOffline = conn.contains(ConnectivityResult.none);
+        if (isOffline) {
+          final cached = await VibeBackend.peekLocalProfile();
+          if (cached != null) {
+            profile = cached;
+            backend.setMyProfile(cached);
+          } else {
+            // Нет кеша и нет сети — не кидаем на регистрацию, а показываем
+            // экран «Нет соединения» с повтором (запрос авторизации в чатах уходит).
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                PageRouteBuilder(
+                  pageBuilder: (_, _, _) => _OfflineRetryScreen(onRetry: () {
+                    Navigator.of(context).pushReplacement(
+                      PageRouteBuilder(
+                        pageBuilder: (_, _, _) => const SplashScreen(),
+                        transitionsBuilder: (_, a, _, c) => FadeTransition(opacity: a, child: c),
+                      ),
+                    );
+                  }),
+                  transitionsBuilder: (_, a, _, c) => FadeTransition(opacity: a, child: c),
+                  transitionDuration: VibeAnimations.fadeIn,
+                ),
+              );
+            }
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
     final Widget next;
 
     if (profile != null) {
@@ -170,6 +209,46 @@ class _SplashScreenState extends State<SplashScreen>
                     ],
                   ),
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Оффлайн-экран без сети и без кеша — вместо онбординга (не просит логин).
+class _OfflineRetryScreen extends StatelessWidget {
+  const _OfflineRetryScreen({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: VibeColors.bgDark,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: VibeBackdrop()),
+          Center(
+            child: VibeGlassSurface(
+              borderRadius: const BorderRadius.all(Radius.circular(VibeRadius.xl)),
+              blur: VibeBlur.sheet,
+              padding: const EdgeInsets.all(VibeSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.white70),
+                  const SizedBox(height: VibeSpacing.md),
+                  const Text('Нет соединения',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: VibeSpacing.sm),
+                  const Text('Проверьте интернет и повторите попытку.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: VibeColors.textPrimaryDark, fontSize: 14)),
+                  const SizedBox(height: VibeSpacing.lg),
+                  FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+                ],
               ),
             ),
           ),

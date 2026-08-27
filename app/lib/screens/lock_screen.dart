@@ -109,7 +109,7 @@ class _LockScreenState extends State<LockScreen> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: VibeColors.bgDark,
         body: Stack(
         children: [
           const Positioned.fill(child: VibeBackdrop()),

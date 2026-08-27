@@ -147,7 +147,13 @@ abstract class VibeBackendApi {
 
 /// Живая реализация по умолчанию: делегирует `VibeBackend.instance`.
 class LiveVibeBackend implements VibeBackendApi {
-  LiveVibeBackend([VibeBackend? backend]) : _b = backend ?? VibeBackend.instance;
+  LiveVibeBackend([VibeBackend? backend]) : _b = backend ?? _resolveBackend();
+
+  static VibeBackend _resolveBackend() {
+    final inst = VibeBackend.instanceOrNull;
+    if (inst != null) return inst;
+    throw StateError('VibeBackend not initialized yet — вызовите await VibeBackend.init()');
+  }
 
   final VibeBackend _b;
 

@@ -28,6 +28,7 @@ import '../core/widgets/vibe_avatar.dart';
 import '../core/profile_avatar.dart';
 import '../data/backend.dart';
 import '../data/backend_api.dart';
+import '../data/chat_folder.dart';
 import '../data/mock/mock_data.dart';
 import '../data/passcode_service.dart';
 import '../data/settings_service.dart';
@@ -363,8 +364,11 @@ class _ChatListScreenState extends State<ChatListScreen>
     if (_selectedTab == 'all') return true;
     final settings = SettingsService.instance;
     if (settings.folderOf(chat.id) == _selectedTab) {
-      // Auto-фильтры папки (как в TG: unread/muted)
-      final folder = settings.chatFolders.where((f) => f.id == _selectedTab).firstOrNull;
+      // Auto-фильтры папки (как в TG: unread/muted) — без firstOrNull race.
+      VibeChatFolder? folder;
+      for (final f in settings.chatFolders) {
+        if (f.id == _selectedTab) { folder = f; break; }
+      }
       if (folder != null) {
         if (folder.filters.contains('unread') && _chat.unreadOf(chat) == 0) return false;
         if (folder.filters.contains('muted') && !_chat.dnd.contains(chat.id)) return false;
@@ -1331,7 +1335,9 @@ class _ChatListScreenState extends State<ChatListScreen>
                 id = folders[i].$1;
                 label = folders[i].$2;
               } else {
-                final f = userFolders[i - folders.length];
+                final idx = i - folders.length;
+                if (idx < 0 || idx >= userFolders.length) return const SizedBox.shrink();
+                final f = userFolders[idx];
                 id = f.id;
                 label = '${f.emoji} ${f.title}';
               }
@@ -1340,6 +1346,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 padding: const EdgeInsets.only(right: 24),
                 child: GestureDetector(
                   onTap: () {
+                    if (!mounted) return;
                     HapticFeedback.selectionClick();
                     if (id == 'business') {
                       Navigator.of(context).push(
@@ -1347,6 +1354,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                       );
                       return;
                     }
+                    if (_selectedTab == id) return;
                     setState(() => _selectedTab = id);
                   },
                   child: Column(

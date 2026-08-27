@@ -432,6 +432,7 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
 
   static VibeBackend? _instance;
   static VibeBackend get instance => _instance!;
+  static VibeBackend? get instanceOrNull => _instance;
 
   final SupabaseClient _client;
 
@@ -565,6 +566,16 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
           // Оффлайн/таймаут: оставляем кеш (если есть), не ломаем маршрут.
         }
       }
+    } else {
+      // Оффлайн/холодный старт: currentUser ещё null (gotrue не успел),
+      // но кеш профиля уже есть в файле — используем его, чтобы не кидать
+      // на онбординг без сети (как в Telegram: кеш доступен офлайн).
+      final cached = await _loadLocalProfile();
+      if (cached != null) {
+        backend._myProfile = cached;
+        backend.myProfileId = cached.id;
+        myProfileNotifier.value = cached;
+      }
     }
 
     // Загрузить очередь офлайн-отправки.
@@ -582,19 +593,27 @@ class VibeBackend with ProfileBackendMixin, MediaBackendMixin {
 
   /// Ждёт первое событие auth (сессия из storage загружена или её нет).
   static Future<bool> _waitForAuthRestore(SupabaseClient client) async {
+    // Если gotrue уже синхронно восстановил сессию — не ждём.
+    if (client.auth.currentUser != null || client.auth.currentSession != null) {
+      return true;
+    }
     final completer = Completer<void>();
     late final StreamSubscription<AuthState> sub;
     sub = client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.initialSession ||
-          data.event == AuthChangeEvent.signedIn) {
+          data.event == AuthChangeEvent.signedIn ||
+          data.event == AuthChangeEvent.tokenRefreshed) {
         if (!completer.isCompleted) completer.complete();
       }
     });
     await completer.future
-        .timeout(const Duration(seconds: 4), onTimeout: () {});
+        .timeout(const Duration(seconds: 2), onTimeout: () {});
     await sub.cancel();
-    return client.auth.currentUser != null;
+    return client.auth.currentUser != null || client.auth.currentSession != null;
   }
+
+  /// Публичный peek кеша профиля (для offline-first сплэша).
+  static Future<VibeProfile?> peekLocalProfile() => _loadLocalProfile();
 
   static VibeProfile? _cachedProfile;
   static Future<VibeProfile?> _loadLocalProfile() async {

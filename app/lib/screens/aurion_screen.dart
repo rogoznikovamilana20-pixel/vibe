@@ -120,7 +120,7 @@ class _AurionScreenState extends State<AurionScreen> {
       builder: (context, _) {
         final status = AurionService.instance.status;
         return Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: context.vibeBackground,
           body: Column(
             children: [
               Expanded(

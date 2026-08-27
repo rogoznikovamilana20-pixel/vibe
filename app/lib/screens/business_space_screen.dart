@@ -105,6 +105,7 @@ class BusinessSpaceScreen extends StatelessWidget {
                 trailing: SettingsService.instance.businessTier == e.value ? Icon(Icons.check_rounded, color: context.vibePrimary) : null,
                 onTap: () async {
                   Navigator.of(ctx).pop();
+                  if (!context.mounted) return;
                   if (e.value == 'start') {
                     await SettingsService.instance.setBusinessTier('start');
                     if (!context.mounted) return;
@@ -112,18 +113,24 @@ class BusinessSpaceScreen extends StatelessWidget {
                     return;
                   }
                   // Только крипта: создаём оплату и открываем pay_url
-                  final ok = await BusinessCryptoPay.instance.payTier(
-                    businessId: 'my_business', // TODO: real businessId from businesses table
-                    tier: e.value,
-                    getCurrentTier: () => SettingsService.instance.businessTier,
-                    onSuccess: (newTier) async => await SettingsService.instance.setBusinessTier(newTier),
-                  );
+                  bool ok = false;
+                  try {
+                    ok = await BusinessCryptoPay.instance.payTier(
+                      businessId: 'my_business', // TODO: real businessId from businesses table
+                      tier: e.value,
+                      getCurrentTier: () => SettingsService.instance.businessTier,
+                      onSuccess: (newTier) async => await SettingsService.instance.setBusinessTier(newTier),
+                    );
+                  } catch (err) {
+                    ok = false;
+                  }
                   if (!context.mounted) return;
                   if (!ok) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не удалось создать оплату')));
                   } else {
-                    // В test mode сразу считаем оплаченным
-                    await BusinessCryptoPay.instance.confirmTestPayment('my_business', e.value);
+                    try {
+                      await BusinessCryptoPay.instance.confirmTestPayment('my_business', e.value);
+                    } catch (_) {}
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Оплачено ${e.key} (test)')));
                   }

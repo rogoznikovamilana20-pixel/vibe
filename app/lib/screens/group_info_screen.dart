@@ -242,7 +242,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     final members = _members;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.vibeBackground,
       body: VibeCollapsibleScreen(
         slivers: [
           SliverToBoxAdapter(

@@ -89,7 +89,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
     final l = VibeLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.vibeBackground,
       body: VibeCollapsibleScreen(
         slivers: [
           SliverToBoxAdapter(

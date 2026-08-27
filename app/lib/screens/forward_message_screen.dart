@@ -52,7 +52,7 @@ class _ForwardPickerScreenState extends State<ForwardPickerScreen> {
             .toList();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.vibeBackground,
       body: Column(
         children: [
           Expanded(

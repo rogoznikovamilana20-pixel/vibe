@@ -152,7 +152,7 @@ class _PeerProfileScreenState extends State<PeerProfileScreen> {
     final bio = _profile?.bio ?? '';
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.vibeBackground,
       body: VibeCollapsibleScreen(
         slivers: [
           SliverToBoxAdapter(
