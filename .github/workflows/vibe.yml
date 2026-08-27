@@ -19,6 +19,17 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            app/android/.gradle
+            app/build
+          key: gradle-${{ runner.os }}-${{ hashFiles('app/android/gradle/wrapper/gradle-wrapper.properties', 'app/android/**/*.gradle') }}
+          restore-keys: gradle-${{ runner.os }}-
 
       - name: flutter pub get
         run: flutter pub get
@@ -27,10 +38,13 @@ jobs:
         run: flutter analyze
 
       - name: flutter test
-        run: flutter test
+        run: flutter test --reporter expanded
+
+      - name: verify business_scalable migration present
+        run: test -f ../supabase/migrate_v1_25_0_business_scalable.sql && test -f ../app/supabase/migrations/20260827000000_business_scalable.sql && echo "migration OK"
 
       - name: build apk (debug)
-        run: flutter build apk --debug
+        run: flutter build apk --debug --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
       - uses: actions/upload-artifact@v4
         with:
