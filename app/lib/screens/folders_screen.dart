@@ -35,7 +35,7 @@ class _FoldersScreenState extends State<FoldersScreen> {
     final l = VibeLocalizations.of(context);
     final settings = SettingsService.instance;
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.vibeBackground,
       appBar: VibeTopBarAppBar(
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
@@ -335,7 +335,7 @@ class _FolderEditScreenState extends State<FolderEditScreen> {
   Widget build(BuildContext context) {
     final l = VibeLocalizations.of(context);
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: context.vibeBackground,
       appBar: VibeTopBarAppBar(
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
