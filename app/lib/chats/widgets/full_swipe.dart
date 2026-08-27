@@ -78,8 +78,9 @@ class _FullSwipeState extends State<FullSwipe>
     if (!widget.enabled) return;
     final v = _offset.value;
 
-    // TG: getSwipeThreshold = 0.45 ширины.
-    const threshold = 0.45;
+    // TG: getSwipeThreshold = 0.45 ширины — считаем от фактической ширины.
+    final width = MediaQuery.maybeSizeOf(context)?.width ?? 360;
+    final threshold = (width * 0.45 / _maxShift).clamp(0.35, 0.9);
     if (v > threshold) {
       final cb = widget.onSwipeLeft;
       _offset.animateTo(1, curve: Curves.easeOut).whenComplete(() {

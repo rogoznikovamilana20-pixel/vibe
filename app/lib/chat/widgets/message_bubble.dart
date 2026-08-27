@@ -470,7 +470,7 @@ class _MessageBubbleState extends State<MessageBubble>
               widget.onOpenUrl,
             ),
             style: VibeTypography.body.copyWith(
-              fontSize: SettingsService.instance.messageFontSize + SettingsService.instance.fontSizeDelta,
+              fontSize: (SettingsService.instance.messageFontSize + SettingsService.instance.fontSizeDelta).clamp(12.0, 24.0),
               color: isIncoming ? context.vibeTextPrimary : Colors.white,
             ),
           ),
@@ -512,7 +512,7 @@ class _MessageBubbleState extends State<MessageBubble>
                 fontSize: 11,
               ),
             ),
-            if (!isIncoming) ...[
+            if (!isIncoming && SettingsService.instance.showTicks) ...[
               const SizedBox(width: 4),
               if (SettingsService.instance.showTicks)
                 MessageStatusTick(status: widget.isGroup && (msg.status == MsgStatus.delivered || msg.status == MsgStatus.read) ? MsgStatus.sent : msg.status),
@@ -705,7 +705,7 @@ class _PhotoBubble extends StatelessWidget {
                 fontSize: 11,
               ),
             ),
-            if (!incoming) ...[
+            if (!incoming && SettingsService.instance.showTicks) ...[
               const SizedBox(width: 3),
               MessageStatusTick(status: isGroup && (msg.status == MsgStatus.delivered || msg.status == MsgStatus.read) ? MsgStatus.sent : msg.status, size: 13),
             ],
@@ -810,7 +810,7 @@ class _NetworkPhotoBubbleState extends State<_NetworkPhotoBubble> {
                   fontSize: 11,
                 ),
               ),
-              if (!widget.incoming) ...[
+              if (!widget.incoming && SettingsService.instance.showTicks) ...[
                 const SizedBox(width: 3),
                 MessageStatusTick(status: widget.isGroup && (widget.status == MsgStatus.delivered || widget.status == MsgStatus.read) ? MsgStatus.sent : widget.status, size: 13),
               ],
@@ -860,7 +860,7 @@ class _NetworkPhotoBubbleState extends State<_NetworkPhotoBubble> {
                 fontSize: 11,
               ),
             ),
-            if (!widget.incoming) ...[
+            if (!widget.incoming && SettingsService.instance.showTicks) ...[
               const SizedBox(width: 3),
               MessageStatusTick(status: widget.isGroup && (widget.status == MsgStatus.delivered || widget.status == MsgStatus.read) ? MsgStatus.sent : widget.status, size: 13),
             ],
@@ -1129,7 +1129,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
                 fontSize: 11,
               ),
             ),
-            if (!isIncoming) ...[
+            if (!isIncoming && SettingsService.instance.showTicks) ...[
               const SizedBox(width: 3),
               MessageStatusTick(status: widget.isGroup && (widget.msg.status == MsgStatus.delivered || widget.msg.status == MsgStatus.read) ? MsgStatus.sent : widget.msg.status, size: 13),
             ],

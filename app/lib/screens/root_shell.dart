@@ -257,12 +257,14 @@ class _RootShellState extends State<RootShell>
             ),
           ],
         ),
-        drawer: _VibeDrawer(
-          userName: widget.userName,
-          userEmoji: widget.userEmoji,
-          onSelect: _openTab,
-          selectedIndex: _index,
-        ),
+        drawer: SettingsService.instance.navigationStyle == 'drawer'
+            ? _VibeDrawer(
+                userName: widget.userName,
+                userEmoji: widget.userEmoji,
+                onSelect: _openTab,
+                selectedIndex: _index,
+              )
+            : null,
       );
     }
     return PopScope(
@@ -276,12 +278,14 @@ class _RootShellState extends State<RootShell>
       child: Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
-      drawer: _VibeDrawer(
-        userName: widget.userName,
-        userEmoji: widget.userEmoji,
-        onSelect: _openTab,
-        selectedIndex: _index,
-      ),
+      drawer: SettingsService.instance.navigationStyle == 'drawer'
+          ? _VibeDrawer(
+              userName: widget.userName,
+              userEmoji: widget.userEmoji,
+              onSelect: _openTab,
+              selectedIndex: _index,
+            )
+          : null,
       body: GestureDetector(
         onHorizontalDragStart: _onEdgeDragStart,
         onHorizontalDragEnd: _onEdgeDragEnd,
@@ -291,10 +295,9 @@ class _RootShellState extends State<RootShell>
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(
-                bottom:
-                    VibeSizes.bottomNavHeight +
-                    VibeSpacing.lg +
-                    MediaQuery.of(context).padding.bottom,
+                bottom: SettingsService.instance.navigationStyle == 'bottom'
+                    ? VibeSizes.bottomNavHeight + VibeSpacing.lg + MediaQuery.of(context).padding.bottom
+                    : 16 + MediaQuery.of(context).padding.bottom,
               ),
               child: FadeTransition(
                 opacity: _tabCurve,
@@ -325,6 +328,29 @@ class _RootShellState extends State<RootShell>
               ),
             ),
           ),
+          // Верхние табы — показывать только при navigationStyle==tabs
+          if (SettingsService.instance.navigationStyle == 'tabs')
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: VibeSpacing.sm, bottom: VibeSpacing.xs),
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: VibeBackend.instance.chatsUnreadTotal,
+                      builder: (context, unread, _) => _VibeBottomNav(
+                        index: _index,
+                        onChanged: _openTab,
+                        chatsUnread: unread,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Нижняя стеклянная капсула — AyuGram: показывать только при navigationStyle==bottom
           if (SettingsService.instance.navigationStyle == 'bottom')
             Positioned(

@@ -342,7 +342,7 @@ class SettingsService {
     _bumpAppearance();
   }
 
-  int get previewLines => _prefs.getInt(_keyPreviewLines) ?? 1;
+  int get previewLines => _prefs.getInt(_keyPreviewLines) ?? 2;
   Future<void> setPreviewLines(int v) async {
     await _prefs.setInt(_keyPreviewLines, v.clamp(1, 3));
     _bumpAppearance();

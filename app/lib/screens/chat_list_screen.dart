@@ -683,7 +683,9 @@ class _ChatListScreenState extends State<ChatListScreen>
                             child: SizedBox(
                               height: MediaQuery.sizeOf(context).width >= 900
                                   ? 16
-                                  : VibeSizes.bottomNavHeight + VibeSpacing.lg,
+                                  : (SettingsService.instance.navigationStyle == 'bottom'
+                                      ? VibeSizes.bottomNavHeight + VibeSpacing.lg
+                                      : 16),
                             ),
                           ),
                           // 8.4.7: пустое состояние с призывом (CTA) —
@@ -775,23 +777,27 @@ class _ChatListScreenState extends State<ChatListScreen>
                       ),
                     ),
                   ),
-                Positioned(
-                  right: VibeSpacing.lg,
-                  bottom: VibeSizes.bottomNavHeight + VibeSpacing.md,
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: _fabVisible,
-                    builder: (context, visible, child) => AnimatedScale(
-                      scale: (visible && SettingsService.instance.fabVisible) ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      child: AnimatedOpacity(
-                        opacity: (visible && SettingsService.instance.fabVisible) ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: child,
-                      ),
+                if (MediaQuery.sizeOf(context).width < 900)
+                  Positioned(
+                    right: VibeSpacing.lg,
+                    bottom: VibeSizes.bottomNavHeight + VibeSpacing.md,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _fabVisible,
+                      builder: (context, visible, child) {
+                        if (MediaQuery.sizeOf(context).width >= 900) return const SizedBox.shrink();
+                        return AnimatedScale(
+                          scale: (visible && SettingsService.instance.fabVisible) ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
+                          child: AnimatedOpacity(
+                            opacity: (visible && SettingsService.instance.fabVisible) ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: ComposeFAB(onTap: () => _openCompose(context)),
                     ),
-                    child: ComposeFAB(onTap: () => _openCompose(context)),
-                  ),
                 ),
               ],
             ),

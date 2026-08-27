@@ -106,22 +106,22 @@ class _VibeFabState extends State<VibeFab> {
       duration: VibeAnimations.micro,
       curve: Curves.easeOut,
       child: Container(
-        width: 60,
-        height: 60,
+        width: 56,
+        height: 56,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: VibeColors.brandGradient,
           ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: const [VibeShadows.floating],
         ),
         child: Material(
           type: MaterialType.transparency,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             onTap: enabled ? widget.onPressed : null,
             splashColor: Colors.white.withValues(alpha: 0.22),
             highlightColor: Colors.white.withValues(alpha: 0.10),
