@@ -5,6 +5,7 @@ import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_top_bar.dart';
+import '../data/payment/business_crypto_pay.dart';
 import '../data/settings_service.dart';
 
 /// Бизнес-пространство: витрины, чаты, метрики, команда — отдельно от личных чатов (как TG Business).
@@ -21,6 +22,11 @@ class BusinessSpaceScreen extends StatelessWidget {
       appBar: VibeTopBarAppBar(
         topInset: MediaQuery.paddingOf(context).top,
         child: VibeTopBar(
+          leading: VibeTopBarIcon(
+            icon: Icons.arrow_back_rounded,
+            onTap: () => Navigator.of(context).maybePop(),
+            tooltip: 'Назад',
+          ),
           title: const VibeTopBarTitle('Бизнес'),
           actions: [
             IconButton(
@@ -75,6 +81,13 @@ class BusinessSpaceScreen extends StatelessWidget {
   }
 
   void _showTierSheet(BuildContext context) {
+    final tiers = {
+      'Старт 0₽ (0 USDT)': 'start',
+      'Микро 2 USDT ~199₽': 'micro',
+      'Рост 8 USDT ~799₽': 'growth',
+      'Масштаб 25 USDT ~2499₽': 'scale',
+      'Энтерпрайз 100 USDT': 'enterprise',
+    };
     showModalBottomSheet(
       context: context,
       builder: (ctx) => Container(
@@ -83,10 +96,39 @@ class BusinessSpaceScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Подписка', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+            Text('Подписка — только USDT TRC20', style: VibeTypography.subtitle.copyWith(color: context.vibeTextPrimary)),
+            Text('Самозанятый: чек НПД в Мой налог после конвертации', style: VibeTypography.caption.copyWith(color: context.vibeTextTertiary)),
             const SizedBox(height: VibeSpacing.md),
-            for (final t in ['Старт 0₽', 'Микро 299₽', 'Рост 799₽', 'Масштаб 2499₽', 'Энтерпрайз 9999₽+'])
-              ListTile(title: Text(t), onTap: () => Navigator.of(ctx).pop()),
+            for (final e in tiers.entries)
+              ListTile(
+                title: Text(e.key),
+                trailing: SettingsService.instance.businessTier == e.value ? Icon(Icons.check_rounded, color: context.vibePrimary) : null,
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  if (e.value == 'start') {
+                    await SettingsService.instance.setBusinessTier('start');
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Тир Старт')));
+                    return;
+                  }
+                  // Только крипта: создаём оплату и открываем pay_url
+                  final ok = await BusinessCryptoPay.instance.payTier(
+                    businessId: 'my_business', // TODO: real businessId from businesses table
+                    tier: e.value,
+                    getCurrentTier: () => SettingsService.instance.businessTier,
+                    onSuccess: (newTier) async => await SettingsService.instance.setBusinessTier(newTier),
+                  );
+                  if (!context.mounted) return;
+                  if (!ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не удалось создать оплату')));
+                  } else {
+                    // В test mode сразу считаем оплаченным
+                    await BusinessCryptoPay.instance.confirmTestPayment('my_business', e.value);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Оплачено ${e.key} (test)')));
+                  }
+                },
+              ),
           ],
         ),
       ),
