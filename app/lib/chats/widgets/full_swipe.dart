@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/vibe_animations.dart';
@@ -132,8 +131,6 @@ class _FullSwipeState extends State<FullSwipe>
               );
             },
             child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              dragStartBehavior: DragStartBehavior.start,
               onHorizontalDragUpdate: enabled ? _onDragUpdate : null,
               onHorizontalDragEnd: enabled ? _onDragEnd : null,
               child: Material(

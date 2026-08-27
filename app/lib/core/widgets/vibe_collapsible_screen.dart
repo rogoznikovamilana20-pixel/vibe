@@ -69,7 +69,9 @@ class _VibeCollapsibleScreenState extends State<VibeCollapsibleScreen> {
               bottom: false,
               child: CustomScrollView(
                 controller: widget.scrollController,
-                physics: const BouncingScrollPhysics(),
+                physics: MediaQuery.sizeOf(context).width >= 900
+                    ? const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+                    : const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 slivers: [
                   ...widget.slivers,
                   SliverToBoxAdapter(
