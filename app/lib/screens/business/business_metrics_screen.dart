@@ -32,7 +32,19 @@ class _BusinessMetricsScreenState extends State<BusinessMetricsScreen> {
     return Scaffold(
       backgroundColor: context.vibeBackground,
       appBar: VibeTopBarAppBar(topInset: MediaQuery.paddingOf(context).top, child: VibeTopBar(leading: VibeTopBarIcon(icon: Icons.arrow_back_rounded, onTap: ()=> Navigator.maybePop(context), tooltip: 'Назад'), title: const VibeTopBarTitle('Метрики'))),
-      body: _loading ? const Center(child: CircularProgressIndicator()) : _rows.isEmpty ? Center(child: Text('Нет данных (нужна активность)', style: VibeTypography.body.copyWith(color: context.vibeTextSecondary))) : ListView.builder(padding: const EdgeInsets.all(VibeSpacing.lg), itemCount: _rows.length, itemBuilder: (_, i) { final r=_rows[i]; return Card(color: context.vibeSurface, child: ListTile(title: Text('${r['date']}', style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)), subtitle: Text('Просм: ${r['views']} • Клик: ${r['clicks']} • Заказ: ${r['orders']} • ${r['revenue']}₽', style: VibeTypography.caption.copyWith(color: context.vibeTextSecondary)))); }),
+      body: _loading ? const Center(child: CircularProgressIndicator()) : _rows.isEmpty ? Center(child: Text('Нет данных (нужна активность)', style: VibeTypography.body.copyWith(color: context.vibeTextSecondary))) : Column(children: [_buildChart(context), Expanded(child: ListView.builder(padding: const EdgeInsets.all(VibeSpacing.lg), itemCount: _rows.length, itemBuilder: (_, i) { final r=_rows[i]; return Card(color: context.vibeSurface, child: ListTile(title: Text('${r['date']}', style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)), subtitle: Text('Просм: ${r['views']} • Клик: ${r['clicks']} • Заказ: ${r['orders']} • ${r['revenue']}₽', style: VibeTypography.caption.copyWith(color: context.vibeTextSecondary)))); }))]),
+    );
+  }
+
+  Widget _buildChart(BuildContext context) {
+    if (_rows.isEmpty) return const SizedBox.shrink();
+    final views = _rows.map((e) => (e['views'] as int?) ?? 0).toList().reversed.toList();
+    final maxV = views.isEmpty ? 1 : views.reduce((a,b)=> a>b?a:b);
+    final m = maxV == 0 ? 1 : maxV;
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.all(VibeSpacing.lg),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [for (final v in views) Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: Container(height: 80 * v / m + 8, decoration: BoxDecoration(color: context.vibePrimary.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(4)))))]),
     );
   }
 }

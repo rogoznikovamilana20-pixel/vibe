@@ -33,11 +33,13 @@ class _BusinessShowcasesScreenState extends State<BusinessShowcasesScreen> {
   }
 
   Future<void> _add() async {
-    final c = TextEditingController();
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Новая витрина'), content: TextField(controller: c, decoration: const InputDecoration(hintText: 'Название')), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Создать'))]));
-    if (ok != true || c.text.trim().isEmpty) return;
+    final t = TextEditingController();
+    final d = TextEditingController();
+    final p = TextEditingController(text: '0');
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Новая витрина'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: t, decoration: const InputDecoration(hintText: 'Название *')), const SizedBox(height: 8), TextField(controller: d, decoration: const InputDecoration(hintText: 'Описание')), const SizedBox(height: 8), TextField(controller: p, decoration: const InputDecoration(hintText: 'Цена RUB'), keyboardType: TextInputType.number)]), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Создать'))]));
+    if (ok != true || t.text.trim().isEmpty) return;
     try {
-      await Supabase.instance.client.from('business_showcases').insert({'business_id': widget.businessId, 'title': c.text.trim()});
+      await Supabase.instance.client.from('business_showcases').insert({'business_id': widget.businessId, 'title': t.text.trim(), 'description': d.text.trim(), 'price': double.tryParse(p.text) ?? 0, 'currency': 'RUB'});
       await _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
@@ -49,7 +51,7 @@ class _BusinessShowcasesScreenState extends State<BusinessShowcasesScreen> {
     return Scaffold(
       backgroundColor: context.vibeBackground,
       appBar: VibeTopBarAppBar(topInset: MediaQuery.paddingOf(context).top, child: VibeTopBar(leading: VibeTopBarIcon(icon: Icons.arrow_back_rounded, onTap: () => Navigator.maybePop(context), tooltip: 'Назад'), title: const VibeTopBarTitle('Витрины'), actions: [IconButton(icon: const Icon(Icons.add_rounded), onPressed: _add)])),
-      body: _loading ? const Center(child: CircularProgressIndicator()) : _items.isEmpty ? Center(child: Text('Нет витрин', style: VibeTypography.body.copyWith(color: context.vibeTextSecondary))) : ListView.builder(padding: const EdgeInsets.all(VibeSpacing.lg), itemCount: _items.length, itemBuilder: (_, i) => Card(color: context.vibeSurface, child: ListTile(title: Text(_items[i]['title'] ?? '', style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)), subtitle: Text(_items[i]['is_active'] == false ? 'Неактивна' : 'Активна', style: VibeTypography.caption.copyWith(color: context.vibeTextSecondary)), trailing: IconButton(icon: const Icon(Icons.delete_outline_rounded), onPressed: () async { await Supabase.instance.client.from('business_showcases').delete().eq('id', _items[i]['id']); await _load(); })))),
+      body: _loading ? const Center(child: CircularProgressIndicator()) : _items.isEmpty ? Center(child: Text('Нет витрин', style: VibeTypography.body.copyWith(color: context.vibeTextSecondary))) : ListView.builder(padding: const EdgeInsets.all(VibeSpacing.lg), itemCount: _items.length, itemBuilder: (_, i) { final it=_items[i]; final price = (it['price'] ?? 0).toString(); return Card(color: context.vibeSurface, child: ListTile(title: Text(it['title'] ?? '', style: VibeTypography.bodyMedium.copyWith(color: context.vibeTextPrimary)), subtitle: Text('${it['description'] ?? ''} • $price ${it['currency'] ?? 'RUB'} • ${it['is_active'] == false ? 'Неактивна' : 'Активна'}', maxLines: 2, overflow: TextOverflow.ellipsis, style: VibeTypography.caption.copyWith(color: context.vibeTextSecondary)), trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: Icon(it['is_active'] == false ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: context.vibeTextTertiary), onPressed: () async { await Supabase.instance.client.from('business_showcases').update({'is_active': !(it['is_active'] == true)}).eq('id', it['id']); await _load(); }), IconButton(icon: const Icon(Icons.delete_outline_rounded), onPressed: () async { await Supabase.instance.client.from('business_showcases').delete().eq('id', it['id']); await _load(); })]))); }),
     );
   }
 }
