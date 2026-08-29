@@ -3388,8 +3388,8 @@ _personal = _client.channel('u_$myId')
           await _sendRemote('u_$peerId', 'new_message', payload);
         }
       }
-      // FCM push — для доставки в фоне.
-      _sendFcmPush(chatId, senderId, me?.displayName, row['text'], row['id']);
+      // FCM push — для доставки в фоне. Для E2E не шлём plaintext (FCM leak F-048).
+      _sendFcmPush(chatId, senderId, me?.displayName, row['is_encrypted'] == true ? null : row['text'], row['id']);
     }());
   }
 

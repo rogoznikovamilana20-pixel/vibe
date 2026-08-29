@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1099,25 +1100,19 @@ class E2eV2Service {
     return results;
   }
 
-  /// Генерирует session ID.
+  /// Генерирует session ID — SHA-256 (16 hex) вместо FNV-1a 32-bit (F-055).
   String _generateSessionId({
     required String initiatorDeviceId,
     required String responderDeviceId,
     required List<int> ephemeralPubBytes,
   }) {
-    // Session ID = hex(SHA-256(initiator || responder || ephemeral_pub))
     final combined = <int>[
       ...utf8.encode(initiatorDeviceId),
       ...utf8.encode(responderDeviceId),
       ...ephemeralPubBytes,
     ];
-    // Простой хеш для session ID (не криптографически критичный)
-    var hash = 0x811c9dc5;
-    for (final byte in combined) {
-      hash ^= byte;
-      hash = (hash * 0x01000193) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
+    final digest = crypto.sha256.convert(combined);
+    return digest.toString().substring(0, 16);
   }
 
   /// Сохраняет сессию в SecureStorage.

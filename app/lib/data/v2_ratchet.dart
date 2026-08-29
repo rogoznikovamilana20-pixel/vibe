@@ -834,16 +834,21 @@ class V2Ratchet {
     required String recipientDeviceId,
     required int messageNumber,
     required int previousChainLength,
+    String chatId = '', // F-051: cross-chat binding, пусто = legacy (без чата) для совместимости
   }) {
     final numBytes = ByteData(8);
     numBytes.setUint32(0, messageNumber, Endian.big);
     numBytes.setUint32(4, previousChainLength, Endian.big);
+    final chatBytes = utf8.encode(chatId);
+    final chatLen = ByteData(2)..setUint16(0, chatBytes.length, Endian.big);
 
     return [
       ...senderIdentityKey,
       ...senderRatchetPublicKey,
       ...utf8.encode(senderDeviceId),
       ...utf8.encode(recipientDeviceId),
+      ...chatLen.buffer.asUint8List(),
+      ...chatBytes,
       ...numBytes.buffer.asUint8List(),
     ];
   }
