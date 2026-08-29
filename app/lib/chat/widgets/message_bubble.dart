@@ -19,6 +19,7 @@ import '../../core/services/link_preview.dart';
 import '../../core/widgets/vibe_avatar.dart';
 import '../../data/backend.dart';
 import '../../data/settings_service.dart';
+import '../../data/translate_service.dart';
 import '../models.dart';
 import 'message_status_tick.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
@@ -108,6 +109,8 @@ class _MessageBubbleState extends State<MessageBubble>
   late final AnimationController _spark;
   bool _sparkVisible = false;
   String _burstEmoji = '❤️';
+  String? _translated;
+  bool _translating = false;
 
   // ??? ????????????? ?????????
   final GlobalKey _bubbleKey = GlobalKey();
@@ -143,6 +146,20 @@ class _MessageBubbleState extends State<MessageBubble>
         setState(() => _yPos = pos);
       }
     }
+  }
+
+  Future<void> _onTranslate() async {
+    if (_translated != null) {
+      setState(() => _translated = null);
+      return;
+    }
+    setState(() => _translating = true);
+    final t = await TranslateService.instance.translate(widget.msg.text, targetLang: 'en');
+    if (!mounted) return;
+    setState(() {
+      _translated = t;
+      _translating = false;
+    });
   }
 
   void _onDoubleTap() {
@@ -481,6 +498,26 @@ class _MessageBubbleState extends State<MessageBubble>
             text: msg.text,
             incoming: isIncoming,
             onOpen: widget.onOpenUrl,
+          ),
+        if (_translated != null)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isIncoming ? context.vibeSurfaceHigh : Colors.white12,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(_translated!, style: VibeTypography.body.copyWith(fontSize: 13, color: isIncoming ? context.vibeTextSecondary : Colors.white70, fontStyle: FontStyle.italic)),
+          ),
+        if (msg.text.trim().isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _translating ? null : _onTranslate,
+              icon: Icon(Icons.translate_rounded, size: 14, color: isIncoming ? context.vibePrimary : Colors.white70),
+              label: Text(_translating ? '...' : (_translated == null ? 'Перевести' : 'Скрыть'), style: VibeTypography.caption.copyWith(fontSize: 11, color: isIncoming ? context.vibePrimary : Colors.white70)),
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: const Size(0, 24), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            ),
           ),
         const SizedBox(height: 1),
         Row(
