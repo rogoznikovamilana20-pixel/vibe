@@ -1,0 +1,11 @@
+default_platform(:android)
+platform :android do
+  desc "Build and upload Vibe to Play Internal and RuStore"
+  lane :beta do
+    gradle(task: "clean assembleRelease", project_dir: "android/")
+    # Play Internal
+    # supply(track: 'internal', aab: '../build/app/outputs/bundle/release/app-release.aab')
+    # RuStore — manual upload of apk/aab via API (needs rustore-private.pem)
+    # sh("python ../scripts/rustore_upload.py --apk ../build/app/outputs/flutter-apk/app-release.apk")
+  end
+end
