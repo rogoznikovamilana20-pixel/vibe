@@ -44,7 +44,7 @@ import 'search_screen.dart';
 import 'settings/privacy/passcode_screen.dart';
 import 'story_composer_screen.dart';
 import 'story_player.dart';
-import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_resolver.dart';
 
 /// Список чатов: сториз, папки, свайпы, мультивыбор, боковое меню.
 class ChatListScreen extends StatefulWidget {
@@ -198,7 +198,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             const SizedBox(height: 8),
             ListTile(
               leading: Icon(
-                pinned ? VibeIcons.pin : VibeIcons.pin,
+                pinned ? VibeIconResolver.pin : VibeIconResolver.pin,
                 color: pinned ? Colors.amber : Colors.grey,
               ),
               title: Text(
@@ -228,7 +228,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             ListTile(
               leading: Icon(
-                archived ? Icons.unarchive_rounded : VibeIcons.archive,
+                archived ? Icons.unarchive_rounded : VibeIconResolver.archive,
                 color: Colors.grey,
               ),
               title: Text(
@@ -242,7 +242,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             ListTile(
               leading: Icon(
-                hidden ? VibeIcons.eye : Icons.visibility_off_rounded,
+                hidden ? VibeIconResolver.eye : Icons.visibility_off_rounded,
                 color: Colors.grey,
               ),
               title: Text(
@@ -272,7 +272,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               },
             ),
             ListTile(
-              leading: const Icon(VibeIcons.check, color: Colors.grey),
+              leading: Icon(VibeIconResolver.check, color: Colors.grey),
               title: Text(
                 l.chatMarkRead,
                 style: TextStyle(color: sheetText, fontSize: 16),
@@ -297,7 +297,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             ListTile(
               leading: Icon(
-                VibeIcons.folder,
+                VibeIconResolver.folder,
                 color: Colors.grey,
               ),
               title: Text(
@@ -753,19 +753,19 @@ class _ChatListScreenState extends State<ChatListScreen>
                               if (PasscodeService.instance.hasPasscode)
                                 IconButton(
                                   onPressed: () => _lockNow(context),
-                                  icon: const Icon(VibeIcons.lock, size: 22),
+                                  icon: Icon(VibeIconResolver.lock, size: 22),
                                   color: context.vibeTextPrimary,
                                   tooltip: l.actionLock,
                                 ),
                               IconButton(
                                 onPressed: () => _openSearch(context),
-                                icon: const Icon(VibeIcons.search, size: 22),
+                                icon: Icon(VibeIconResolver.search, size: 22),
                                 color: context.vibeTextPrimary,
                                 tooltip: l.tooltipSearch,
                               ),
                               IconButton(
                                 onPressed: () => _showChatsMenu(context),
-                                icon: const Icon(VibeIcons.moreVertical, size: 22),
+                                icon: Icon(VibeIconResolver.moreVertical, size: 22),
                                 color: context.vibeTextPrimary,
                                 tooltip: l.actionChatsMenu,
                               ),
@@ -861,17 +861,17 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             IconButton(
               onPressed: _chat.markRead,
-              icon: const Icon(VibeIcons.checkAll),
+              icon: Icon(VibeIconResolver.checkAll),
               tooltip: l.actionRead,
             ),
             IconButton(
               onPressed: _chat.markArchived,
-              icon: const Icon(VibeIcons.archive),
+              icon: Icon(VibeIconResolver.archive),
               tooltip: l.actionArchive,
             ),
             IconButton(
               onPressed: _markHidden,
-              icon: const Icon(VibeIcons.lock),
+              icon: Icon(VibeIconResolver.lock),
               tooltip: l.actionHide,
             ),
             IconButton(
@@ -884,7 +884,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
             IconButton(
               onPressed: _chat.clearSelection,
-              icon: const Icon(VibeIcons.check),
+              icon: Icon(VibeIconResolver.check),
               tooltip: l.actionDone,
             ),
           ],
@@ -915,17 +915,17 @@ class _ChatListScreenState extends State<ChatListScreen>
       actions: [
         if (PasscodeService.instance.hasPasscode)
           VibeTopBarIcon(
-            icon: VibeIcons.lock,
+            icon: VibeIconResolver.lock,
             tooltip: l.actionLock,
             onTap: () => _lockNow(context),
           ),
         VibeTopBarIcon(
-          icon: VibeIcons.search,
+          icon: VibeIconResolver.search,
           tooltip: l.tooltipSearch,
           onTap: () => _openSearch(context),
         ),
         VibeTopBarIcon(
-          icon: VibeIcons.moreVertical,
+          icon: VibeIconResolver.moreVertical,
           tooltip: l.actionChatsMenu,
           onTap: () => _showChatsMenu(context),
         ),
@@ -1422,7 +1422,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                VibeIcons.plus,
+                VibeIconResolver.plus,
                 size: 18,
                 color: context.vibePrimary,
               ),
@@ -1491,7 +1491,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             onPressed: _showArchive || _showHidden
                 ? null
                 : () => _openCompose(context),
-            icon: const Icon(VibeIcons.edit, size: 18),
+            icon: Icon(VibeIconResolver.edit, size: 18),
             label: Text(l.actionNewMessage),
           ),
         ],
@@ -1520,7 +1520,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _showHidden ? VibeIcons.lock : VibeIcons.archive,
+                    _showHidden ? VibeIconResolver.lock : VibeIconResolver.archive,
                     size: 18,
                     color: Colors.white,
                   ),
@@ -1626,7 +1626,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                label == l.archiveTitle ? VibeIcons.archive : VibeIcons.lock,
+                label == l.archiveTitle ? VibeIconResolver.archive : VibeIconResolver.lock,
                 size: 16,
                 color: active ? Colors.white : context.vibeTextSecondary,
               ),
@@ -1862,7 +1862,7 @@ class _ChatListScreenState extends State<ChatListScreen>
       child: Row(
         children: [
           Icon(
-            VibeIcons.pin,
+            VibeIconResolver.pin,
             size: 16,
             color: context.vibeTextSecondary,
           ),
@@ -1895,7 +1895,7 @@ class _ChatListScreenState extends State<ChatListScreen>
               shape: BoxShape.circle,
             ),
             child: Icon(
-              VibeIcons.archive,
+              VibeIconResolver.archive,
               color: context.vibeTextSecondary,
             ),
           ),

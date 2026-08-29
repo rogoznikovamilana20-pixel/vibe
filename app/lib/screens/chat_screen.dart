@@ -53,7 +53,7 @@ import 'group_info_screen.dart';
 import 'peer_profile_screen.dart';
 import 'video_round_recorder.dart';
 import 'call_screen.dart';
-import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_resolver.dart';
 import '../core/localization/vibe_localizations.dart';
 
 /// Экран чата. Собирает ввод и отображает ленту; вся работа с данными —
@@ -334,7 +334,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
-                      VibeIcons.clock,
+                      VibeIconResolver.clock,
                       color: context.vibePrimary,
                     ),
                     title: Text(l.scheduleIn1Hour),
@@ -348,7 +348,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
-                      VibeIcons.clock,
+                      VibeIconResolver.clock,
                       color: context.vibePrimary,
                     ),
                     title: Text(l.scheduleTomorrow9am),
@@ -458,7 +458,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(
-                    VibeIcons.clock,
+                    VibeIconResolver.clock,
                     color: context.vibePrimary,
                   ),
                   title: Text(
@@ -483,7 +483,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                       _snack(l.scheduleCancelled);
                     },
-                    icon: const Icon(VibeIcons.close, size: 20),
+                    icon: Icon(VibeIconResolver.close, size: 20),
                     color: context.vibeError,
                     tooltip: l.scheduleCancelSend,
                   ),
@@ -824,7 +824,7 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SheetCallTile(
-              icon: VibeIcons.phone,
+              icon: VibeIconResolver.phone,
               color: VibeColors.success,
               title: l.callAudio,
               subtitle: l.callViaVibe,
@@ -846,7 +846,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(height: VibeSpacing.xs),
             SheetCallTile(
-              icon: VibeIcons.video,
+              icon: VibeIconResolver.video,
               color: context.vibePrimary,
               title: l.callVideo,
               subtitle: l.callViaVibe,
@@ -1008,7 +1008,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
-                  VibeIcons.user,
+                  VibeIconResolver.user,
                   color: context.vibePrimary,
                 ),
                 title: Text(l.chatMember),
@@ -1577,7 +1577,7 @@ class _ChatScreenState extends State<ChatScreen> {
       },
       children: [
         ActionTile(
-          icon: VibeIcons.reply,
+          icon: VibeIconResolver.reply,
           label: l.msgReply,
           onTap: () {
             Navigator.of(context).pop();
@@ -1594,7 +1594,7 @@ class _ChatScreenState extends State<ChatScreen> {
             },
           ),
         ActionTile(
-          icon: VibeIcons.copy,
+          icon: VibeIconResolver.copy,
           label: l.msgCopy,
           onTap: () {
             Navigator.of(context).pop();
@@ -1650,7 +1650,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         if (msg.serverId != null && _chat.pins.contains(msg.serverId))
           ActionTile(
-            icon: VibeIcons.pin,
+            icon: VibeIconResolver.pin,
             label: l.msgUnpin,
             onTap: () {
               Navigator.of(context).pop();
@@ -1659,7 +1659,7 @@ class _ChatScreenState extends State<ChatScreen> {
           )
         else if (msg.serverId != null)
           ActionTile(
-            icon: VibeIcons.pin,
+            icon: VibeIconResolver.pin,
             label: l.msgPin,
             onTap: () {
               Navigator.of(context).pop();
@@ -1668,7 +1668,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         if (isMy && msg.type == MsgType.text && hasText && !_isV2Encrypted(msg))
           ActionTile(
-            icon: VibeIcons.edit,
+            icon: VibeIconResolver.edit,
             label: l.msgEdit,
             onTap: () {
               Navigator.of(context).pop();
@@ -1840,7 +1840,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 Row(
                                   children: [
                                     Icon(
-                                      VibeIcons.edit,
+                                      VibeIconResolver.edit,
                                       size: 13,
                                       color: context.vibeTextTertiary,
                                     ),
@@ -1887,7 +1887,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(width: 36, height: 4, decoration: BoxDecoration(color: context.vibeDivider, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 12),
             ListTile(
-              leading: Icon(VibeIcons.bubble, color: context.vibePrimary),
+              leading: Icon(VibeIconResolver.bubble, color: context.vibePrimary),
               title: const Text('С именем автора'),
               subtitle: const Text('Покажет от кого переслано', style: TextStyle(fontSize: 12)),
               onTap: () => Navigator.of(ctx).pop(false),
@@ -2487,7 +2487,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 Icon(
-                  VibeIcons.pin,
+                  VibeIconResolver.pin,
                   size: 15,
                   color: context.vibePrimary,
                 ),
@@ -2515,7 +2515,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 GestureDetector(
                   onTap: () => _chat.setPin(null),
                   child: Icon(
-                    VibeIcons.close,
+                    VibeIconResolver.close,
                     size: 16,
                     color: context.vibeTextTertiary,
                   ),
@@ -2565,14 +2565,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   final id = _chat.pins[i];
                   final preview = _pinPreview(id);
                   return ListTile(
-                    leading: const Icon(VibeIcons.pin, size: 20),
+                    leading: Icon(VibeIconResolver.pin, size: 20),
                     title: Text(
                       preview,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     trailing: IconButton(
-                      icon: const Icon(VibeIcons.close, size: 20),
+                      icon: Icon(VibeIconResolver.close, size: 20),
                       tooltip: l.msgUnpin,
                       onPressed: () {
                         Navigator.of(sheetContext).pop();
@@ -2655,7 +2655,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              VibeIcons.clock,
+                              VibeIconResolver.clock,
                               size: 18,
                               color: context.vibePrimary,
                             ),
@@ -2731,7 +2731,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           : Border.all(color: const Color(0x1F1C1B22)),
                     ),
                     child: Icon(
-                      VibeIcons.video,
+                      VibeIconResolver.video,
                       size: 20,
                       color: _videoRolling ? Colors.white : context.vibePrimary,
                     ),
@@ -2742,7 +2742,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onPressed: _recording || _videoRolling
                       ? null
                       : () => _openAttachmentMenu(context),
-                  icon: const Icon(VibeIcons.attach),
+                  icon: Icon(VibeIconResolver.attach),
                   color: context.vibePrimary,
                   tooltip: VibeLocalizations.of(context).attachmentTitle,
                 ),

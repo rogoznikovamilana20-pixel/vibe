@@ -22,7 +22,7 @@ import '../../data/settings_service.dart';
 import '../models.dart';
 import 'message_status_tick.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
-import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_resolver.dart';
 import '../../core/localization/vibe_localizations.dart';
 
 /// ?????? ?????????: ?????/?????/??????/?????????/???????????, ?????-?????,
@@ -230,7 +230,7 @@ class _MessageBubbleState extends State<MessageBubble>
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      VibeIcons.reply,
+                      VibeIconResolver.reply,
                       color: _triggeredReply
                           ? context.vibePrimary
                           : context.vibeTextSecondary,
@@ -1021,7 +1021,7 @@ class _VoiceBubbleState extends State<_VoiceBubble>
                 child: AnimatedSwitcher(
                   duration: VibeAnimations.fadeIn,
                   child: Icon(
-                    _playing ? VibeIcons.pause : VibeIcons.play,
+                    _playing ? VibeIconResolver.pause : VibeIconResolver.play,
                     key: ValueKey(_playing),
                     color: isIncoming ? context.vibePrimary : Colors.white,
                     size: 22,
@@ -1286,11 +1286,11 @@ class _VideoRoundBubbleState extends State<_VideoRoundBubble> {
       height: 200,
       child: ClipOval(
         child: _controller == null
-            ? const ColoredBox(
+            ? ColoredBox(
                 color: VibeColors.surfaceDark,
                 child: Center(
                   child: Icon(
-                    VibeIcons.video,
+                    VibeIconResolver.video,
                     color: VibeColors.textTertiaryDark,
                   ),
                 ),
@@ -1741,7 +1741,7 @@ class _LocationBubble extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(VibeIcons.pin, color: primary, size: 18),
+            Icon(VibeIconResolver.pin, color: primary, size: 18),
             const SizedBox(width: 8),
             Text(
               attach.label?.isNotEmpty == true
@@ -1911,7 +1911,7 @@ class _PollBubble extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(VibeIcons.bubble, color: primary, size: 16),
+            Icon(VibeIconResolver.bubble, color: primary, size: 16),
             const SizedBox(width: 8),
             Flexible(
               child: Text(

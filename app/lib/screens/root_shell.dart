@@ -26,7 +26,7 @@ import '../data/settings_service.dart';
 import 'settings_screen.dart';
 import 'incoming_call_screen.dart';
 import 'package:vibe_app/core/services/back_history_service.dart';
-import 'package:vibe_app/core/widgets/vibe_icon_font.dart';
+import 'package:vibe_app/core/widgets/vibe_icon_resolver.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 
 /// Оболочка приложения: стеклянная нижняя навигация
@@ -393,11 +393,11 @@ class _VibeBottomNav extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final int chatsUnread;
 
-  static const _destinations = [
-    (Icons.chat_bubble_outline_rounded, VibeIcons.bubble, 'Чаты'),
-    (Icons.people_outline_rounded, VibeIcons.group, 'Контакты'),
-    (Icons.settings_outlined, VibeIcons.settings, 'Настройки'),
-    (VibeIcons.user, VibeIcons.user, 'Профиль'),
+  static final _destinations = [
+    (Icons.chat_bubble_outline_rounded, VibeIconResolver.bubble, 'Чаты'),
+    (Icons.people_outline_rounded, VibeIconResolver.group, 'Контакты'),
+    (Icons.settings_outlined, VibeIconResolver.settings, 'Настройки'),
+    (VibeIconResolver.user, VibeIconResolver.user, 'Профиль'),
   ];
 
   @override
@@ -626,7 +626,7 @@ class _NavAvatar extends StatelessWidget {
           size: 26,
           emoji: profile?.emoji,
           photo: photo,
-          fallbackIcon: VibeIcons.user,
+          fallbackIcon: VibeIconResolver.user,
         ),
       ),
     );
@@ -710,7 +710,7 @@ class _VibeDrawer extends StatelessWidget {
                 _drawerTile(context, icon: Icons.call_outlined, label: 'Звонки', selected: false, onTap: () { Navigator.pop(context); VibeToast.show(context, 'Звонки — скоро'); }),
                 const Divider(height: 16),
                 _drawerTile(context, icon: Icons.settings_outlined, label: 'Настройки', selected: selectedIndex == 2, onTap: () { Navigator.pop(context); onSelect(2); }),
-                _drawerTile(context, icon: VibeIcons.user, label: 'Профиль', selected: selectedIndex == 3, onTap: () { Navigator.pop(context); onSelect(3); }),
+                _drawerTile(context, icon: VibeIconResolver.user, label: 'Профиль', selected: selectedIndex == 3, onTap: () { Navigator.pop(context); onSelect(3); }),
                 _drawerTile(context, icon: Icons.bookmark_border, label: 'Избранное', selected: false, onTap: () async { Navigator.pop(context); onSelect(0); final id = await VibeBackend.instance.ensureSavedChat(); final chat = await VibeBackend.instance.chatById(id); if (chat != null && context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(chat: chat))); }),
               ],
             ),
