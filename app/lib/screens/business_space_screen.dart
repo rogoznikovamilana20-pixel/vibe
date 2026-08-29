@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
 import '../core/widgets/vibe_top_bar.dart';
+import '../data/backend.dart';
 import '../data/payment/business_crypto_pay.dart';
 import '../data/settings_service.dart';
+import 'business/business_members_screen.dart';
+import 'business/business_metrics_screen.dart';
+import 'business/business_showcases_screen.dart';
+
+Future<String> _ensureBusinessId() async {
+  final uid = VibeBackend.instanceOrNull?.myProfileId ?? Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) throw Exception('Не авторизован');
+  final client = Supabase.instance.client;
+  final existing = await client.from('businesses').select('id').eq('owner_id', uid).limit(1);
+  if (existing.isNotEmpty) return existing.first['id'] as String;
+  final inserted = await client.from('businesses').insert({'owner_id': uid, 'title': 'Мой бизнес'}).select('id').single();
+  return inserted['id'] as String;
+}
 
 /// Бизнес-пространство: витрины, чаты, метрики, команда — отдельно от личных чатов (как TG Business).
 /// Лимиты по тиру: Старт(1/10/1) Микро(1/50/3) Рост(5/500/10) Масштаб(20/5k/50) Энтерпрайз(∞).
@@ -46,26 +61,26 @@ class BusinessSpaceScreen extends StatelessWidget {
             icon: Icons.storefront_rounded,
             title: 'Витрина',
             subtitle: '${limits['showcases']} витрин • ${limits['products']} товаров',
-            onTap: () {},
+            onTap: () async { try { final id = await _ensureBusinessId(); if (!context.mounted) return; Navigator.of(context).push(MaterialPageRoute(builder: (_) => BusinessShowcasesScreen(businessId: id))); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e'))); } },
           ),
           _SectionCard(
             icon: Icons.chat_bubble_rounded,
             title: 'Чаты бизнеса',
             subtitle: '${limits['chats']} чатов/мес',
-            onTap: () {},
+            onTap: () async { try { final id = await _ensureBusinessId(); if (!context.mounted) return; final chats = await VibeBackend.instance.listChats(); if (!context.mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Бизнес $id: ${chats.length} чатов'))); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e'))); } },
           ),
           _SectionCard(
             icon: Icons.bar_chart_rounded,
             title: 'Метрики',
             subtitle: tier == 'start' ? '7 дней' : tier == 'micro' ? '30 дней' : tier == 'growth' ? '90 дней' : '365 дней',
-            onTap: () {},
+            onTap: () async { try { final id = await _ensureBusinessId(); if (!context.mounted) return; Navigator.of(context).push(MaterialPageRoute(builder: (_) => BusinessMetricsScreen(businessId: id))); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e'))); } },
           ),
           _SectionCard(
             icon: Icons.group_rounded,
             title: 'Команда',
             subtitle: '${limits['members']} сотрудников',
             trailing: TextButton(
-              onPressed: () {},
+              onPressed: () async { try { final id = await _ensureBusinessId(); if (!context.mounted) return; Navigator.of(context).push(MaterialPageRoute(builder: (_) => BusinessMembersScreen(businessId: id))); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e'))); } },
               child: const Text('+ Добавить'),
             ),
           ),
@@ -112,11 +127,12 @@ class BusinessSpaceScreen extends StatelessWidget {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Тир Старт')));
                     return;
                   }
-                  // Только крипта: создаём оплату и открываем pay_url
                   bool ok = false;
+                  String bid = 'my_business';
+                  try { bid = await _ensureBusinessId(); } catch (_) {}
                   try {
                     ok = await BusinessCryptoPay.instance.payTier(
-                      businessId: 'my_business', // TODO: real businessId from businesses table
+                      businessId: bid,
                       tier: e.value,
                       getCurrentTier: () => SettingsService.instance.businessTier,
                       onSuccess: (newTier) async => await SettingsService.instance.setBusinessTier(newTier),
@@ -129,7 +145,7 @@ class BusinessSpaceScreen extends StatelessWidget {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не удалось создать оплату')));
                   } else {
                     try {
-                      await BusinessCryptoPay.instance.confirmTestPayment('my_business', e.value);
+                      await BusinessCryptoPay.instance.confirmTestPayment(bid, e.value);
                     } catch (_) {}
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Оплачено ${e.key} (test)')));
