@@ -69,3 +69,17 @@ flutter:
     - family: VibeIcons
       fonts:
         - asset: assets/fonts/vibe_icons.ttf
+
+# Desktop MSIX packaging (Windows) — `dart pub global activate msix && msix:create`
+msix_config:
+  display_name: Vibe
+  publisher_display_name: Vibe Messenger
+  identity_name: com.vibe.messenger
+  msix_version: 1.6.3.0
+  logo_path: assets/icon.png
+  start_menu_icon_path: assets/icon.png
+  tile_icon_path: assets/icon.png
+  icons_background_color: "#0D0A1E"
+  architecture: x64
+  capabilities: internetClient, microphone, webcam
+  languages: ru-ru, en-us

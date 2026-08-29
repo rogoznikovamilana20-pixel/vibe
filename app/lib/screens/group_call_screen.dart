@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/vibe_colors.dart';
 import '../core/theme/vibe_spacing.dart';
@@ -30,10 +32,13 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   String? _error;
   StreamSubscription<LiveKitEvent>? _eventSub;
   late List<VibeProfile> _fallbackParts;
+  bool _blur = false;
+  DateTime? _callStart;
 
   @override
   void initState() {
     super.initState();
+    _callStart = DateTime.now();
     _fallbackParts = List.of(widget.participants);
     if (_fallbackParts.isEmpty) {
       _fallbackParts = [
@@ -187,6 +192,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                               cameraOn: cameraOn,
                               room: _liveKit.room,
                               participant: _liveKit.room?.localParticipant,
+                              blur: _blur,
                             );
                           }
                           final p = remoteParts[i - 1];
@@ -243,10 +249,32 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                     ),
                   ),
                   _CallAction(
+                    icon: _blur ? Icons.blur_on_rounded : Icons.blur_off_rounded,
+                    color: _blur ? VibeColors.primary : Colors.white10,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _blur = !_blur);
+                    },
+                  ),
+                  _CallAction(
                     icon: Icons.call_end_rounded,
                     color: VibeColors.error,
                     onTap: () async {
                       HapticFeedback.mediumImpact();
+                      // Запись метрики длительности звонка
+                      final secs = _callStart != null ? DateTime.now().difference(_callStart!).inSeconds : 0;
+                      try {
+                        if (secs > 5) {
+                          final uid = VibeBackend.instanceOrNull?.myProfileId ?? Supabase.instance.client.auth.currentUser?.id;
+                          if (uid != null) {
+                            final biz = await Supabase.instance.client.from('businesses').select('id').eq('owner_id', uid).limit(1);
+                            if (biz.isNotEmpty) {
+                              final bid = biz.first['id'] as String;
+                              await Supabase.instance.client.from('business_metrics_daily').upsert({'business_id': bid, 'date': DateTime.now().toIso8601String().substring(0,10), 'views': 0, 'clicks': 0, 'orders': 0, 'revenue': 0, 'unique_chats': 1}, onConflict: 'business_id,date');
+                            }
+                          }
+                        }
+                      } catch (_) {}
                       await _liveKit.leaveRoom();
                       if (mounted) Navigator.of(context).maybePop();
                     },
@@ -282,6 +310,7 @@ class _ParticipantTile extends StatelessWidget {
     required this.cameraOn,
     this.room,
     this.participant,
+    this.blur = false,
   });
 
   final String name;
@@ -291,6 +320,7 @@ class _ParticipantTile extends StatelessWidget {
   final bool cameraOn;
   final lk.Room? room;
   final lk.Participant? participant;
+  final bool blur;
 
   @override
   Widget build(BuildContext context) {
@@ -314,7 +344,11 @@ class _ParticipantTile extends StatelessWidget {
                   final pub = tracks.isNotEmpty ? tracks.first : null;
                   final track = pub?.track;
                   if (track is lk.VideoTrack) {
-                    return lk.VideoTrackRenderer(track);
+                    final video = lk.VideoTrackRenderer(track);
+                    if (blur && isLocal) {
+                      return ImageFiltered(imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), child: video);
+                    }
+                    return video;
                   }
                   return Center(
                     child: Column(
