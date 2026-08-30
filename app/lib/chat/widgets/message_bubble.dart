@@ -226,11 +226,13 @@ class _MessageBubbleState extends State<MessageBubble>
     final bottomLeft = widget.isLastInGroup ? (isIncoming ? flat : r) : flat;
     final bottomRight = widget.isLastInGroup ? (isIncoming ? r : flat) : flat;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      transform: Matrix4.translationValues(_dragOffset, 0, 0),
-      curve: Curves.easeOutCubic,
-      child: Stack(
+    return Semantics(
+      label: msg.text.isEmpty ? 'Медиа сообщение' : msg.text,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        transform: Matrix4.translationValues(_dragOffset, 0, 0),
+        curve: Curves.easeOutCubic,
+        child: Stack(
         clipBehavior: Clip.none,
         children: [
           // Reply icon (appears on right swipe)
@@ -377,6 +379,7 @@ class _MessageBubbleState extends State<MessageBubble>
             ),
           ),
         ],
+        ),
       ),
     );
   }
