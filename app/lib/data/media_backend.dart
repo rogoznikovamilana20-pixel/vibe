@@ -29,9 +29,10 @@ mixin MediaBackendMixin {
     final cached = _signedUrls[path];
     if (cached != null && cached.expires.isAfter(DateTime.now())) return cached.url;
 
+    final bucket = path.split('/').first; // avatars|stories|media|messages
     try {
       final res = await VibeBackend.instance._client.functions
-          .invoke('media-sign', body: {'bucket': 'avatars', 'path': path});
+          .invoke('media-sign', body: {'bucket': bucket, 'path': path});
       final data = res.data;
       final url = data is Map<String, dynamic> ? data['url'] as String? : null;
       if (url != null) {
