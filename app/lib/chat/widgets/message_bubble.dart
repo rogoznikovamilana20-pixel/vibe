@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -22,6 +23,7 @@ import '../../data/settings_service.dart';
 import '../../data/translate_service.dart';
 import '../models.dart';
 import 'message_status_tick.dart';
+import 'poll_bubble.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_resolver.dart';
 import '../../core/localization/vibe_localizations.dart';
@@ -384,6 +386,13 @@ class _MessageBubbleState extends State<MessageBubble>
     if (msg.stickerEmoji != null) {
       return _StickerBubble(emoji: msg.stickerEmoji!, incoming: isIncoming);
     }
+    // Опрос (poll) — msg.text = json {question, options}
+    try {
+      final j = jsonDecode(msg.text);
+      if (j is Map<String, dynamic> && j['question'] is String && j['options'] is List) {
+        return PollBubble(question: j['question'] as String, options: List<String>.from(j['options'] as List), incoming: isIncoming);
+      }
+    } catch (_) {}
     if (msg.type == MsgType.photo) {
       return _PhotoBubble(
         msg: msg,

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../core/theme/vibe_spacing.dart';
 import '../core/theme/vibe_theme.dart';
 import '../core/theme/vibe_typography.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../core/widgets/vibe_top_bar.dart';
 import '../data/payment/crypto_gateway.dart';
 
@@ -20,10 +22,24 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   void initState() { super.initState(); _load(); }
   Future<void> _load() async {
-    // Mock: баланс из CryptoGateway (test mode 100 USDT)
-    final bal = CryptoGateway.instance.isTestMode ? 100.0 : 0.0;
+    double bal = CryptoGateway.instance.isTestMode ? 100.0 : 0.0;
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid != null) {
+        final biz = await Supabase.instance.client.from('businesses').select('id').eq('owner_id', uid).limit(1);
+        if (biz.isNotEmpty) {
+          final bid = biz.first['id'] as String;
+          final subs = await Supabase.instance.client.from('business_subscriptions').select('coins_spent').eq('business_id', bid).maybeSingle();
+          final spent = (subs?['coins_spent'] as int?) ?? 0;
+          final addons = await Supabase.instance.client.from('business_addons').select('coins').eq('business_id', bid);
+          final addonCoins = (addons as List).fold<int>(0, (s, r) => s + ((r['coins'] as int?) ?? 0));
+          bal = (100 - spent - addonCoins).clamp(0, 10000).toDouble();
+          // Realtime: слушать изменения
+          Supabase.instance.client.from('business_subscriptions').stream(primaryKey: ['business_id']).eq('business_id', bid).listen((_) { if (mounted) _load(); });
+        }
+      }
+    } catch (_) {}
     if (mounted) setState(()=> _balance = bal);
-    // в live: await Supabase.instance.client.from('business_subscriptions').select('coins_spent')
     if (mounted) setState(()=> _loading = false);
   }
 

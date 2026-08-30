@@ -25,6 +25,8 @@ import 'profile_screen.dart';
 import '../data/settings_service.dart';
 import 'settings_screen.dart';
 import 'incoming_call_screen.dart';
+import 'chat_search_screen.dart';
+import 'new_message_screen.dart';
 import 'package:vibe_app/core/services/back_history_service.dart';
 import 'package:vibe_app/core/widgets/vibe_icon_resolver.dart';
 import 'package:vibe_app/core/widgets/vibe_toast.dart';
@@ -197,6 +199,16 @@ class _RootShellState extends State<RootShell>
     }
   }
 
+  void _openSearch() {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChatSearchScreen(items: [])));
+  }
+
+  void _openNewMessage() {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewMessageScreen()));
+  }
+
   void _onEdgeDragStart(DragStartDetails d) {
     _edgeStartX = d.globalPosition.dx;
   }
@@ -223,48 +235,58 @@ class _RootShellState extends State<RootShell>
         MediaQuery.sizeOf(context).width >= 900;
     if (isDesktop) {
       // TG Desktop референс: левая панель 420 (список чатов) + правая панель чат — без дубль-хедера.
-      return Scaffold(
-        backgroundColor: context.vibeBackground,
-        body: Row(
-          children: [
-            // Левая панель — список чатов (TG Desktop: 420px)
-            SizedBox(
-              width: 420,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: context.vibeSurface,
-                  border: Border(right: BorderSide(color: context.vibeDivider, width: 1)),
+      return CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openSearch,
+          const SingleActivator(LogicalKeyboardKey.keyN, control: true): _openNewMessage,
+          const SingleActivator(LogicalKeyboardKey.escape): () => _openTab(0),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            backgroundColor: context.vibeBackground,
+            body: Row(
+              children: [
+                // Левая панель — список чатов (TG Desktop: 420px)
+                SizedBox(
+                  width: 420,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: context.vibeSurface,
+                      border: Border(right: BorderSide(color: context.vibeDivider, width: 1)),
+                    ),
+                    child: ChatListScreen(
+                      userName: widget.userName,
+                      userEmoji: widget.userEmoji,
+                      onOpenTab: _openTab,
+                      onChatSelected: (chat) => _desktopSelectedChat.value = chat,
+                    ),
+                  ),
                 ),
-                child: ChatListScreen(
-                  userName: widget.userName,
-                  userEmoji: widget.userEmoji,
-                  onOpenTab: _openTab,
-                  onChatSelected: (chat) => _desktopSelectedChat.value = chat,
+                // Правая панель — чат или плейсхолдер (как в TG Desktop)
+                Expanded(
+                  child: ValueListenableBuilder<VibeChat?>(
+                    valueListenable: _desktopSelectedChat,
+                    builder: (context, chat, _) => chat == null
+                        ? _DesktopPlaceholder(userName: widget.userName)
+                        : ChatScreen(
+                            key: ValueKey(chat.id),
+                            chat: chat,
+                          ),
+                  ),
                 ),
-              ),
+              ],
             ),
-            // Правая панель — чат или плейсхолдер (как в TG Desktop)
-            Expanded(
-              child: ValueListenableBuilder<VibeChat?>(
-                valueListenable: _desktopSelectedChat,
-                builder: (context, chat, _) => chat == null
-                    ? _DesktopPlaceholder(userName: widget.userName)
-                    : ChatScreen(
-                        key: ValueKey(chat.id),
-                        chat: chat,
-                      ),
-              ),
-            ),
-          ],
+            drawer: SettingsService.instance.navigationStyle == 'drawer'
+                ? _VibeDrawer(
+                    userName: widget.userName,
+                    userEmoji: widget.userEmoji,
+                    onSelect: _openTab,
+                    selectedIndex: _index,
+                  )
+                : null,
+          ),
         ),
-        drawer: SettingsService.instance.navigationStyle == 'drawer'
-            ? _VibeDrawer(
-                userName: widget.userName,
-                userEmoji: widget.userEmoji,
-                onSelect: _openTab,
-                selectedIndex: _index,
-              )
-            : null,
       );
     }
     return PopScope(
