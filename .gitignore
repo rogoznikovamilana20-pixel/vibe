@@ -12,6 +12,9 @@ app/android/app/build/
 app/app/
 *.apk
 *.aab
+*.jks
+*.keystore
+android/key.properties
 
 # Runtime / generated
 server/pb_data/
