@@ -41,23 +41,25 @@ class VibeGlassSurface extends StatelessWidget {
     final shape = radius != null
         ? BorderRadius.circular(radius!)
         : borderRadius;
-    return Container(
-      decoration: BoxDecoration(
-        color: color ?? context.vibeGlass,
-        borderRadius: shape,
-        border: Border.all(
-          color: borderColor ?? context.vibeGlassBorder,
+    return RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          color: color ?? context.vibeGlass,
+          borderRadius: shape,
+          border: Border.all(
+            color: borderColor ?? context.vibeGlassBorder,
+          ),
+          boxShadow: [context.vibeGlassShadow],
         ),
-        boxShadow: [context.vibeGlassShadow],
-      ),
-      clipBehavior: clipBehavior,
-      child: ClipRRect(
-        borderRadius: shape,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: padding != null
-              ? Padding(padding: padding!, child: child)
-              : child,
+        clipBehavior: clipBehavior,
+        child: ClipRRect(
+          borderRadius: shape,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+            child: padding != null
+                ? Padding(padding: padding!, child: child)
+                : child,
+          ),
         ),
       ),
     );

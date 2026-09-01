@@ -39,6 +39,7 @@ import 'chat_screen.dart';
 import 'create_group_screen.dart';
 import 'folders_screen.dart';
 import 'lock_screen.dart';
+import 'add_contact_screen.dart';
 import 'new_message_screen.dart';
 import 'search_screen.dart';
 import 'settings/privacy/passcode_screen.dart';
@@ -913,6 +914,11 @@ class _ChatListScreenState extends State<ChatListScreen>
         ],
       ),
       actions: [
+        VibeTopBarIcon(
+          icon: Icons.person_add_alt_1_rounded,
+          tooltip: 'Добавить контакт',
+          onTap: () => _openAddContact(context),
+        ),
         if (PasscodeService.instance.hasPasscode)
           VibeTopBarIcon(
             icon: VibeIconResolver.lock,
@@ -1133,6 +1139,13 @@ class _ChatListScreenState extends State<ChatListScreen>
     if (h < 12) return '${l.greetingMorning}, ${widget.userName}';
     if (h < 18) return '${l.greetingDay}, ${widget.userName}';
     return '${l.greetingEvening}, ${widget.userName}';
+  }
+
+  void _openAddContact(BuildContext context) {
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => AddContactScreen(backend: _backend)),
+    );
   }
 
   void _openSearch(BuildContext context) {
