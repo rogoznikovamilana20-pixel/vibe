@@ -226,9 +226,10 @@ class _MessageBubbleState extends State<MessageBubble>
     final bottomLeft = widget.isLastInGroup ? (isIncoming ? flat : r) : flat;
     final bottomRight = widget.isLastInGroup ? (isIncoming ? r : flat) : flat;
 
-    return Semantics(
-      label: msg.text.isEmpty ? 'Медиа сообщение' : msg.text,
-      child: AnimatedContainer(
+    return RepaintBoundary(
+      child: Semantics(
+        label: msg.text.isEmpty ? 'Медиа сообщение' : msg.text,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         transform: Matrix4.translationValues(_dragOffset, 0, 0),
         curve: Curves.easeOutCubic,
@@ -380,8 +381,8 @@ class _MessageBubbleState extends State<MessageBubble>
           ),
         ],
         ),
-      ),
-    );
+       ),
+     ));
   }
 
   Widget _bubbleContent(BuildContext context, ChatMsg msg, bool isIncoming) {
